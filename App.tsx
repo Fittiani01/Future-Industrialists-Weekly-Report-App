@@ -4,7 +4,7 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2 } from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
@@ -52,7 +52,8 @@ export default function App() {
   const bulkImageInputRef = useRef<HTMLInputElement>(null);
   const bulkLogoInputRef = useRef<HTMLInputElement>(null);
   const coverImageRef = useRef<HTMLInputElement>(null);
-  const decorationInputRef = useRef<HTMLInputElement>(null);
+  const decorationInputRef1 = useRef<HTMLInputElement>(null);
+  const decorationInputRef2 = useRef<HTMLInputElement>(null);
   const mainLogoRef = useRef<HTMLInputElement>(null);
   const rightLogoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const partnerRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -203,23 +204,48 @@ export default function App() {
       document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleDecorationUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload handler updated to support specific slots (index 0 or 1)
+  const handleDecorationUpload = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file && report.id) {
           try {
               const url = await uploadReportImage(file, report.id, 'decorations');
+              
+              // Set default visible positions so user sees them immediately
+              // Index 0: Top Left (visible area)
+              // Index 1: Bottom Right (visible area)
+              const defaultX = index === 0 ? 5 : 60; 
+              const defaultY = index === 0 ? 5 : 60;
+
               const newDeco: Decoration = {
-                  id: `deco-${Date.now()}`,
+                  id: `deco-${index}-${Date.now()}`,
                   url,
-                  x: 10, // Default positions
-                  y: 10,
+                  x: defaultX, 
+                  y: defaultY,
                   scale: 1,
                   opacity: 1
               };
-              updateCurrentReport(prev => ({
-                  ...prev,
-                  decorations: [...(prev.decorations || []), newDeco].slice(0, 2) // Max 2
-              }));
+              
+              updateCurrentReport(prev => {
+                  const newDecos = [...(prev.decorations || [])];
+                  // If we have a decoration at this index, replace it. Otherwise add.
+                  // We'll filter existing ones to ensure we don't duplicate logic, 
+                  // but simplest is to just rebuild array ensuring order.
+                  
+                  // Strategy: ensure the array has up to 2 items.
+                  // We map specific uploaded files to specific array slots.
+                  if (index === 0) {
+                      if (newDecos.length > 0) newDecos[0] = newDeco;
+                      else newDecos.push(newDeco);
+                  } else {
+                      // Index 1
+                      if (newDecos.length < 1) newDecos.push({} as any); // Filler if 0 is empty (unlikely but safe)
+                      newDecos[1] = newDeco;
+                  }
+                  
+                  // Clean up empty slots if any
+                  return { ...prev, decorations: newDecos.filter(d => d && d.url) };
+              });
           } catch(e) {
               console.error(e);
               alert("فشل رفع الزخرفة");
@@ -649,9 +675,10 @@ export default function App() {
           {report.coverImage && (
             <div className="print-page w-full h-full p-0 overflow-hidden relative" style={{ height: '297mm', width: '210mm' }}>
                 <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" style={{ objectFit: 'cover' }} />
-                <div className="absolute bottom-[15%] left-0 w-full flex flex-col items-center justify-center z-10 text-white">
-                    <h1 className="text-6xl font-extrabold mb-4 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-wide text-center" style={{textShadow: '2px 2px 8px black'}}>{report.header.weekTitle}</h1>
-                    <p className="text-3xl font-bold dir-ltr drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-95 text-center" style={{textShadow: '2px 2px 4px black'}}>{report.header.dateRange}</p>
+                <div className="absolute bottom-[8%] left-0 w-full flex flex-col items-center justify-center z-10 text-white px-8">
+                    <h1 className="text-3xl font-extrabold mb-1 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] tracking-wide text-center" style={{textShadow: '1px 1px 4px black'}}>{report.header.weekTitle}</h1>
+                    <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
+                    <p className="text-xl font-bold dir-ltr drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-95 text-center" style={{textShadow: '1px 1px 3px black'}}>{report.header.dateRange}</p>
                 </div>
             </div>
           )}
@@ -762,13 +789,26 @@ export default function App() {
                     </div>
                     <div>
                         <div className="flex items-center gap-2 mb-3 text-brand-dark"><Move className="text-purple-500" /><h2 className="font-bold text-lg">0.1 زخارف حرة (Free SVG)</h2></div>
-                        <div className="flex gap-4 items-center">
-                            <input type="file" ref={decorationInputRef} accept="image/*,.svg" onChange={handleDecorationUpload} className="hidden" />
-                            <button onClick={() => decorationInputRef.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-purple-50" disabled={(report.decorations?.length || 0) >= 2}>
-                                <Plus size={16} /> إضافة زخرفة ({report.decorations?.length || 0}/2)
-                            </button>
-                            <span className="text-xs text-gray-500">ارفع ملف SVG أو صورة، ثم حركها بالفأرة</span>
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* Decoration 1 Button */}
+                            <div className="flex flex-col gap-1">
+                                <input type="file" ref={decorationInputRef1} accept="image/*,.svg" onChange={handleDecorationUpload(0)} className="hidden" />
+                                <button onClick={() => decorationInputRef1.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50">
+                                    <Plus size={16} /> زخرفة 1
+                                </button>
+                                {report.decorations?.[0] && <span className="text-[10px] text-green-600 text-center">موجودة</span>}
+                            </div>
+                            
+                            {/* Decoration 2 Button */}
+                            <div className="flex flex-col gap-1">
+                                <input type="file" ref={decorationInputRef2} accept="image/*,.svg" onChange={handleDecorationUpload(1)} className="hidden" />
+                                <button onClick={() => decorationInputRef2.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50">
+                                    <Plus size={16} /> زخرفة 2
+                                </button>
+                                {report.decorations?.[1] && <span className="text-[10px] text-green-600 text-center">موجودة</span>}
+                            </div>
                         </div>
+                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1"><MousePointer2 size={12}/> <span>حرك الزخرفة بالفأرة وضعها في المكان المناسب</span></div>
                     </div>
                 </div>
 
