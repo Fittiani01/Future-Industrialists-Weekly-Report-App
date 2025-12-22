@@ -545,19 +545,6 @@ export default function App() {
       </header>
   );
 
-  const ReportTitleBlock = () => (
-    <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-6 shadow-sm">
-        <div className="text-right">
-            <h1 className="text-2xl font-bold mb-1">التقرير الأسبوعي</h1>
-            <p className="text-indigo-100 text-sm">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
-        </div>
-        <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm">
-            <h2 className="text-lg font-bold">{report.header.weekTitle}</h2>
-            <p className="text-sm dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
-        </div>
-    </div>
-  );
-
   const ReportFooterContent = () => (
       <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
@@ -638,7 +625,7 @@ export default function App() {
                    </div>
                </div>
                
-               <div className="flex-grow flex flex-col justify-start pt-4">
+               <div className="flex-grow flex flex-col justify-center py-4">
                     <StatisticsSection 
                         stats={report.stats} 
                         categoryLogos={report.logos.categories}
@@ -669,49 +656,63 @@ export default function App() {
       {/* Screen Container */}
       <div className="screen-only-container max-w-[210mm] mx-auto mt-8 bg-white shadow-2xl min-h-[297mm] h-auto p-8 md:p-12 relative flex flex-col z-10 rounded-[2.5rem] overflow-hidden">
         
-        {/* --- ADMIN CONTROL STRIP --- */}
-        {isAdmin && (
-            <div className="no-print mb-8 bg-gray-50 rounded-xl p-3 border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 shadow-inner">
-                <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
-                    {reports.map((r: WeeklyReport, idx) => (
-                        <button
-                            key={r.id}
-                            onClick={() => setCurrentReportIndex(idx)}
-                            className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
-                        >
-                            {r.header.weekTitle}
-                        </button>
-                    ))}
-                    <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-200"><Plus size={18} /></button>
-                </div>
-
-                <div className="flex items-center gap-3 flex-shrink-0">
-                    <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700 text-xs font-bold shadow-sm transition-colors"><Printer size={14} /> PDF</button>
-                    
-                    <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                    
-                    <button 
-                        onClick={() => setIsEditing(!isEditing)} 
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-200 text-gray-700'}`}
+        {/* --- NAVIGATION & CONTROL BAR (VISIBLE TO ALL) --- */}
+        <div className="no-print mb-8 bg-gray-50 rounded-xl p-3 border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 shadow-inner">
+            
+            {/* Week Selector - Accessible to Everyone */}
+            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
+                {reports.map((r: WeeklyReport, idx) => (
+                    <button
+                        key={r.id}
+                        onClick={() => setCurrentReportIndex(idx)}
+                        className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
                     >
-                        {isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}
+                        {r.header.weekTitle}
                     </button>
-
-                    <button 
-                        onClick={saveReportToFirestore} 
-                        disabled={!isDirty || saving}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${
-                            isDirty 
-                            ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' 
-                            : 'bg-gray-200 text-gray-400'
-                        }`}
-                    >
-                        {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                        {saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "تم الحفظ"}
+                ))}
+                {/* Admin Only: Add New Report */}
+                {isAdmin && (
+                    <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-200" title="إضافة تقرير جديد">
+                        <Plus size={18} />
                     </button>
-                </div>
+                )}
             </div>
-        )}
+
+            {/* Actions Area */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+                {/* Print Button - Accessible to Everyone */}
+                <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700 text-xs font-bold shadow-sm transition-colors">
+                    <Printer size={14} /> طباعة PDF
+                </button>
+                
+                {/* Admin Only Actions */}
+                {isAdmin && (
+                    <>
+                        <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                        
+                        <button 
+                            onClick={() => setIsEditing(!isEditing)} 
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-200 text-gray-700'}`}
+                        >
+                            {isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}
+                        </button>
+
+                        <button 
+                            onClick={saveReportToFirestore} 
+                            disabled={!isDirty || saving}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${
+                                isDirty 
+                                ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' 
+                                : 'bg-gray-200 text-gray-400'
+                            }`}
+                        >
+                            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                            {saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "تم الحفظ"}
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
 
         {/* --- SMART IMPORT AREA (Admin Only) --- */}
         {isEditing && isAdmin && (
@@ -839,46 +840,52 @@ export default function App() {
             />
         </div>
 
-        {/* --- REPORT FOOTER (Screen Only, uses same component structure) --- */}
+        {/* --- REPORT FOOTER (Screen Only - Updated) --- */}
         <div className="mt-8 pt-4 border-t border-gray-200 relative pb-4">
              <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
-             <div className="flex flex-wrap justify-center items-start gap-x-8 gap-y-8 px-4 relative z-10">
+             <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-8 px-4 relative z-10">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
-                    <div key={partner.id} className="relative flex flex-col items-center gap-2 group/partner">
-                        <div 
-                           className={`relative ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`}
-                           onClick={() => isEditing && partnerRefs.current[idx]?.click()}
-                        >
-                            <img 
-                                src={partner.url} 
-                                style={{ height: `${48 * partner.scale}px`, width: 'auto' }}
-                                className="object-contain transition-all duration-200" 
-                                alt="" 
-                            />
-                             <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
-                        </div>
-                        
-                        {/* Precision Zoom Controls (Only in Screen Mode) */}
-                        {isEditing && (
-                            <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} 
-                                    className="p-1 hover:bg-gray-100 text-brand-primary rounded"
-                                    title="تكبير"
-                                >
-                                    <Plus size={12} />
-                                </button>
-                                <div className="w-px h-3 bg-gray-300"></div>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} 
-                                    className="p-1 hover:bg-gray-100 text-brand-primary rounded"
-                                    title="تصغير"
-                                >
-                                    <Minus size={12} />
-                                </button>
+                    <React.Fragment key={partner.id}>
+                        <div className="relative flex flex-col items-center gap-2 group/partner">
+                            <div 
+                            className={`relative ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`}
+                            onClick={() => isEditing && partnerRefs.current[idx]?.click()}
+                            >
+                                <img 
+                                    src={partner.url} 
+                                    style={{ height: `${48 * partner.scale}px`, width: 'auto' }}
+                                    className="object-contain transition-all duration-200" 
+                                    alt="" 
+                                />
+                                <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
                             </div>
+                            
+                            {/* Precision Zoom Controls (Only in Screen Mode) */}
+                            {isEditing && (
+                                <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} 
+                                        className="p-1 hover:bg-gray-100 text-brand-primary rounded"
+                                        title="تكبير"
+                                    >
+                                        <Plus size={12} />
+                                    </button>
+                                    <div className="w-px h-3 bg-gray-300"></div>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} 
+                                        className="p-1 hover:bg-gray-100 text-brand-primary rounded"
+                                        title="تصغير"
+                                    >
+                                        <Minus size={12} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        {/* Gray Vertical Separator (Only between items, not after the last one) */}
+                        {idx < report.logos.partners.length - 1 && (
+                            <div className="h-10 w-px bg-gray-200 mx-2 hidden md:block"></div>
                         )}
-                    </div>
+                    </React.Fragment>
                 ))}
             </div>
             

@@ -56,8 +56,8 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   return (
     <div className="mb-8 print:mb-0 break-inside-avoid relative shadow-lg rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent">
       
-      {/* Header Bar - Updated for Print Compactness */}
-      <div className="bg-brand-dark text-white p-3 print:py-1.5 print:px-3 flex flex-col md:flex-row print:flex-row items-stretch md:items-center justify-between gap-3 relative rounded-t-xl print:rounded-md">
+      {/* Header Bar - Optimized Alignment & Larger Print Fonts */}
+      <div className="bg-brand-dark text-white p-3 print:py-2 print:px-3 flex flex-col md:flex-row print:flex-row items-center justify-between gap-3 relative rounded-t-xl print:rounded-lg">
          {isEditing && (
             <button 
                 onClick={() => onDelete(visit.id)}
@@ -70,11 +70,12 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
         
         {/* Right Section: School & Factory */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="bg-white/10 p-2 print:p-1 rounded-lg flex-shrink-0">
-            <Building2 className="w-5 h-5 print:w-3.5 print:h-3.5 text-white" />
+          {/* School Icon - Fixed Alignment */}
+          <div className="bg-white/10 w-10 h-10 print:w-9 print:h-9 flex items-center justify-center rounded-lg flex-shrink-0">
+            <Building2 className="w-6 h-6 print:w-5 print:h-5 text-white" />
           </div>
           
-          <div className="flex flex-col w-full min-w-0">
+          <div className="flex flex-col w-full min-w-0 justify-center">
             {/* School Name */}
             <div className="mb-0.5">
                  {isEditing ? (
@@ -86,13 +87,13 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                         placeholder="اسم المدرسة..."
                     />
                 ) : (
-                    <h3 className="text-lg print:text-sm font-bold leading-tight truncate">{visit.schoolName}</h3>
+                    <h3 className="text-lg print:text-base font-bold leading-tight truncate">{visit.schoolName}</h3>
                 )}
             </div>
 
-            {/* Factory Name */}
+            {/* Factory Name - Increased Print Size */}
             <div className="flex items-center gap-1.5 text-indigo-200">
-                 <Factory size={14} />
+                 <Factory size={14} className="print:w-4 print:h-4" />
                  {isEditing ? (
                     <input 
                         type="text" 
@@ -102,17 +103,17 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                         placeholder="اسم المصنع..."
                     />
                 ) : (
-                    <span className="text-sm print:text-[10px] font-medium truncate">{visit.factory}</span>
+                    <span className="text-sm print:text-sm font-bold truncate text-indigo-100">{visit.factory}</span>
                 )}
             </div>
           </div>
         </div>
 
         {/* Left Section: Stats & Logo */}
-        <div className="flex items-center gap-4 print:gap-2 self-end md:self-center flex-shrink-0">
+        <div className="flex items-center gap-4 print:gap-3 self-end md:self-center flex-shrink-0">
             
-            {/* Stats */}
-            <div className="flex flex-col items-end gap-0.5 px-2 border-r border-indigo-400/30">
+            {/* Stats - Increased Print Size */}
+            <div className="flex flex-col items-end justify-center gap-0.5 px-2 border-r border-indigo-400/30 h-full">
                 {/* Date */}
                 <div className="flex items-center gap-1.5 text-indigo-100">
                     {isEditing ? (
@@ -123,14 +124,14 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                             className="bg-white/10 text-white w-24 px-1 py-0.5 rounded text-center focus:outline-none focus:bg-white/20 text-xs"
                         />
                     ) : (
-                        <span className="font-mono dir-ltr text-sm print:text-[9px] font-medium">{visit.date}</span>
+                        <span className="font-mono dir-ltr text-sm print:text-xs font-bold">{visit.date}</span>
                     )}
-                    <Calendar size={14} />
+                    <Calendar size={14} className="print:w-4 print:h-4" />
                 </div>
                 
                 {/* Participants */}
                 <div className="flex items-center gap-1.5">
-                     <span className="text-[10px] text-indigo-200 print:text-[8px]">مشارك</span>
+                     <span className="text-[10px] text-indigo-200 print:text-[10px] font-medium">مشارك</span>
                      {isEditing ? (
                         <input 
                             type="number" 
@@ -139,21 +140,21 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                             className="bg-white/10 text-white w-12 px-1 py-0.5 rounded text-center focus:outline-none focus:bg-white/20 font-bold text-sm"
                         />
                     ) : (
-                        <span className="text-lg print:text-sm font-bold leading-none">{visit.participants}</span>
+                        <span className="text-lg print:text-base font-bold leading-none">{visit.participants}</span>
                     )}
-                     <Users size={16} />
+                     <Users size={16} className="print:w-4 print:h-4" />
                 </div>
             </div>
 
             {/* Factory Logo */}
             <div 
-                className={`w-14 h-14 print:w-10 print:h-10 bg-white rounded-lg p-1 flex items-center justify-center relative group overflow-hidden shadow-sm ${isEditing ? 'cursor-pointer hover:ring-2 ring-indigo-400' : ''}`}
+                className={`w-14 h-14 print:w-12 print:h-12 bg-white rounded-lg p-1 flex items-center justify-center relative group overflow-hidden shadow-sm ${isEditing ? 'cursor-pointer hover:ring-2 ring-indigo-400' : ''}`}
                 onClick={() => isEditing && logoInputRef.current?.click()}
             >
                 {visit.factoryLogo ? (
                     <img src={visit.factoryLogo} alt={visit.factory} className="w-full h-full object-contain" />
                 ) : (
-                    <Factory className="text-gray-300" size={20} />
+                    <Factory className="text-gray-300" size={24} />
                 )}
                 <input 
                     type="file" 
@@ -167,9 +168,8 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
         </div>
       </div>
 
-      {/* Content Area - Images (Horizontal Row in Print) */}
+      {/* Content Area - Images */}
       <div className="p-3 print:p-0 print:pt-1 bg-gray-50/50 print:bg-transparent">
-        {/* Screen: Grid 2x2 or 4x1. Print: Strictly 4 columns (1 row) */}
         <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-3 print:gap-1.5">
             {[0, 1, 2, 3].map((idx) => (
                 <div 
