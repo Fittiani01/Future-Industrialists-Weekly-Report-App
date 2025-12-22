@@ -212,16 +212,16 @@ export default function App() {
               const url = await uploadReportImage(file, report.id, 'decorations');
               
               // Spawning Logic:
-              // Make sure they spawn in a visible area initially
-              const defaultX = index === 0 ? 10 : 50; 
-              const defaultY = index === 0 ? 10 : 50;
+              // Make sure they spawn centrally so they aren't hidden
+              const defaultX = index === 0 ? 10 : 60; 
+              const defaultY = 30; // 30% down the page (safe zone)
 
               const newDeco: Decoration = {
                   id: `deco-${index}-${Date.now()}`,
                   url,
                   x: defaultX, 
                   y: defaultY,
-                  scale: 1,
+                  scale: 1.5, // Start slightly bigger
                   opacity: 1
               };
               
@@ -629,9 +629,9 @@ export default function App() {
 
   const DecorationLayer = ({ isPrint = false }) => (
       // Z-Index Logic:
-      // If Editing and NOT printing: z-[999] (Front of everything to be clickable)
+      // If Editing and NOT printing: z-[1000] (Front of everything to be clickable)
       // If Printing or Viewing: z-[2] (Behind text, but above background)
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[999]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[1000]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}

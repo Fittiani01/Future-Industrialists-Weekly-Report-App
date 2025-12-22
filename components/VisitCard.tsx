@@ -53,11 +53,11 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   const headerColor = isGirls ? "#867bba" : "#2b3592";
 
   return (
-    <div className="mb-6 break-inside-avoid relative shadow-md rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent print:mb-3">
+    <div className="mb-6 break-inside-avoid relative shadow-md rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent print:mb-4">
       
-      {/* Header Bar - New Grid Layout for Better Mobile Alignment */}
+      {/* Header Bar - Completely Redesigned for Pro Look */}
       <div 
-        className="text-white p-3 print:py-2 print:px-3 relative rounded-t-xl print:rounded-lg transition-colors duration-300"
+        className="text-white p-4 print:p-3 relative rounded-t-xl print:rounded-lg transition-colors duration-300"
         style={{ backgroundColor: headerColor }}
       >
          {isEditing && (
@@ -70,63 +70,97 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
             </button>
         )}
         
-        <div className="flex flex-row items-start justify-between gap-3">
+        {/* Main Flex Container */}
+        <div className="flex flex-row items-stretch justify-between gap-4">
             
-            {/* Right Side: School & Factory Info */}
-            <div className="flex flex-col gap-2 flex-1 min-w-0">
+            {/* RIGHT: Text Info (School & Factory Name) */}
+            <div className="flex flex-col justify-center gap-2 flex-grow min-w-0 pr-1">
                 {/* School */}
                 <div className="flex items-center gap-2">
-                    <div className="bg-white/10 w-8 h-8 print:w-6 print:h-6 flex items-center justify-center rounded-lg flex-shrink-0">
-                        <Building2 className="w-4 h-4 text-white" />
+                    <div className="bg-white/20 p-1.5 rounded-lg flex-shrink-0">
+                        <Building2 className="w-5 h-5 text-white" />
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="w-full">
                         {isEditing ? (
                             <input 
                                 type="text" 
                                 value={visit.schoolName}
                                 onChange={(e) => onUpdate(visit.id, { schoolName: e.target.value })}
-                                className="bg-transparent border-b border-white/30 text-white px-0 py-0.5 placeholder-indigo-200 w-full focus:outline-none focus:border-white transition-colors text-base font-bold"
+                                className="bg-transparent border-b border-white/30 text-white w-full focus:outline-none focus:border-white font-bold text-lg placeholder-indigo-200"
                                 placeholder="اسم المدرسة..."
                             />
                         ) : (
-                            <h3 className="text-base print:text-sm font-bold leading-tight truncate">{visit.schoolName}</h3>
+                            <h3 className="text-xl print:text-lg font-bold leading-tight truncate">{visit.schoolName}</h3>
                         )}
                     </div>
                 </div>
 
-                {/* Factory */}
+                {/* Factory Name */}
                 <div className="flex items-center gap-2">
-                    <div className="bg-white/5 w-8 h-8 print:w-6 print:h-6 flex items-center justify-center rounded-lg flex-shrink-0">
-                        <Factory className="w-4 h-4 text-indigo-100" />
+                    <div className="bg-white/10 p-1.5 rounded-lg flex-shrink-0">
+                        <Factory className="w-5 h-5 text-indigo-100" />
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="w-full">
                         {isEditing ? (
                             <input 
                                 type="text" 
                                 value={visit.factory}
                                 onChange={(e) => onUpdate(visit.id, { factory: e.target.value })}
-                                className="bg-transparent border-b border-white/20 text-indigo-50 px-0 py-0 placeholder-indigo-300/70 w-full focus:outline-none focus:border-indigo-200 transition-colors text-xs font-medium"
+                                className="bg-transparent border-b border-white/20 text-indigo-50 w-full focus:outline-none focus:border-indigo-200 font-bold text-base placeholder-indigo-300"
                                 placeholder="اسم المصنع..."
                             />
                         ) : (
-                            <h4 className="text-sm print:text-xs font-medium truncate text-indigo-100">{visit.factory}</h4>
+                            <h4 className="text-lg print:text-base font-bold text-indigo-50 truncate">{visit.factory}</h4>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Left Side: Logo & Stats Stacked */}
-            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            {/* CENTER: Stats (Date & Participants) - Next to Logo */}
+            <div className="flex flex-col justify-center items-end gap-2 pl-2 border-l border-white/10 print:border-none">
+                <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-md min-w-[110px] justify-end">
+                     {isEditing ? (
+                        <input 
+                            type="text" 
+                            value={visit.date}
+                            onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
+                            className="bg-transparent text-white w-24 text-right focus:outline-none font-bold text-sm"
+                        />
+                    ) : (
+                        <span className="font-bold text-sm dir-ltr">{visit.date}</span>
+                    )}
+                    <Calendar size={16} className="text-indigo-200" />
+                </div>
                 
-                {/* Logo */}
-                <div 
-                    className={`w-12 h-12 print:w-10 print:h-10 bg-white rounded-lg p-1 flex items-center justify-center relative group overflow-hidden shadow-sm ${isEditing ? 'cursor-pointer hover:ring-2 ring-indigo-300' : ''}`}
+                <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-md min-w-[110px] justify-end">
+                    {isEditing ? (
+                            <input 
+                            type="number" 
+                            value={visit.participants}
+                            onChange={(e) => onUpdate(visit.id, { participants: parseInt(e.target.value) || 0 })}
+                            className="bg-transparent text-white w-12 text-right focus:outline-none font-bold text-sm"
+                        />
+                    ) : (
+                        <span className="font-bold text-sm">{visit.participants}</span>
+                    )}
+                    <span className="text-xs text-indigo-200 font-normal">مشارك</span>
+                    <Users size={16} className="text-indigo-200" />
+                </div>
+            </div>
+
+            {/* LEFT: Big Factory Logo */}
+            <div className="flex-shrink-0 flex items-center">
+                 <div 
+                    className={`w-24 h-24 print:w-20 print:h-20 bg-white rounded-xl p-1.5 flex items-center justify-center relative shadow-lg overflow-hidden ${isEditing ? 'cursor-pointer hover:ring-4 ring-indigo-300' : ''}`}
                     onClick={() => isEditing && logoInputRef.current?.click()}
                 >
                     {visit.factoryLogo ? (
                         <img src={visit.factoryLogo} alt={visit.factory} className="w-full h-full object-contain" />
                     ) : (
-                        <Factory className="text-gray-300" size={20} />
+                        <div className="flex flex-col items-center justify-center text-gray-300">
+                             <Factory size={32} />
+                             <span className="text-[10px] text-center mt-1">شعار المصنع</span>
+                        </div>
                     )}
                     <input 
                         type="file" 
@@ -136,39 +170,8 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                         onChange={handleLogoUpload}
                     />
                 </div>
-
-                {/* Stats (Compact) */}
-                <div className="flex flex-col items-end gap-0.5">
-                     <div className="flex items-center gap-1 text-indigo-50 text-[10px] print:text-[9px]">
-                        {isEditing ? (
-                            <input 
-                                type="text" 
-                                value={visit.date}
-                                onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
-                                className="bg-white/10 text-white w-20 px-1 rounded text-center focus:outline-none text-[10px]"
-                            />
-                        ) : (
-                            <span className="font-mono dir-ltr opacity-90">{visit.date}</span>
-                        )}
-                        <Calendar size={10} />
-                    </div>
-                    <div className="flex items-center gap-1 text-white text-xs print:text-[10px] font-bold">
-                        {isEditing ? (
-                             <input 
-                                type="number" 
-                                value={visit.participants}
-                                onChange={(e) => onUpdate(visit.id, { participants: parseInt(e.target.value) || 0 })}
-                                className="bg-white/10 text-white w-10 px-1 rounded text-center focus:outline-none font-bold"
-                            />
-                        ) : (
-                            <span>{visit.participants}</span>
-                        )}
-                        <span className="text-[10px] font-normal opacity-80">مشارك</span>
-                        <Users size={10} />
-                    </div>
-                </div>
-
             </div>
+
         </div>
       </div>
 
