@@ -122,12 +122,10 @@ export default function App() {
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
             } else {
-                // If no reports in DB, start with Initial but assign a new ID
                 setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`}]);
             }
         } catch (error) {
             console.error("Error fetching reports:", error);
-            // Fallback for offline or error
             setReports([INITIAL_REPORT]);
         } finally {
             setLoading(false);
@@ -145,10 +143,8 @@ export default function App() {
     setSaving(true);
     try {
         const reportId = report.id || `week-${Date.now()}`;
-        // Ensure ID is set
         const reportToSave = { ...report, id: reportId };
         
-        // If it's a new doc creation that wasn't in list
         if (!report.createdAt) {
              reportToSave.createdAt = serverTimestamp();
         }
@@ -156,7 +152,6 @@ export default function App() {
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
         
         setIsDirty(false);
-        // Update local state id if it was missing
         if (!report.id) {
             updateCurrentReport({ id: reportId });
         }
@@ -168,7 +163,6 @@ export default function App() {
     }
   };
 
-  // Helper to update state and mark as dirty
   const updateCurrentReport = (newData: Partial<WeeklyReport> | ((prev: WeeklyReport) => WeeklyReport)) => {
       setReports(prevReports => {
           const newReports = [...prevReports];
@@ -196,12 +190,12 @@ export default function App() {
           ...INITIAL_REPORT,
           id: newId,
           header: { ...INITIAL_REPORT.header, weekTitle: `الأسبوع ${nextWeekNum}` },
-          logos: report.logos, // Inherit logos from current
+          logos: report.logos, 
           visits: [],
-          createdAt: serverTimestamp() // Will be set on save
+          createdAt: serverTimestamp() 
       };
       
-      setReports(prev => [newReport, ...prev]); // Add to top
+      setReports(prev => [newReport, ...prev]); 
       setCurrentReportIndex(0);
       setIsDirty(true);
   };
@@ -349,8 +343,7 @@ export default function App() {
       setRawText(""); 
     } catch (error: any) { 
         console.error(error);
-        // Show specific error message
-        alert(`حدث خطأ أثناء المعالجة: ${error.message || "تأكد من إعداد مفتاح API بشكل صحيح"}`); 
+        alert(`حدث خطأ أثناء المعالجة: ${error.message}`); 
     } finally { 
         setIsParsing(false); 
     }
@@ -384,7 +377,7 @@ export default function App() {
         updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
         setImageMatchStatus(`تم مطابقة ورفع ${matchCount} صورة بنجاح!`);
       } catch (error: any) { 
-          setImageMatchStatus(`فشل التوزيع: ${error.message || "خطأ غير معروف"}`); 
+          setImageMatchStatus(`فشل التوزيع: ${error.message}`); 
       } finally {
           setIsAnalyzingImages(false);
           if (bulkImageInputRef.current) bulkImageInputRef.current.value = "";
@@ -407,12 +400,9 @@ export default function App() {
         for (const file of files) {
             const matchedVisitIds = mapping[file.name];
             if (matchedVisitIds && matchedVisitIds.length > 0) {
-                // Upload once, assign to all matches
-                // Use the first matched visit ID to structure the path in Firebase
                 const primaryVisitId = matchedVisitIds[0];
                 try {
                     const url = await uploadReportImage(file, report.id, primaryVisitId);
-                    
                     matchedVisitIds.forEach(id => {
                         const visit = visitMap.get(id);
                         if (visit) {
@@ -560,7 +550,7 @@ export default function App() {
                         {imageMatchStatus && <div className="mt-2 p-1 text-xs text-center text-teal-700">{imageMatchStatus}</div>}
                     </div>
                     <div>
-                        {/* THIS IS THE BUTTON YOU WERE MISSING - Ensuring visibility */}
+                        {/* THIS IS THE BUTTON FOR FACTORY LOGOS */}
                         <input type="file" multiple accept="image/*" ref={bulkLogoInputRef} onChange={handleBulkFactoryLogoUpload} className="hidden" />
                         <button onClick={() => bulkLogoInputRef.current?.click()} disabled={isAnalyzingLogos} className="w-full border-2 border-dashed border-purple-300 bg-purple-50 text-purple-700 py-4 rounded-lg flex flex-col items-center justify-center hover:bg-purple-100 transition-colors">
                             {isAnalyzingLogos ? <Loader2 className="animate-spin" /> : <Factory size={24} />}
@@ -654,35 +644,39 @@ export default function App() {
             <div className="absolute bottom-0 right-0 w-32 h-24 overflow-hidden pointer-events-none z-0"><ConstellationCorner className="w-full h-full" /></div>
             <div className="absolute bottom-0 left-0 w-32 h-24 overflow-hidden pointer-events-none z-0"><ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} /></div>
             <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
-            <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6 px-4 relative z-10">
+            <div className="flex flex-wrap justify-center items-start gap-x-8 gap-y-8 px-4 relative z-10">
                 {report.logos.partners.map((partner, idx) => (
-                    <div key={partner.id} className="relative flex flex-col items-center group/partner">
-                        <img 
-                            src={partner.url} 
-                            style={{ height: `${48 * partner.scale}px`, width: 'auto' }}
-                            className={`object-contain transition-all duration-200 ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`} 
-                            alt="" 
-                            onClick={() => isEditing && partnerRefs.current[idx]?.click()}
-                        />
-                        <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
+                    <div key={partner.id} className="relative flex flex-col items-center gap-2 group/partner">
+                        <div 
+                           className={`relative ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`}
+                           onClick={() => isEditing && partnerRefs.current[idx]?.click()}
+                        >
+                            <img 
+                                src={partner.url} 
+                                style={{ height: `${48 * partner.scale}px`, width: 'auto' }}
+                                className="object-contain transition-all duration-200" 
+                                alt="" 
+                            />
+                             <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
+                        </div>
                         
-                        {/* New Precision Zoom Controls - Replaces Slider */}
+                        {/* New Precision Zoom Controls - ALWAYS VISIBLE IN EDIT MODE AND BELOW IMAGE */}
                         {isEditing && (
-                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white shadow-md rounded-full border border-gray-200 p-1 flex items-center gap-1 z-20 no-print opacity-0 group-hover/partner:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} 
-                                    className="p-1 hover:bg-gray-100 rounded-full text-brand-primary"
+                                    className="p-1 hover:bg-gray-100 text-brand-primary rounded"
                                     title="تكبير"
                                 >
-                                    <ZoomInIcon size={14} />
+                                    <Plus size={12} />
                                 </button>
                                 <div className="w-px h-3 bg-gray-300"></div>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} 
-                                    className="p-1 hover:bg-gray-100 rounded-full text-brand-primary"
+                                    className="p-1 hover:bg-gray-100 text-brand-primary rounded"
                                     title="تصغير"
                                 >
-                                    <ZoomOutIcon size={14} />
+                                    <Minus size={12} />
                                 </button>
                             </div>
                         )}

@@ -6,8 +6,6 @@ if (!process.env.API_KEY) {
 }
 
 const getAIClient = () => {
-    // Basic check to prevent runtime crash if process is not defined in some envs, 
-    // although strictly per instructions we expect it to work.
     let apiKey = '';
     try {
         apiKey = process.env.API_KEY || '';
@@ -16,7 +14,7 @@ const getAIClient = () => {
     }
     
     if (!apiKey) {
-        throw new Error("API Key is missing. Ensure process.env.API_KEY is set.");
+        throw new Error("مفتاح API غير موجود. يرجى التأكد من إضافة API_KEY في إعدادات البيئة (Environment Variables) في Vercel.");
     }
     return new GoogleGenAI({ apiKey });
 };
@@ -74,7 +72,7 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
     });
 
     const responseText = response.text;
-    if (!responseText) throw new Error("No response from AI");
+    if (!responseText) throw new Error("لم يتم استلام رد من الذكاء الاصطناعي");
 
     return JSON.parse(cleanJson(responseText));
   } catch (error) {
