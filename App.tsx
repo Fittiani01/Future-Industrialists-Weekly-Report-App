@@ -68,14 +68,14 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   
-  // Admin Mode State
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  // Admin Mode State - Default to TRUE as requested
+  const [isAdmin, setIsAdmin] = useState(true);
+  const [isEditing, setIsEditing] = useState(true);
 
   // Parsing & AI State
   const [rawText, setRawText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
-  const [parseError, setParseError] = useState<string | null>(null); // New state for inline errors
+  const [parseError, setParseError] = useState<string | null>(null); 
   
   const [isAnalyzingImages, setIsAnalyzingImages] = useState(false);
   const [isAnalyzingLogos, setIsAnalyzingLogos] = useState(false);
@@ -93,10 +93,17 @@ export default function App() {
 
   // 1. Initial Load from Firebase
   useEffect(() => {
+    // Check URL override, but default to true if not present
     const params = new URLSearchParams(window.location.search);
-    const adminMode = params.get('mode') === 'admin';
-    setIsAdmin(adminMode);
-    if (adminMode) setIsEditing(true);
+    if (params.has('mode')) {
+        const adminMode = params.get('mode') === 'admin';
+        setIsAdmin(adminMode);
+        setIsEditing(adminMode);
+    } else {
+        // Default behavior: Admin Mode ON
+        setIsAdmin(true);
+        setIsEditing(true);
+    }
 
     const fetchReports = async () => {
         setLoading(true);
@@ -147,7 +154,7 @@ export default function App() {
         }
     } catch (error) {
         console.error("Error saving report:", error);
-        // Silent fail or subtle indicator handled by 'saving' state returning false
+        alert("فشل الحفظ. تأكد من الاتصال بالإنترنت.");
     } finally {
         setSaving(false);
     }
@@ -193,7 +200,7 @@ export default function App() {
   const handleDeleteCurrentReport = async () => {
       if (!isAdmin) return;
       if (reports.length <= 1) {
-          alert("لا يمكن حذف التقرير الأخير."); // Keeping this simple alert as it is a critical destructive action
+          alert("لا يمكن حذف التقرير الأخير.");
           return;
       }
       if (window.confirm("هل أنت متأكد من حذف هذا التقرير نهائياً من قاعدة البيانات؟")) {
@@ -254,7 +261,10 @@ export default function App() {
           try {
               const url = await uploadReportImage(file, report.id, visitId);
               urls.push(url);
-          } catch(e) { console.error(e); }
+          } catch(e) { 
+              console.error(e); 
+              alert(`فشل رفع الصورة ${file.name}`);
+          }
       }
       setIsDirty(true);
       return urls;
@@ -296,7 +306,7 @@ export default function App() {
       });
   };
 
-  // --- AI & Bulk Ops ---
+  // --- AI & Bulk Ops (UPDATED TO USE INDEX MATCHING) ---
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -321,7 +331,7 @@ export default function App() {
   const handleSmartParse = async () => {
     if (!rawText.trim()) return;
     setIsParsing(true);
-    setParseError(null); // Clear previous errors
+    setParseError(null); 
     
     try {
       const parsedData = await parseReportFromText(rawText);
@@ -347,13 +357,18 @@ export default function App() {
       setImageMatchStatus("جاري التوزيع الذكي للصور...");
       try {
         const filenames = files.map(f => f.name);
+        // Returns { "0": "visit_id", "1": "visit_id" }
         const mapping = await matchImagesToVisits(filenames, report.visits);
+        
         const newVisits = [...report.visits];
         let matchCount = 0;
         const visitMap = new Map(newVisits.map(v => [v.id, v]));
 
-        for (const file of files) {
-            const visitId = mapping[file.name];
+        // Iterate by index to match the AI response keys
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const visitId = mapping[i.toString()]; // Key is index as string
+
             if (visitId && visitMap.has(visitId)) {
                 const visit = visitMap.get(visitId)!;
                 if (visit.images.length < 4) {
@@ -361,7 +376,10 @@ export default function App() {
                         const url = await uploadReportImage(file, report.id, visitId);
                         visit.images.push(url);
                         matchCount++;
-                    } catch (err) { console.error("Failed to upload image", file.name, err); }
+                    } catch (err) { 
+                        console.error("Failed to upload image", file.name, err);
+                        // Optional: setImageMatchStatus(`فشل رفع ${file.name}`);
+                    }
                 }
             }
         }
@@ -383,17 +401,23 @@ export default function App() {
       
       try {
         const filenames = files.map(f => f.name);
+        // Returns { "0": ["id1", "id2"], "1": ["id3"] }
         const mapping = await matchLogosToFactories(filenames, report.visits);
+        
         const newVisits = [...report.visits];
         const visitMap = new Map(newVisits.map(v => [v.id, v]));
         let matchCount = 0;
 
-        for (const file of files) {
-            const matchedVisitIds = mapping[file.name];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const matchedVisitIds = mapping[i.toString()];
+
             if (matchedVisitIds && matchedVisitIds.length > 0) {
+                // Upload ONCE for the first visit, then use URL for all matches
                 const primaryVisitId = matchedVisitIds[0];
                 try {
                     const url = await uploadReportImage(file, report.id, primaryVisitId);
+                    
                     matchedVisitIds.forEach(id => {
                         const visit = visitMap.get(id);
                         if (visit) {

@@ -12,18 +12,14 @@ const getAIClient = () => {
     return new GoogleGenAI({ apiKey });
 };
 
-// تحسين دالة التنظيف لاستخراج الكائن JSON فقط بغض النظر عن النصوص المحيطة
+// تحسين دالة التنظيف
 const cleanJson = (text: string): string => {
     if (!text) return "";
-    // محاولة العثور على أول قوس { وآخر قوس }
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
-    
     if (firstBrace !== -1 && lastBrace !== -1) {
         return text.substring(firstBrace, lastBrace + 1);
     }
-    
-    // Fallback: إزالة الرموز الخاصة فقط
     return text.replace(/```json\n?|```/g, '').trim();
 };
 
@@ -37,7 +33,7 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   Extract the following:
   1. Header info: Week name (e.g. الأسبوع الأول) and Date Range.
   2. Visits: List of visits with School Name, Participant Count, Date, and Factory Name.
-  3. Statistics: Total beneficiaries, tweets, posts, videos, and category breakdowns (Creative, Discoverer, Ambassador, Artist).
+  3. Statistics: Total beneficiaries, tweets, posts, videos, and category breakdowns.
 
   Return ONLY a valid JSON object matching this TypeScript interface:
   {
@@ -68,9 +64,7 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
           { role: 'user', parts: [{ text: systemPrompt }] },
           { role: 'user', parts: [{ text: text }] }
       ],
-      config: {
-        responseMimeType: "application/json"
-      }
+      config: { responseMimeType: "application/json" }
     });
 
     const responseText = response.text;
@@ -83,6 +77,8 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   }
 };
 
+// --- تغيير جذري: المطابقة بناءً على Index وليس اسم الملف ---
+
 export const matchImagesToVisits = async (filenames: string[], visits: Visit[]): Promise<Record<string, string>> => {
     const ai = getAIClient();
 
@@ -92,25 +88,21 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
         factory: v.factory
     }));
 
-    // تحسين الأمر البرمجي لضمان عدم تغيير أسماء الملفات
+    // إعداد قائمة مرقمة للملفات
+    const indexedFiles = filenames.map((name, index) => ({ index, name }));
+
     const prompt = `
     You are an intelligent file organizer. 
-    I have a list of image filenames and a list of School Visits.
-    
-    Task: Match each filename to the most likely Visit ID based on the text in the filename (School Name OR Factory Name).
+    Match each file (by its INDEX) to the correct Visit ID based on the filename semantics (School Name OR Factory Name).
+
+    Data:
+    Visits: ${JSON.stringify(visitsSummary)}
+    Files: ${JSON.stringify(indexedFiles)}
 
     CRITICAL RULES:
-    1. The Output JSON Keys MUST be the **EXACT** filenames from the provided list (do not remove extensions like .jpg or .png).
-    2. If a file matches "Jeddah School", find the visit ID for that school.
-    3. If a file matches "York Factory", find the visit ID for that factory.
-    4. Return ONLY a JSON object.
-
-    Input Data:
-    Visits: ${JSON.stringify(visitsSummary)}
-    Filenames: ${JSON.stringify(filenames)}
-    
-    Expected Output Format:
-    { "exact_filename_1.jpg": "visit_id_1", "exact_filename_2.png": "visit_id_2" }
+    1. Return a JSON object where the KEY is the file "index" (string) and VALUE is the "visit_id".
+    2. Example Output: { "0": "visit_123", "1": "visit_456" }
+    3. Do NOT use filenames as keys. Use the provided INDEX.
     `;
 
     try {
@@ -122,8 +114,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
 
         const text = response.text;
         if (!text) return {};
-        // طباعة الرد للتأكد أثناء التطوير
-        console.log("AI Image Match Response:", text);
+        console.log("AI Image Match Response (Index-based):", text);
         return JSON.parse(cleanJson(text));
     } catch (error) {
         console.error("Error matching images:", error);
@@ -139,22 +130,19 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
         factory: v.factory
     }));
 
-    // تحسين الأمر البرمجي لضمان الدقة في أسماء الملفات
-    const prompt = `
-    You are an intelligent bilingual assistant organizing factory logos.
-    Task: Match logo filenames to **ALL** Visit IDs that correspond to that Factory Name.
-    
-    CRITICAL RULES:
-    1. The Output JSON Keys MUST be the **EXACT** filenames from the provided list.
-    2. Map Arabic factory names to English filenames if needed (e.g., "Almarai.png" -> "المراعي").
-    3. Return an ARRAY of visit IDs for each matched logo.
+    const indexedFiles = filenames.map((name, index) => ({ index, name }));
 
+    const prompt = `
+    Match logo files (by INDEX) to **ALL** Visit IDs that correspond to that Factory Name.
+    
     Data:
     Factory List (Visits): ${JSON.stringify(factoryList)}
-    Logo Filenames: ${JSON.stringify(filenames)}
-    
-    Expected Output Format:
-    { "exact_logo_name.png": ["id_1", "id_2"] }
+    Files: ${JSON.stringify(indexedFiles)}
+
+    CRITICAL RULES:
+    1. Return a JSON object where KEY is the file "index" (string).
+    2. VALUE must be an ARRAY of "visit_id"s.
+    3. Example Output: { "0": ["id_1", "id_2"], "1": ["id_3"] }
     `;
 
     try {
@@ -166,7 +154,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
 
         const text = response.text;
         if (!text) return {};
-        console.log("AI Logo Match Response:", text);
+        console.log("AI Logo Match Response (Index-based):", text);
         return JSON.parse(cleanJson(text));
     } catch (error) {
         console.error("Error matching logos:", error);
