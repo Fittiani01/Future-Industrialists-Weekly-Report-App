@@ -53,11 +53,11 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   const headerColor = isGirls ? "#867bba" : "#2b3592";
 
   return (
-    <div className="mb-8 print:mb-3 break-inside-avoid relative shadow-lg rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent">
+    <div className="mb-6 break-inside-avoid relative shadow-md rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent print:mb-3">
       
-      {/* Header Bar - Stacked Layout with Dynamic Color */}
+      {/* Header Bar - New Grid Layout for Better Mobile Alignment */}
       <div 
-        className="text-white p-3 print:py-2 print:px-3 flex flex-col md:flex-row print:flex-row items-center justify-between gap-3 relative rounded-t-xl print:rounded-lg transition-colors duration-300"
+        className="text-white p-3 print:py-2 print:px-3 relative rounded-t-xl print:rounded-lg transition-colors duration-300"
         style={{ backgroundColor: headerColor }}
       >
          {isEditing && (
@@ -70,112 +70,111 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
             </button>
         )}
         
-        {/* Right Section: School & Factory - Stacked Vertically */}
-        <div className="flex flex-col gap-2 w-full flex-1">
+        <div className="flex flex-row items-start justify-between gap-3">
             
-            {/* Row 1: School */}
-            <div className="flex items-center gap-3">
-                <div className="bg-white/10 w-8 h-8 print:w-7 print:h-7 flex items-center justify-center rounded-lg flex-shrink-0">
-                    <Building2 className="w-5 h-5 print:w-4 print:h-4 text-white" />
+            {/* Right Side: School & Factory Info */}
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
+                {/* School */}
+                <div className="flex items-center gap-2">
+                    <div className="bg-white/10 w-8 h-8 print:w-6 print:h-6 flex items-center justify-center rounded-lg flex-shrink-0">
+                        <Building2 className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                value={visit.schoolName}
+                                onChange={(e) => onUpdate(visit.id, { schoolName: e.target.value })}
+                                className="bg-transparent border-b border-white/30 text-white px-0 py-0.5 placeholder-indigo-200 w-full focus:outline-none focus:border-white transition-colors text-base font-bold"
+                                placeholder="اسم المدرسة..."
+                            />
+                        ) : (
+                            <h3 className="text-base print:text-sm font-bold leading-tight truncate">{visit.schoolName}</h3>
+                        )}
+                    </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                     {isEditing ? (
-                        <input 
-                            type="text" 
-                            value={visit.schoolName}
-                            onChange={(e) => onUpdate(visit.id, { schoolName: e.target.value })}
-                            className="bg-transparent border-b border-indigo-400/50 text-white px-0 py-0.5 placeholder-indigo-300 w-full focus:outline-none focus:border-white transition-colors text-lg font-bold"
-                            placeholder="اسم المدرسة..."
-                        />
-                    ) : (
-                        <h3 className="text-lg print:text-base font-bold leading-tight truncate">{visit.schoolName}</h3>
-                    )}
+
+                {/* Factory */}
+                <div className="flex items-center gap-2">
+                    <div className="bg-white/5 w-8 h-8 print:w-6 print:h-6 flex items-center justify-center rounded-lg flex-shrink-0">
+                        <Factory className="w-4 h-4 text-indigo-100" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                value={visit.factory}
+                                onChange={(e) => onUpdate(visit.id, { factory: e.target.value })}
+                                className="bg-transparent border-b border-white/20 text-indigo-50 px-0 py-0 placeholder-indigo-300/70 w-full focus:outline-none focus:border-indigo-200 transition-colors text-xs font-medium"
+                                placeholder="اسم المصنع..."
+                            />
+                        ) : (
+                            <h4 className="text-sm print:text-xs font-medium truncate text-indigo-100">{visit.factory}</h4>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Row 2: Factory */}
-            <div className="flex items-center gap-3">
-                <div className="bg-white/5 w-8 h-8 print:w-7 print:h-7 flex items-center justify-center rounded-lg flex-shrink-0">
-                    <Factory className="w-5 h-5 print:w-4 print:h-4 text-indigo-200" />
-                </div>
-                <div className="flex-1 min-w-0">
-                     {isEditing ? (
-                        <input 
-                            type="text" 
-                            value={visit.factory}
-                            onChange={(e) => onUpdate(visit.id, { factory: e.target.value })}
-                            className="bg-transparent border-b border-indigo-400/30 text-indigo-100 px-0 py-0 placeholder-indigo-400/70 w-full focus:outline-none focus:border-indigo-200 transition-colors text-sm font-medium"
-                            placeholder="اسم المصنع..."
-                        />
-                    ) : (
-                        <h4 className="text-sm print:text-sm font-medium truncate text-indigo-100">{visit.factory}</h4>
-                    )}
-                </div>
-            </div>
-        </div>
-
-        {/* Left Section: Stats & Logo */}
-        <div className="flex items-center gap-4 print:gap-3 self-end md:self-center flex-shrink-0 mt-2 md:mt-0">
-            
-            {/* Stats - Increased Print Size */}
-            <div className="flex flex-col items-end justify-center gap-1 px-2 border-r border-indigo-400/30 h-full">
-                {/* Date */}
-                <div className="flex items-center gap-1.5 text-indigo-100">
-                    {isEditing ? (
-                        <input 
-                            type="text" 
-                            value={visit.date}
-                            onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
-                            className="bg-white/10 text-white w-24 px-1 py-0.5 rounded text-center focus:outline-none focus:bg-white/20 text-xs"
-                        />
-                    ) : (
-                        <span className="font-mono dir-ltr text-sm print:text-xs font-bold">{visit.date}</span>
-                    )}
-                    <Calendar size={14} className="print:w-4 print:h-4" />
-                </div>
+            {/* Left Side: Logo & Stats Stacked */}
+            <div className="flex flex-col items-end gap-2 flex-shrink-0">
                 
-                {/* Participants */}
-                <div className="flex items-center gap-1.5">
-                     <span className="text-[10px] text-indigo-200 print:text-[10px] font-medium">مشارك</span>
-                     {isEditing ? (
-                        <input 
-                            type="number" 
-                            value={visit.participants}
-                            onChange={(e) => onUpdate(visit.id, { participants: parseInt(e.target.value) || 0 })}
-                            className="bg-white/10 text-white w-12 px-1 py-0.5 rounded text-center focus:outline-none focus:bg-white/20 font-bold text-sm"
-                        />
+                {/* Logo */}
+                <div 
+                    className={`w-12 h-12 print:w-10 print:h-10 bg-white rounded-lg p-1 flex items-center justify-center relative group overflow-hidden shadow-sm ${isEditing ? 'cursor-pointer hover:ring-2 ring-indigo-300' : ''}`}
+                    onClick={() => isEditing && logoInputRef.current?.click()}
+                >
+                    {visit.factoryLogo ? (
+                        <img src={visit.factoryLogo} alt={visit.factory} className="w-full h-full object-contain" />
                     ) : (
-                        <span className="text-lg print:text-base font-bold leading-none">{visit.participants}</span>
+                        <Factory className="text-gray-300" size={20} />
                     )}
-                     <Users size={16} className="print:w-4 print:h-4" />
+                    <input 
+                        type="file" 
+                        accept="image/*,.svg" 
+                        ref={logoInputRef}
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                    />
                 </div>
-            </div>
 
-            {/* Factory Logo */}
-            <div 
-                className={`w-14 h-14 print:w-12 print:h-12 bg-white rounded-lg p-1 flex items-center justify-center relative group overflow-hidden shadow-sm ${isEditing ? 'cursor-pointer hover:ring-2 ring-indigo-400' : ''}`}
-                onClick={() => isEditing && logoInputRef.current?.click()}
-            >
-                {visit.factoryLogo ? (
-                    <img src={visit.factoryLogo} alt={visit.factory} className="w-full h-full object-contain" />
-                ) : (
-                    <Factory className="text-gray-300" size={24} />
-                )}
-                <input 
-                    type="file" 
-                    accept="image/*,.svg" 
-                    ref={logoInputRef}
-                    className="hidden"
-                    onChange={handleLogoUpload}
-                />
-            </div>
+                {/* Stats (Compact) */}
+                <div className="flex flex-col items-end gap-0.5">
+                     <div className="flex items-center gap-1 text-indigo-50 text-[10px] print:text-[9px]">
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                value={visit.date}
+                                onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
+                                className="bg-white/10 text-white w-20 px-1 rounded text-center focus:outline-none text-[10px]"
+                            />
+                        ) : (
+                            <span className="font-mono dir-ltr opacity-90">{visit.date}</span>
+                        )}
+                        <Calendar size={10} />
+                    </div>
+                    <div className="flex items-center gap-1 text-white text-xs print:text-[10px] font-bold">
+                        {isEditing ? (
+                             <input 
+                                type="number" 
+                                value={visit.participants}
+                                onChange={(e) => onUpdate(visit.id, { participants: parseInt(e.target.value) || 0 })}
+                                className="bg-white/10 text-white w-10 px-1 rounded text-center focus:outline-none font-bold"
+                            />
+                        ) : (
+                            <span>{visit.participants}</span>
+                        )}
+                        <span className="text-[10px] font-normal opacity-80">مشارك</span>
+                        <Users size={10} />
+                    </div>
+                </div>
 
+            </div>
         </div>
       </div>
 
       {/* Content Area - Images */}
       <div className="p-3 print:p-0 print:pt-1 bg-gray-50/50 print:bg-transparent">
-        <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-3 print:gap-1.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-2 print:gap-1">
             {[0, 1, 2, 3].map((idx) => (
                 <div 
                     key={idx} 

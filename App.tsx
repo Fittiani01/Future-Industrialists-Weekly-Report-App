@@ -211,11 +211,10 @@ export default function App() {
           try {
               const url = await uploadReportImage(file, report.id, 'decorations');
               
-              // Set default visible positions so user sees them immediately
-              // Index 0: Top Left (visible area)
-              // Index 1: Bottom Right (visible area)
-              const defaultX = index === 0 ? 5 : 60; 
-              const defaultY = index === 0 ? 5 : 60;
+              // Spawning Logic:
+              // Make sure they spawn in a visible area initially
+              const defaultX = index === 0 ? 10 : 50; 
+              const defaultY = index === 0 ? 10 : 50;
 
               const newDeco: Decoration = {
                   id: `deco-${index}-${Date.now()}`,
@@ -630,9 +629,9 @@ export default function App() {
 
   const DecorationLayer = ({ isPrint = false }) => (
       // Z-Index Logic:
-      // If Editing and NOT printing: z-[50] (Front of everything, allows dragging)
-      // If Printing or Viewing: z-[2] (Behind content but above background)
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[50]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
+      // If Editing and NOT printing: z-[999] (Front of everything to be clickable)
+      // If Printing or Viewing: z-[2] (Behind text, but above background)
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[999]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
@@ -646,13 +645,13 @@ export default function App() {
                     pointerEvents: isEditing && !isPrint ? 'auto' : 'none',
                 }}
                 onMouseDown={(e) => !isPrint && handleDecoMouseDown(e, d.id)}
-                className={`origin-top-left ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded' : ''} ${isEditing ? 'border border-dashed border-gray-300/50' : ''}`}
+                className={`origin-top-left ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded shadow-2xl' : ''} ${isEditing ? 'border border-dashed border-gray-300/50' : ''}`}
               >
                   <img src={d.url} className="max-w-[300px] h-auto object-contain select-none pointer-events-none" draggable={false} alt="" />
                   
-                  {/* Controls for Editing */}
+                  {/* Controls for Editing - Visible on top */}
                   {isEditing && !isPrint && (
-                      <div className="absolute -top-10 left-0 flex items-center gap-1 bg-white shadow-md rounded p-1 pointer-events-auto z-[60]">
+                      <div className="absolute -top-10 left-0 flex items-center gap-1 bg-white shadow-xl rounded p-1 pointer-events-auto z-[1000] border border-gray-200">
                           <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, 0.1); }} className="p-1 hover:bg-gray-100 rounded text-green-600"><Plus size={14}/></button>
                           <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, -0.1); }} className="p-1 hover:bg-gray-100 rounded text-red-600"><Minus size={14}/></button>
                           <button onClick={(e) => { e.stopPropagation(); deleteDecoration(d.id); }} className="p-1 hover:bg-gray-100 rounded text-red-600 ml-2"><Trash2 size={14}/></button>
@@ -675,10 +674,12 @@ export default function App() {
           {report.coverImage && (
             <div className="print-page w-full h-full p-0 overflow-hidden relative" style={{ height: '297mm', width: '210mm' }}>
                 <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" style={{ objectFit: 'cover' }} />
-                <div className="absolute bottom-[8%] left-0 w-full flex flex-col items-center justify-center z-10 text-white px-8">
-                    <h1 className="text-3xl font-extrabold mb-1 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] tracking-wide text-center" style={{textShadow: '1px 1px 4px black'}}>{report.header.weekTitle}</h1>
+                {/* Fixed bottom positioning */}
+                <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
+                    {/* Consistent Font: Tajawal (font-sans) */}
+                    <h1 className="text-2xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
                     <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
-                    <p className="text-xl font-bold dir-ltr drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-95 text-center" style={{textShadow: '1px 1px 3px black'}}>{report.header.dateRange}</p>
+                    <p className="text-lg font-bold font-sans dir-ltr drop-shadow-md opacity-95 text-center">{report.header.dateRange}</p>
                 </div>
             </div>
           )}
@@ -751,8 +752,9 @@ export default function App() {
       {/* Main Container */}
       <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-auto mt-8 bg-white shadow-2xl min-h-[297mm] h-auto p-8 md:p-12 relative flex flex-col z-10 rounded-[2.5rem] overflow-hidden border-8 border-gray-100">
         
-        {/* Render Free Decorations on Screen */}
-        <DecorationLayer />
+        {/* Only Render Decorations here if NOT editing, otherwise we render later for z-index issues, wait... 
+            Actually, to ensure it's on top of everything including white backgrounds of cards, it MUST be last.
+        */}
 
         {/* --- CONTROLS --- */}
         <div className="no-print mb-8 bg-gray-50 rounded-xl p-3 border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 shadow-inner relative z-50">
@@ -930,8 +932,10 @@ export default function App() {
                     </React.Fragment>
                 ))}
             </div>
-            {/* Removed ConstellationCorner as requested */}
         </div>
+
+        {/* Render Decorations LAST to ensure they are on top of everything (z-index alone sometimes fails with nested relative contexts) */}
+        <DecorationLayer />
 
       </div>
     </div>
