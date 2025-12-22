@@ -14,44 +14,44 @@ import { uploadReportImage } from './utils/uploadImage';
 // Local compress for Logos
 import { compressImage } from './utils/compressImage';
 
+// New Subtle Tech Corner Design
 const ConstellationCorner = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
     <svg 
-        viewBox="0 0 300 300" 
-        className={`${className} pointer-events-none`}
+        viewBox="0 0 400 400" 
+        className={`${className} pointer-events-none opacity-20`} // Very low opacity
         style={style}
     >
         <defs>
-             <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#837cb9" />
-                <stop offset="100%" stopColor="#2a3590" />
+             <linearGradient id="techGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#2a3590" stopOpacity="0" />
+                <stop offset="100%" stopColor="#2a3590" stopOpacity="0.8" />
             </linearGradient>
         </defs>
-        <g stroke="url(#starGradient)" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.7">
-            <path d="M280,280 L220,240 L160,260 L100,280" />
-            <path d="M280,280 L250,180 L220,240" />
-            <path d="M250,180 L180,150 L220,240" />
-            <path d="M180,150 L120,200 L160,260" />
-            <path d="M120,200 L80,250 L100,280" />
-            <path d="M250,180 L280,100" />
-            <path d="M180,150 L150,80" />
-            <path d="M120,200 L60,180" />
-            <path d="M220,240 L160,260" />
-            <path d="M160,260 L120,200" />
-            <path d="M180,150 L220,100" />
+        {/* Geometric Tech Lines hugging the corner (400,400 is bottom right) */}
+        <g stroke="url(#techGradient)" strokeWidth="1.5" fill="none" strokeLinecap="round">
+            {/* Horizontal Lines */}
+            <path d="M100,380 L400,380" />
+            <path d="M200,350 L400,350" />
+            <path d="M280,320 L400,320" />
+            
+            {/* Vertical/Diagonal Lines */}
+            <path d="M380,100 L380,400" />
+            <path d="M350,200 L350,400" />
+            <path d="M320,280 L320,400" />
+            
+            {/* Connecting Nodes */}
+            <path d="M200,350 L350,200" opacity="0.5" />
+            <path d="M280,320 L320,280" opacity="0.5" />
+            <path d="M100,380 L380,100" opacity="0.3" />
         </g>
-        <g fill="#837cb9">
-            <circle cx="280" cy="280" r="2.5" />
-            <circle cx="220" cy="240" r="3" />
-            <circle cx="160" cy="260" r="2.5" />
-            <circle cx="100" cy="280" r="2" />
-            <circle cx="250" cy="180" r="3" />
-            <circle cx="180" cy="150" r="3.5" />
-            <circle cx="120" cy="200" r="3" />
-            <circle cx="80" cy="250" r="2.5" />
-            <circle cx="280" cy="100" r="2" />
-            <circle cx="150" cy="80" r="2" />
-            <circle cx="60" cy="180" r="2" />
-            <circle cx="220" cy="100" r="2" />
+        
+        {/* Subtle Dots at intersections */}
+        <g fill="#2a3590">
+            <circle cx="380" cy="380" r="3" />
+            <circle cx="350" cy="350" r="2.5" />
+            <circle cx="320" cy="320" r="2" />
+            <circle cx="200" cy="350" r="2" />
+            <circle cx="350" cy="200" r="2" />
         </g>
     </svg>
 );
@@ -641,8 +641,14 @@ export default function App() {
 
         {/* --- REPORT FOOTER (Screen Only) --- */}
         <footer className="screen-footer mt-8 pt-4 border-t border-gray-200 relative pb-4">
-            <div className="absolute bottom-0 right-0 w-32 h-24 overflow-hidden pointer-events-none z-0"><ConstellationCorner className="w-full h-full" /></div>
-            <div className="absolute bottom-0 left-0 w-32 h-24 overflow-hidden pointer-events-none z-0"><ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} /></div>
+            {/* New Positioned Corners - Way larger container but drawing is confined to bottom corner */}
+            <div className="absolute -bottom-4 -right-4 w-64 h-64 overflow-hidden pointer-events-none z-0">
+                <ConstellationCorner className="w-full h-full" />
+            </div>
+            <div className="absolute -bottom-4 -left-4 w-64 h-64 overflow-hidden pointer-events-none z-0">
+                <ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} />
+            </div>
+            
             <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
             <div className="flex flex-wrap justify-center items-start gap-x-8 gap-y-8 px-4 relative z-10">
                 {report.logos.partners.map((partner, idx) => (

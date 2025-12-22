@@ -223,11 +223,10 @@
         const ctx = canvas.getContext('2d');
         let width, height;
         let particles = [];
-        const particleCount = 100;
-        const connectionDistance = 160;
-        const moveSpeed = 0.7; 
+        const particleCount = 110; // Slightly more particles for better coverage
+        const connectionDistance = 150;
+        const moveSpeed = 0.6; 
 
-        // Important: Set size immediately before initializing particles
         function resize() {
           width = window.innerWidth;
           height = window.innerHeight;
@@ -237,12 +236,12 @@
 
         class Particle {
           constructor() {
-            // Distribute randomly across the ENTIRE canvas from t=0
-            this.x = Math.random() * width;
-            this.y = Math.random() * height;
+            // Guarantee random distribution
+            this.x = Math.random() * (window.innerWidth || document.documentElement.clientWidth);
+            this.y = Math.random() * (window.innerHeight || document.documentElement.clientHeight);
             this.vx = (Math.random() - 0.5) * moveSpeed;
             this.vy = (Math.random() - 0.5) * moveSpeed;
-            this.size = Math.random() * 2 + 1.5;
+            this.size = Math.random() * 2 + 1; // Slightly smaller max size
           }
           update() {
             this.x += this.vx;
@@ -253,7 +252,8 @@
           draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            // Changed color to lavender/blueish white with lower opacity
+            ctx.fillStyle = 'rgba(200, 210, 255, 0.4)'; 
             ctx.fill();
           }
         }
@@ -280,7 +280,8 @@
               if (distance < connectionDistance) {
                 ctx.beginPath();
                 let opacity = 1 - (distance / connectionDistance);
-                ctx.strokeStyle = `rgba(200, 220, 255, ${opacity * 0.5})`; 
+                // Changed connection color to match
+                ctx.strokeStyle = `rgba(131, 124, 185, ${opacity * 0.3})`; 
                 ctx.lineWidth = 1;
                 ctx.moveTo(p1.x, p1.y);
                 ctx.lineTo(p2.x, p2.y);
@@ -292,7 +293,7 @@
         }
         window.addEventListener('resize', resize);
         
-        // Execute immediately
+        // Init immediately
         init();
         animate();
       })();
