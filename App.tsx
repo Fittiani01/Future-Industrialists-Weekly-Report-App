@@ -8,8 +8,9 @@ import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadClo
 import mammoth from 'mammoth';
 
 // Firebase Imports
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
 // Local compress for Logos
 import { compressImage } from './utils/compressImage';
@@ -100,8 +101,18 @@ export default function App() {
     setIsAdmin(adminMode);
     setIsEditing(adminMode);
 
-    const fetchReports = async () => {
+    const init = async () => {
         setLoading(true);
+        
+        // 1. Attempt Anonymous Sign-In (Fixes 403 Storage Permission Errors)
+        try {
+            await signInAnonymously(auth);
+            console.log("Signed in anonymously");
+        } catch (error) {
+            console.error("Auth Error: Could not sign in anonymously. Check Firebase Console > Auth > Sign-in method.", error);
+        }
+
+        // 2. Fetch Reports
         try {
             const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "desc"));
             const querySnapshot = await getDocs(q);
@@ -124,7 +135,7 @@ export default function App() {
         }
     };
 
-    fetchReports();
+    init();
   }, []);
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
@@ -149,7 +160,7 @@ export default function App() {
         }
     } catch (error) {
         console.error("Error saving report:", error);
-        alert("فشل الحفظ. تأكد من الاتصال بالإنترنت.");
+        alert("فشل الحفظ. تأكد من الاتصال بالإنترنت ومن صلاحيات الكتابة في Firebase.");
     } finally {
         setSaving(false);
     }
@@ -256,9 +267,14 @@ export default function App() {
           try {
               const url = await uploadReportImage(file, report.id, visitId);
               urls.push(url);
-          } catch(e) { 
+          } catch(e: any) { 
               console.error(e); 
-              alert(`فشل رفع الصورة ${file.name}`);
+              if (e.code === 'storage/unauthorized') {
+                  alert("خطأ في الصلاحيات! (Storage 403).\nيرجى التأكد من تفعيل 'Anonymous Auth' في Firebase Console أو تعديل قواعد التخزين.");
+                  break;
+              } else {
+                  alert(`فشل رفع الصورة ${file.name}: ${e.message}`);
+              }
           }
       }
       setIsDirty(true);
@@ -371,9 +387,13 @@ export default function App() {
                         const url = await uploadReportImage(file, report.id, visitId);
                         visit.images.push(url);
                         matchCount++;
-                    } catch (err) { 
+                    } catch (err: any) { 
                         console.error("Failed to upload image", file.name, err);
-                        // Optional: setImageMatchStatus(`فشل رفع ${file.name}`);
+                         if (err.code === 'storage/unauthorized') {
+                             alert("خطأ 403 (Permission Denied): يرجى تفعيل Anonymous Auth في Firebase أو تعديل قواعد Storage.");
+                             setImageMatchStatus("توقف الرفع بسبب خطأ في الصلاحيات.");
+                             return; // Stop the loop
+                         }
                     }
                 }
             }
@@ -420,8 +440,13 @@ export default function App() {
                         }
                     });
                     matchCount++;
-                } catch(e) {
+                } catch(e: any) {
                     console.error("Failed logo upload", file.name);
+                    if (e.code === 'storage/unauthorized') {
+                         alert("خطأ 403 (Permission Denied): يرجى تفعيل Anonymous Auth في Firebase.");
+                         setLogoMatchStatus("توقف الرفع بسبب خطأ في الصلاحيات.");
+                         return;
+                    }
                 }
             }
         }
