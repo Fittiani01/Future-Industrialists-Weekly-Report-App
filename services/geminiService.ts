@@ -1,22 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
-if (!process.env.API_KEY) {
-    console.warn("API Key is missing in environment variables");
-}
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+// Assume this variable is pre-configured, valid, and accessible in the execution context.
+declare const process: any;
 
 const getAIClient = () => {
-    let apiKey = '';
-    try {
-        apiKey = process.env.API_KEY || '';
-    } catch(e) {
-        // ignore
-    }
-    
-    if (!apiKey) {
-        throw new Error("مفتاح API غير موجود. يرجى التأكد من إضافة API_KEY في إعدادات البيئة (Environment Variables) في Vercel.");
-    }
-    return new GoogleGenAI({ apiKey });
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 // Helper to remove Markdown code blocks (e.g. ```json ... ```)

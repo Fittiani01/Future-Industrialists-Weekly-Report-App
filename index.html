@@ -20,6 +20,16 @@
                 accent: '#837cb9',  // Lavender/Purple
                 light: '#f8f9fa'    // Off-white
               }
+            },
+            animation: {
+              'blob': 'blob 7s infinite',
+              'fade-in': 'fadeIn 0.3s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              }
             }
           }
         }
@@ -29,11 +39,69 @@
       body {
         margin: 0;
         padding: 0;
-        background-color: #f8f9fa;
+        background-color: transparent;
         min-height: 100vh;
         overflow-x: hidden;
       }
       
+      .animated-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(-45deg, #0f1125, #2a3590, #6c429e, #3d59a5);
+        background-size: 400% 400%;
+        animation: gradientAnimation 12s ease infinite;
+        z-index: -3;
+      }
+      
+      @keyframes gradientAnimation {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      .glow-layer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -2;
+        pointer-events: none;
+      }
+
+      .glow-blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.6;
+        animation: floatBlob 20s infinite ease-in-out alternate;
+      }
+
+      .glow-blob-1 {
+        top: -10%;
+        left: -10%;
+        width: 50vw;
+        height: 50vw;
+        background: radial-gradient(circle, rgba(131, 124, 185, 0.5) 0%, transparent 70%);
+      }
+
+      .glow-blob-2 {
+        bottom: -10%;
+        right: -10%;
+        width: 50vw;
+        height: 50vw;
+        background: radial-gradient(circle, rgba(61, 89, 165, 0.5) 0%, transparent 70%);
+        animation-delay: -10s;
+      }
+
+      @keyframes floatBlob {
+        0% { transform: translate(0, 0) scale(1); }
+        100% { transform: translate(30px, 30px) scale(1.1); }
+      }
+
       #network-canvas {
         position: fixed;
         top: 0;
@@ -59,10 +127,12 @@
           height: auto;
         }
 
-        .no-print, #network-canvas, button { 
+        /* Hide Backgrounds and UI elements */
+        .no-print, .animated-bg, .glow-layer, #network-canvas, button { 
           display: none !important; 
         }
 
+        /* Container Reset */
         .max-w-\[210mm\] {
           max-width: none !important;
           width: 100% !important;
@@ -72,6 +142,7 @@
           border-radius: 0 !important;
         }
 
+        /* Fixed Header Logic */
         .print-header-fixed {
           position: fixed;
           top: 0;
@@ -85,6 +156,7 @@
           border-bottom: 2px solid #2a3590;
         }
 
+        /* Fixed Footer Logic */
         .print-footer-fixed {
           position: fixed;
           bottom: 0;
@@ -100,18 +172,21 @@
           border-top: 1px solid #eee;
         }
 
+        /* Main Content Padding to prevent overlap */
         .print-content-wrapper {
           margin-top: 130px;
           margin-bottom: 110px;
           padding: 0 20px;
         }
 
+        /* Avoid breaking inside cards */
         .print-break-inside {
           break-inside: avoid;
           page-break-inside: avoid;
           margin-bottom: 20px;
         }
 
+        /* Hide the original on-screen header/footer to avoid duplication if we use fixed ones */
         .screen-header, .screen-footer {
           display: none !important;
         }
@@ -132,6 +207,11 @@
 </script>
 </head>
   <body>
+    <div class="animated-bg"></div>
+    <div class="glow-layer">
+        <div class="glow-blob glow-blob-1"></div>
+        <div class="glow-blob glow-blob-2"></div>
+    </div>
     <canvas id="network-canvas"></canvas>
     <div id="root"></div>
 
@@ -141,6 +221,7 @@
       (function() {
         const canvas = document.getElementById('network-canvas');
         const ctx = canvas.getContext('2d');
+        // Initialize width/height immediately to ensure full coverage from start
         let width = window.innerWidth;
         let height = window.innerHeight;
         canvas.width = width;
@@ -153,8 +234,8 @@
 
         class Particle {
           constructor() {
-            this.x = Math.random() * window.innerWidth;
-            this.y = Math.random() * window.innerHeight;
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
             this.vx = (Math.random() - 0.5) * moveSpeed;
             this.vy = (Math.random() - 0.5) * moveSpeed;
             this.size = Math.random() * 2 + 1;
@@ -168,7 +249,8 @@
           draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; 
+            // Increased opacity from 0.3 to 0.7 to make them visible
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; 
             ctx.fill();
           }
         }
@@ -201,7 +283,8 @@
               if (distance < connectionDistance) {
                 ctx.beginPath();
                 let opacity = 1 - (distance / connectionDistance);
-                ctx.strokeStyle = `rgba(0, 0, 0, ${opacity * 0.05})`; 
+                // Increased opacity of lines
+                ctx.strokeStyle = `rgba(180, 200, 255, ${opacity * 0.4})`; 
                 ctx.lineWidth = 1;
                 ctx.moveTo(p1.x, p1.y);
                 ctx.lineTo(p2.x, p2.y);
