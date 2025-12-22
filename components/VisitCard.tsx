@@ -126,7 +126,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                                 placeholder="اسم المدرسة..."
                             />
                         ) : (
-                            <h3 className="text-sm md:text-xl print:text-base font-bold leading-tight truncate">{visit.schoolName}</h3>
+                            <h3 className="text-sm md:text-lg print:text-sm font-bold leading-tight truncate">{visit.schoolName}</h3>
                         )}
                     </div>
                 </div>
@@ -146,7 +146,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                                 placeholder="اسم المصنع..."
                             />
                         ) : (
-                            <h4 className="text-xs md:text-lg print:text-sm font-bold text-indigo-50 truncate">{visit.factory}</h4>
+                            <h4 className="text-xs md:text-base print:text-xs font-bold text-indigo-50 truncate">{visit.factory}</h4>
                         )}
                     </div>
                 </div>
