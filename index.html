@@ -24,16 +24,11 @@
             animation: {
               'blob': 'blob 7s infinite',
               'fade-in': 'fadeIn 0.3s ease-out forwards',
-              'zoom-in': 'zoomIn 0.3s ease-out forwards',
             },
             keyframes: {
               fadeIn: {
                 '0%': { opacity: '0' },
                 '100%': { opacity: '1' },
-              },
-              zoomIn: {
-                '0%': { transform: 'scale(0.95)', opacity: '0' },
-                '100%': { transform: 'scale(1)', opacity: '1' },
               }
             }
           }
@@ -232,6 +227,7 @@
         const connectionDistance = 160;
         const moveSpeed = 0.7; 
 
+        // Important: Set size immediately before initializing particles
         function resize() {
           width = window.innerWidth;
           height = window.innerHeight;
@@ -241,7 +237,7 @@
 
         class Particle {
           constructor() {
-            // Updated to distribute randomly across the entire canvas immediately
+            // Distribute randomly across the ENTIRE canvas from t=0
             this.x = Math.random() * width;
             this.y = Math.random() * height;
             this.vx = (Math.random() - 0.5) * moveSpeed;
@@ -295,6 +291,8 @@
           requestAnimationFrame(animate);
         }
         window.addEventListener('resize', resize);
+        
+        // Execute immediately
         init();
         animate();
       })();

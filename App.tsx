@@ -4,7 +4,7 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon } from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
@@ -303,9 +303,11 @@ export default function App() {
       }
   };
 
-  const handlePartnerScale = (index: number, newScale: number) => {
+  const changePartnerScale = (index: number, delta: number) => {
       updateCurrentReport(prev => {
           const newPartners = [...prev.logos.partners];
+          const currentScale = newPartners[index].scale;
+          const newScale = Math.max(0.5, Math.min(3.0, currentScale + delta));
           newPartners[index] = { ...newPartners[index], scale: newScale };
           return { ...prev, logos: { ...prev.logos, partners: newPartners } };
       });
@@ -550,6 +552,7 @@ export default function App() {
                         {imageMatchStatus && <div className="mt-2 p-1 text-xs text-center text-teal-700">{imageMatchStatus}</div>}
                     </div>
                     <div>
+                        {/* THIS IS THE BUTTON YOU WERE MISSING - Ensuring visibility */}
                         <input type="file" multiple accept="image/*" ref={bulkLogoInputRef} onChange={handleBulkFactoryLogoUpload} className="hidden" />
                         <button onClick={() => bulkLogoInputRef.current?.click()} disabled={isAnalyzingLogos} className="w-full border-2 border-dashed border-purple-300 bg-purple-50 text-purple-700 py-4 rounded-lg flex flex-col items-center justify-center hover:bg-purple-100 transition-colors">
                             {isAnalyzingLogos ? <Loader2 className="animate-spin" /> : <Factory size={24} />}
@@ -645,7 +648,7 @@ export default function App() {
             <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
             <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6 px-4 relative z-10">
                 {report.logos.partners.map((partner, idx) => (
-                    <div key={partner.id} className="relative flex flex-col items-center group">
+                    <div key={partner.id} className="relative flex flex-col items-center group/partner">
                         <img 
                             src={partner.url} 
                             style={{ height: `${48 * partner.scale}px`, width: 'auto' }}
@@ -654,9 +657,25 @@ export default function App() {
                             onClick={() => isEditing && partnerRefs.current[idx]?.click()}
                         />
                         <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
+                        
+                        {/* New Precision Zoom Controls - Replaces Slider */}
                         {isEditing && (
-                            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-24 bg-white shadow-md rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex flex-col items-center border border-gray-200 no-print">
-                                <input type="range" min="0.5" max="3.0" step="0.1" value={partner.scale} onChange={(e) => handlePartnerScale(idx, parseFloat(e.target.value))} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white shadow-md rounded-full border border-gray-200 p-1 flex items-center gap-1 z-20 no-print opacity-0 group-hover/partner:opacity-100 transition-opacity">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} 
+                                    className="p-1 hover:bg-gray-100 rounded-full text-brand-primary"
+                                    title="تكبير"
+                                >
+                                    <ZoomInIcon size={14} />
+                                </button>
+                                <div className="w-px h-3 bg-gray-300"></div>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} 
+                                    className="p-1 hover:bg-gray-100 rounded-full text-brand-primary"
+                                    title="تصغير"
+                                >
+                                    <ZoomOutIcon size={14} />
+                                </button>
                             </div>
                         )}
                     </div>
