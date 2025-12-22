@@ -4,7 +4,7 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2 } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand } from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
@@ -34,6 +34,8 @@ export default function App() {
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Track dragging state to distinguish between click and drag
+  const isDraggingRef = useRef(false);
 
   // Parsing & AI State
   const [rawText, setRawText] = useState("");
@@ -158,36 +160,55 @@ export default function App() {
       if (isAdmin) setIsDirty(true);
   };
 
-  // --- Drag & Drop Decoration Handlers (Center Anchor Logic) ---
-  const handleDecoMouseDown = (e: React.MouseEvent, id: string) => {
+  // --- Drag & Drop Decoration Handlers (Unified Mouse & Touch) ---
+  const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
       if (!isEditing) return;
       e.stopPropagation();
-      e.preventDefault();
-      
+      // Prevent default to stop scrolling while dragging on touch
+      // e.preventDefault(); // NOTE: Calling this on touchstart might block click, be careful.
+
       const decoration = report.decorations?.find(d => d.id === id);
       if (!decoration || !containerRef.current) return;
 
       setActiveDecoId(id);
+      isDraggingRef.current = false;
       
-      // Starting Coordinates
-      const startMouseX = e.clientX;
-      const startMouseY = e.clientY;
+      // Get client coordinates
+      let clientX, clientY;
+      if ('touches' in e) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+      } else {
+          clientX = (e as React.MouseEvent).clientX;
+          clientY = (e as React.MouseEvent).clientY;
+      }
+
+      const startMouseX = clientX;
+      const startMouseY = clientY;
       const startDecoX = decoration.x;
       const startDecoY = decoration.y;
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
           if (!containerRef.current) return;
+          isDraggingRef.current = true;
+          
+          let moveClientX, moveClientY;
+          if ('touches' in moveEvent) {
+               moveClientX = moveEvent.touches[0].clientX;
+               moveClientY = moveEvent.touches[0].clientY;
+          } else {
+               moveClientX = (moveEvent as MouseEvent).clientX;
+               moveClientY = (moveEvent as MouseEvent).clientY;
+          }
+
           const rect = containerRef.current.getBoundingClientRect();
           
-          // Calculate delta in pixels
-          const deltaX_px = moveEvent.clientX - startMouseX;
-          const deltaY_px = moveEvent.clientY - startMouseY;
+          const deltaX_px = moveClientX - startMouseX;
+          const deltaY_px = moveClientY - startMouseY;
 
-          // Convert delta to percentage of container
           const deltaX_percent = (deltaX_px / rect.width) * 100;
           const deltaY_percent = (deltaY_px / rect.height) * 100;
 
-          // Calculate new position (clamped 0-100 to prevent disappearing)
           const newX = Math.max(0, Math.min(100, startDecoX + deltaX_percent));
           const newY = Math.max(0, Math.min(100, startDecoY + deltaY_percent));
 
@@ -199,34 +220,33 @@ export default function App() {
           }));
       };
 
-      const handleMouseUp = () => {
-          setActiveDecoId(null);
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
+      const handleEnd = () => {
+          document.removeEventListener('mousemove', handleMove);
+          document.removeEventListener('mouseup', handleEnd);
+          document.removeEventListener('touchmove', handleMove);
+          document.removeEventListener('touchend', handleEnd);
       };
 
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleEnd);
+      document.addEventListener('touchmove', handleMove, { passive: false });
+      document.addEventListener('touchend', handleEnd);
   };
 
-  // Upload handler updated to support specific slots (index 0 or 1)
   const handleDecorationUpload = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file && report.id) {
           try {
               const url = await uploadReportImage(file, report.id, 'decorations');
-              
-              // Spawning Logic:
-              // Spawn in the visual center of the top half
               const defaultX = 50; 
-              const defaultY = index === 0 ? 15 : 40;
+              const defaultY = 20; // Safe visible area
 
               const newDeco: Decoration = {
                   id: `deco-${index}-${Date.now()}`,
                   url,
                   x: defaultX, 
                   y: defaultY,
-                  scale: 1.0, 
+                  scale: 0.8, // Slightly smaller default
                   opacity: 1
               };
               
@@ -241,6 +261,7 @@ export default function App() {
                   }
                   return { ...prev, decorations: newDecos.filter(d => d && d.url) };
               });
+              setActiveDecoId(newDeco.id);
           } catch(e) {
               console.error(e);
               alert("فشل رفع الزخرفة");
@@ -262,6 +283,7 @@ export default function App() {
           ...prev,
           decorations: prev.decorations?.filter(d => d.id !== id)
       }));
+      setActiveDecoId(null);
   };
 
   // --- Handlers (Existing) ---
@@ -625,37 +647,27 @@ export default function App() {
 
   const DecorationLayer = ({ isPrint = false }) => (
       // Z-Index: 
-      // Editing Mode (Screen): z-[2000] - Must be higher than everything else (cards, modals) to catch clicks.
-      // Print Mode: z-[2] - Lower than content but above background.
+      // Editing Mode (Screen): z-[2000] - Must be higher than everything else.
+      // Print Mode: z-[2] - Lower than content.
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
                 style={{
                     position: 'absolute',
-                    // Use Center as the anchor point
                     left: `${d.x}%`,
                     top: `${d.y}%`,
-                    // Translate -50% -50% to truly center it on the coordinates
                     transform: `translate(-50%, -50%) scale(${d.scale})`,
                     opacity: d.opacity,
                     cursor: isEditing && !isPrint ? 'move' : 'default',
                     pointerEvents: isEditing && !isPrint ? 'auto' : 'none',
+                    touchAction: 'none' // Critical for touch dragging
                 }}
-                onMouseDown={(e) => !isPrint && handleDecoMouseDown(e, d.id)}
-                className={`origin-center ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded shadow-2xl' : ''} ${isEditing && !isPrint ? 'border border-dashed border-gray-400/50' : ''}`}
+                onMouseDown={(e) => !isPrint && handleDecoStart(e, d.id)}
+                onTouchStart={(e) => !isPrint && handleDecoStart(e, d.id)}
+                className={`origin-center select-none ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded border border-indigo-300' : ''}`}
               >
                   <img src={d.url} className="max-w-[300px] h-auto object-contain select-none pointer-events-none" draggable={false} alt="" />
-                  
-                  {/* Controls for Editing - Visible on top */}
-                  {isEditing && !isPrint && activeDecoId === d.id && (
-                      <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white shadow-xl rounded-lg p-1.5 pointer-events-auto z-[2001] border border-gray-200 w-max">
-                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, 0.1); }} className="p-1 hover:bg-gray-100 rounded text-green-600 font-bold"><Plus size={16}/></button>
-                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, -0.1); }} className="p-1 hover:bg-gray-100 rounded text-red-600 font-bold"><Minus size={16}/></button>
-                          <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                          <button onClick={(e) => { e.stopPropagation(); deleteDecoration(d.id); }} className="p-1 hover:bg-red-50 rounded text-red-600"><Trash2 size={16}/></button>
-                      </div>
-                  )}
               </div>
           ))}
       </div>
@@ -666,16 +678,26 @@ export default function App() {
   return (
     <div className="min-h-screen pb-4 relative">
       
+      {/* ======================= FIXED EDIT CONTROLS (Active Decoration) ======================= */}
+      {isEditing && activeDecoId && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[3000] bg-white shadow-2xl rounded-full px-6 py-3 border border-gray-200 flex items-center gap-6 animate-fade-in no-print">
+              <span className="text-xs font-bold text-gray-500 hidden md:block">تحكم بالزخرفة:</span>
+              <button onClick={() => updateDecoScale(activeDecoId, 0.1)} className="p-2 hover:bg-gray-100 rounded-full text-brand-primary transition-colors bg-gray-50" title="تكبير"><ZoomInIcon size={24}/></button>
+              <button onClick={() => updateDecoScale(activeDecoId, -0.1)} className="p-2 hover:bg-gray-100 rounded-full text-brand-primary transition-colors bg-gray-50" title="تصغير"><ZoomOutIcon size={24}/></button>
+              <div className="w-px h-8 bg-gray-300"></div>
+              <button onClick={() => deleteDecoration(activeDecoId)} className="p-2 hover:bg-red-50 rounded-full text-red-500 transition-colors bg-red-50" title="حذف"><Trash2 size={24}/></button>
+              <button onClick={() => setActiveDecoId(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors" title="إغلاق"><X size={20}/></button>
+          </div>
+      )}
+
       {/* ======================= PRINT VIEW ======================= */}
       <div className="hidden print-only-container">
-          
+          {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
             <div className="print-page w-full h-full p-0 overflow-hidden relative" style={{ height: '297mm', width: '210mm' }}>
                 <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" style={{ objectFit: 'cover' }} />
-                {/* Fixed bottom positioning */}
                 <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
-                    {/* Consistent Font: Tajawal (font-sans) */}
                     <h1 className="text-2xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
                     <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
                     <p className="text-lg font-bold font-sans dir-ltr drop-shadow-md opacity-95 text-center">{report.header.dateRange}</p>
@@ -809,7 +831,7 @@ export default function App() {
                                 {report.decorations?.[1] && <span className="text-[10px] text-green-600 text-center">موجودة</span>}
                             </div>
                         </div>
-                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1"><MousePointer2 size={12}/> <span>حرك الزخرفة بالفأرة وضعها في المكان المناسب</span></div>
+                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1"><Hand size={12}/> <span>اضغط واسحب الزخرفة على الشاشة</span></div>
                     </div>
                 </div>
 
@@ -912,21 +934,33 @@ export default function App() {
         <div className="mt-8 pt-4 border-t border-gray-200 relative pb-4 z-20">
              <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
              <div className="w-full px-4 relative z-10">
-                {/* --- MOBILE: Grid Layout (3 Columns) --- */}
+                
+                {/* --- MOBILE: Professional Grid with Separators --- */}
+                <div className="md:hidden w-full border border-gray-200 rounded-lg overflow-hidden bg-gray-200 gap-px grid grid-cols-3">
+                    {report.logos.partners.map((partner: PartnerLogo, idx) => (
+                        <div key={partner.id} className="bg-white p-2 flex items-center justify-center relative min-h-[70px] group/partner">
+                            <div className={`relative w-full h-full flex items-center justify-center ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
+                                <img 
+                                    src={partner.url} 
+                                    className="object-contain max-h-[50px] w-auto max-w-full"
+                                    alt="" 
+                                />
+                                <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
                 {/* --- DESKTOP: Flex Layout (Original) --- */}
-                <div className="grid grid-cols-3 gap-4 md:flex md:flex-wrap md:justify-center md:items-center md:gap-x-4 md:gap-y-8">
+                <div className="hidden md:flex md:flex-wrap md:justify-center md:items-center md:gap-x-4 md:gap-y-8">
                     {report.logos.partners.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex flex-col items-center gap-2 group/partner">
                                 <div className={`relative w-full flex items-center justify-center ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
-                                    {/* On Mobile: Force smaller height/contain. On Desktop: Use scale logic */}
                                     <img 
                                         src={partner.url} 
-                                        style={{ 
-                                            // Dynamic inline style mainly for desktop scaling preference
-                                            height: window.innerWidth > 768 ? `${48 * partner.scale}px` : undefined 
-                                        }} 
-                                        className="object-contain transition-all duration-200 h-12 w-full md:w-auto md:h-auto" 
+                                        style={{ height: `${48 * partner.scale}px` }} 
+                                        className="object-contain transition-all duration-200 w-auto" 
                                         alt="" 
                                     />
                                     <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
@@ -939,8 +973,7 @@ export default function App() {
                                     </div>
                                 )}
                             </div>
-                            {/* Vertical Divider - Desktop Only */}
-                            {idx < report.logos.partners.length - 1 && <div className="hidden md:block h-10 w-px bg-gray-200 mx-2"></div>}
+                            {idx < report.logos.partners.length - 1 && <div className="h-10 w-px bg-gray-200 mx-2"></div>}
                         </React.Fragment>
                     ))}
                 </div>
