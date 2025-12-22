@@ -13,6 +13,12 @@ import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, dele
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
 
+// Helper for Arabic Ordinals
+const getArabicOrdinal = (n: number) => {
+    const ordinals = ["", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر"];
+    return ordinals[n] || n.toString();
+};
+
 // New Subtle Tech Corner Design - Strictly Corner Hugging
 const ConstellationCorner = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
     <svg 
@@ -234,11 +240,12 @@ export default function App() {
   // --- Handlers ---
   const handleCreateNewReport = () => {
       const nextWeekNum = reports.length + 1;
+      const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
       const newId = `week-${Date.now()}`;
       const newReport: WeeklyReport = {
           ...INITIAL_REPORT,
           id: newId,
-          header: { ...INITIAL_REPORT.header, weekTitle: `الأسبوع ${nextWeekNum}` },
+          header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
           logos: report.logos, 
           visits: [], 
           createdAt: serverTimestamp() 
@@ -559,7 +566,12 @@ export default function App() {
       </header>
   );
 
-  const ReportFooterContent = () => (
+  const ReportFooterContent = () => {
+    // Split partners into top 6 and bottom 5 for print
+    const partnersTop = report.logos.partners.slice(0, 6);
+    const partnersBottom = report.logos.partners.slice(6, 11);
+
+    return (
       <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
@@ -577,27 +589,42 @@ export default function App() {
                 ))}
             </div>
 
-            {/* Print Version (Strict & Compact) */}
-            <div className="hidden print:flex flex-wrap justify-center items-center gap-y-2 gap-x-2 max-w-full mx-auto">
-                {report.logos.partners.map((partner: PartnerLogo, idx) => (
-                    <React.Fragment key={partner.id}>
-                        <div className="relative flex flex-col items-center justify-center h-5">
-                            <img 
-                                src={partner.url} 
-                                className="h-full w-auto object-contain" 
-                                alt="" 
-                            />
-                        </div>
-                        {/* Separator */}
-                        {idx < report.logos.partners.length - 1 && (
-                            <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                        )}
-                    </React.Fragment>
-                ))}
+            {/* Print Version (Strict 2 Lines: 6 Top, 5 Bottom) */}
+            <div className="hidden print:flex flex-col items-center gap-1 w-full">
+                {/* Row 1: 6 Items */}
+                <div className="flex justify-center items-center gap-x-2 w-full">
+                    {partnersTop.map((partner: PartnerLogo, idx) => (
+                        <React.Fragment key={partner.id}>
+                            <div className="relative flex flex-col items-center justify-center h-5">
+                                <img 
+                                    src={partner.url} 
+                                    className="h-full w-auto object-contain" 
+                                    alt="" 
+                                />
+                            </div>
+                            {idx < partnersTop.length - 1 && <div className="h-3 w-px bg-gray-300"></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+                {/* Row 2: 5 Items */}
+                 <div className="flex justify-center items-center gap-x-2 w-full">
+                    {partnersBottom.map((partner: PartnerLogo, idx) => (
+                        <React.Fragment key={partner.id}>
+                            <div className="relative flex flex-col items-center justify-center h-5">
+                                <img 
+                                    src={partner.url} 
+                                    className="h-full w-auto object-contain" 
+                                    alt="" 
+                                />
+                            </div>
+                            {idx < partnersBottom.length - 1 && <div className="h-3 w-px bg-gray-300"></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
             </div>
         </div>
       </div>
-  );
+  )};
 
   if (loading) {
       return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-10 h-10 text-brand-primary animate-spin" /></div>;
@@ -614,7 +641,13 @@ export default function App() {
           {/* OPTIONAL: Full Page Cover Image (First Page) */}
           {report.coverImage && (
             <div className="print-page w-full h-full p-0 overflow-hidden relative">
-                <img src={report.coverImage} className="w-full h-full object-cover" alt="Cover" />
+                <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" />
+                
+                {/* DYNAMIC TEXT OVERLAY FOR COVER PAGE */}
+                <div className="absolute bottom-[13%] left-0 w-full flex flex-col items-center justify-center z-10 text-white">
+                    <h1 className="text-6xl font-extrabold mb-4 drop-shadow-lg tracking-wide">{report.header.weekTitle}</h1>
+                    <p className="text-2xl font-bold dir-ltr drop-shadow-md opacity-90">{report.header.dateRange}</p>
+                </div>
             </div>
           )}
 
