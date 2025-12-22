@@ -527,7 +527,7 @@ export default function App() {
       }
   };
 
-  // CHANGE: Reduced chunk size to 3 for more breathing room (Spacing improvement)
+  // CHANGE: Increased chunk size to 4 as requested
   const chunkArray = <T,>(array: T[], size: number): T[][] => {
       const result: T[][] = [];
       for (let i = 0; i < array.length; i += size) {
@@ -536,7 +536,7 @@ export default function App() {
       return result;
   };
 
-  const visitChunks = chunkArray(report.visits, 3); // CHANGED TO 3
+  const visitChunks = chunkArray(report.visits, 4); // CHANGED TO 4
 
   // --- Render Components ---
 
@@ -577,21 +577,20 @@ export default function App() {
                 ))}
             </div>
 
-            {/* Print Version (Strict 2 Lines with Separators) */}
-            <div className="hidden print:flex flex-wrap justify-center items-center gap-y-2 gap-x-2 max-w-[90%] mx-auto">
+            {/* Print Version (Strict & Compact) */}
+            <div className="hidden print:flex flex-wrap justify-center items-center gap-y-2 gap-x-2 max-w-full mx-auto">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <React.Fragment key={partner.id}>
-                        <div className="relative flex flex-col items-center justify-center h-8">
+                        <div className="relative flex flex-col items-center justify-center h-5">
                             <img 
                                 src={partner.url} 
-                                style={{ height: '24px', width: 'auto' }} 
-                                className="object-contain" 
+                                className="h-full w-auto object-contain" 
                                 alt="" 
                             />
                         </div>
-                        {/* Gray separator (only if not last, and try to avoid end of line issues via flex) */}
+                        {/* Separator */}
                         {idx < report.logos.partners.length - 1 && (
-                            <div className="h-5 w-px bg-gray-300 mx-2"></div>
+                            <div className="h-4 w-px bg-gray-300 mx-1"></div>
                         )}
                     </React.Fragment>
                 ))}
@@ -626,21 +625,23 @@ export default function App() {
                   {/* Fixed Header */}
                   <div>
                     <ReportHeaderContent />
-                    {/* Compact Title for First Page only (if no cover) */}
-                    {pageIndex === 0 && !report.coverImage && (
-                        <div className="mb-2 border-b-2 border-brand-primary/20 pb-1">
-                             <div className="flex justify-between items-center px-2">
-                                <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                <span className="text-sm text-gray-500 dir-ltr">{report.header.dateRange}</span>
-                             </div>
-                        </div>
-                    )}
+                    {/* Header Title Block - Visible on ALL pages now */}
+                    <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                            <div className="flex justify-between items-center px-2">
+                                <div className="flex flex-col">
+                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                    <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                </div>
+                                <span className="text-sm text-gray-500 dir-ltr font-medium">{report.header.dateRange}</span>
+                            </div>
+                    </div>
                   </div>
 
                   {/* Flexible Content Area: 
-                      CHANGE: Use justify-start and gap-8 to stack from top with MORE SPACE.
+                      CHANGE: Use justify-start and gap-4 to stack from top.
+                      Added pt-4 for top spacing as requested.
                   */}
-                  <div className="flex-grow flex flex-col justify-start gap-8 pt-4">
+                  <div className="flex-grow flex flex-col justify-start gap-4 pt-4">
                       {chunk.map((visit: Visit) => (
                            <VisitCard 
                                 key={visit.id} 
@@ -662,6 +663,16 @@ export default function App() {
           <div className="print-page flex flex-col justify-between">
                <div>
                    <ReportHeaderContent />
+                    {/* Header Title Block - Visible on Stats page too */}
+                    <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                            <div className="flex justify-between items-center px-2">
+                                <div className="flex flex-col">
+                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                    <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                </div>
+                                <span className="text-sm text-gray-500 dir-ltr font-medium">{report.header.dateRange}</span>
+                            </div>
+                    </div>
                    <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
                         <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
                    </div>
