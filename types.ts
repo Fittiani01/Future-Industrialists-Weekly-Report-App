@@ -49,6 +49,7 @@ export interface ReportLogos {
 export interface WeeklyReport {
   id?: string;
   createdAt?: any; // Firestore Timestamp
+  coverImage?: string; // Optional full-page cover image
   header: ReportHeader;
   visits: Visit[];
   stats: Statistics;

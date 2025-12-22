@@ -4,7 +4,7 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate } from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
@@ -70,6 +70,7 @@ export default function App() {
   const wordInputRef = useRef<HTMLInputElement>(null);
   const bulkImageInputRef = useRef<HTMLInputElement>(null);
   const bulkLogoInputRef = useRef<HTMLInputElement>(null);
+  const coverImageRef = useRef<HTMLInputElement>(null);
   const mainLogoRef = useRef<HTMLInputElement>(null);
   const rightLogoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const partnerRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -334,6 +335,19 @@ export default function App() {
        return await uploadReportImage(file, report.id, visitId);
   }
 
+  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && report.id) {
+        try {
+            const url = await uploadReportImage(file, report.id, 'cover_page');
+            updateCurrentReport({ coverImage: url });
+        } catch(e) {
+            console.error("Cover upload failed", e);
+            alert("فشل رفع صورة الغلاف");
+        }
+    }
+  };
+
   const handleLogoUpdate = (section: 'main' | 'right' | 'partners' | 'categories', indexOrKey: number | string = -1) => async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -576,6 +590,14 @@ export default function App() {
           PRINT VIEW (Hidden on Screen) 
           ======================= */}
       <div className="hidden print-only-container">
+          
+          {/* OPTIONAL: Full Page Cover Image (First Page) */}
+          {report.coverImage && (
+            <div className="print-page w-full h-full p-0 overflow-hidden relative">
+                <img src={report.coverImage} className="w-full h-full object-cover" alt="Cover" />
+            </div>
+          )}
+
           {/* Loop over chunks of visits to create pages */}
           {visitChunks.map((chunk, pageIndex) => (
               <div key={pageIndex} className="print-page flex flex-col justify-between">
@@ -583,8 +605,8 @@ export default function App() {
                   {/* Fixed Header */}
                   <div>
                     <ReportHeaderContent />
-                    {/* Compact Title for First Page only */}
-                    {pageIndex === 0 && (
+                    {/* Compact Title for First Page only (if no cover) */}
+                    {pageIndex === 0 && !report.coverImage && (
                         <div className="mb-2 border-b-2 border-brand-primary/20 pb-1">
                              <div className="flex justify-between items-center px-2">
                                 <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
@@ -620,12 +642,12 @@ export default function App() {
           <div className="print-page flex flex-col justify-between">
                <div>
                    <ReportHeaderContent />
-                   <div className="mb-6 border-b-2 border-brand-primary/20 pb-2 mt-4">
-                        <h2 className="text-3xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
+                   <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
+                        <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
                    </div>
                </div>
                
-               <div className="flex-grow flex flex-col justify-center py-4">
+               <div className="flex-grow flex flex-col justify-start py-4 print:py-0">
                     <StatisticsSection 
                         stats={report.stats} 
                         categoryLogos={report.logos.categories}
@@ -717,6 +739,23 @@ export default function App() {
         {/* --- SMART IMPORT AREA (Admin Only) --- */}
         {isEditing && isAdmin && (
             <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl no-print space-y-6">
+                {/* Cover Page Uploader */}
+                 <div className="border-b border-indigo-100 pb-6">
+                    <div className="flex items-center gap-2 mb-3 text-brand-dark"><LayoutTemplate className="text-pink-500" /><h2 className="font-bold text-lg">0. صورة الغلاف (اختياري)</h2></div>
+                    <div className="flex gap-4 items-center">
+                        <input type="file" ref={coverImageRef} accept="image/*" onChange={handleCoverImageUpload} className="hidden" />
+                        <button onClick={() => coverImageRef.current?.click()} className="bg-white border border-pink-300 text-pink-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-pink-50">
+                            <ImageIcon size={16} /> رفع تصميم صفحة الغلاف (A4 كاملة)
+                        </button>
+                        {report.coverImage && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-green-600 text-sm font-bold flex items-center gap-1"><CheckCircle2 size={14}/> تم الرفع</span>
+                                <button onClick={() => updateCurrentReport({ coverImage: undefined })} className="text-red-500 text-xs underline">حذف</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 {/* Text Parser */}
                 <div className="border-b border-indigo-100 pb-6">
                     <div className="flex items-center gap-2 mb-3 text-brand-dark"><Sparkles className="text-yellow-500" /><h2 className="font-bold text-lg">1. استيراد البيانات</h2></div>
