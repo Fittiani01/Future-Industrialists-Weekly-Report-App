@@ -48,6 +48,7 @@ export interface ReportLogos {
 
 export interface WeeklyReport {
   id?: string;
+  createdAt?: any; // Firestore Timestamp
   header: ReportHeader;
   visits: Visit[];
   stats: Statistics;
