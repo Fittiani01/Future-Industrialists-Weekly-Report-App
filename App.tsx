@@ -603,8 +603,10 @@ export default function App() {
   )};
 
   const DecorationLayer = ({ isPrint = false }) => (
-      // Corrected Z-Index to ensure it appears above white background but below content
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isPrint ? 'print-layer z-[2]' : 'z-[5]'}`}>
+      // Z-Index Logic:
+      // If Editing and NOT printing: z-[50] (Front of everything, allows dragging)
+      // If Printing or Viewing: z-[2] (Behind content but above background)
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[50]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
@@ -618,13 +620,13 @@ export default function App() {
                     pointerEvents: isEditing && !isPrint ? 'auto' : 'none',
                 }}
                 onMouseDown={(e) => !isPrint && handleDecoMouseDown(e, d.id)}
-                className={`origin-top-left ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded' : ''}`}
+                className={`origin-top-left ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded' : ''} ${isEditing ? 'border border-dashed border-gray-300/50' : ''}`}
               >
                   <img src={d.url} className="max-w-[300px] h-auto object-contain select-none pointer-events-none" draggable={false} alt="" />
                   
                   {/* Controls for Editing */}
                   {isEditing && !isPrint && (
-                      <div className="absolute -top-10 left-0 flex items-center gap-1 bg-white shadow-md rounded p-1 pointer-events-auto">
+                      <div className="absolute -top-10 left-0 flex items-center gap-1 bg-white shadow-md rounded p-1 pointer-events-auto z-[60]">
                           <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, 0.1); }} className="p-1 hover:bg-gray-100 rounded text-green-600"><Plus size={14}/></button>
                           <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, -0.1); }} className="p-1 hover:bg-gray-100 rounded text-red-600"><Minus size={14}/></button>
                           <button onClick={(e) => { e.stopPropagation(); deleteDecoration(d.id); }} className="p-1 hover:bg-gray-100 rounded text-red-600 ml-2"><Trash2 size={14}/></button>
@@ -643,14 +645,13 @@ export default function App() {
       {/* ======================= PRINT VIEW ======================= */}
       <div className="hidden print-only-container">
           
-          {/* 1. Cover Page */}
+          {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
-            // Ensure z-0 allows img to be seen, content is z-10
             <div className="print-page w-full h-full p-0 overflow-hidden relative" style={{ height: '297mm', width: '210mm' }}>
                 <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" style={{ objectFit: 'cover' }} />
-                <div className="absolute bottom-[13%] left-0 w-full flex flex-col items-center justify-center z-10 text-white">
-                    <h1 className="text-6xl font-extrabold mb-4 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-wide text-center" style={{textShadow: '2px 2px 4px black'}}>{report.header.weekTitle}</h1>
-                    <p className="text-2xl font-bold dir-ltr drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-95 text-center" style={{textShadow: '1px 1px 3px black'}}>{report.header.dateRange}</p>
+                <div className="absolute bottom-[15%] left-0 w-full flex flex-col items-center justify-center z-10 text-white">
+                    <h1 className="text-6xl font-extrabold mb-4 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-wide text-center" style={{textShadow: '2px 2px 8px black'}}>{report.header.weekTitle}</h1>
+                    <p className="text-3xl font-bold dir-ltr drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-95 text-center" style={{textShadow: '2px 2px 4px black'}}>{report.header.dateRange}</p>
                 </div>
             </div>
           )}
