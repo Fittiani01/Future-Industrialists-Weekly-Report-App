@@ -112,7 +112,7 @@
         display: block;
       }
       
-      /* --- PRINT STYLES (A4 Fixed Header/Footer) --- */
+      /* --- PRINT STYLES (Controlled A4 Layout) --- */
       @media print {
         @page {
           size: A4;
@@ -123,72 +123,35 @@
           background-color: white !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
-          width: 210mm;
-          height: auto;
         }
 
-        /* Hide Backgrounds and UI elements */
-        .no-print, .animated-bg, .glow-layer, #network-canvas, button { 
+        /* Hide Screen UI elements */
+        .no-print, .animated-bg, .glow-layer, #network-canvas, .screen-only-container { 
           display: none !important; 
         }
 
-        /* Container Reset */
-        .max-w-\[210mm\] {
-          max-width: none !important;
-          width: 100% !important;
-          box-shadow: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          border-radius: 0 !important;
+        /* Show Print UI elements */
+        .print-only-container {
+            display: block !important;
         }
 
-        /* Fixed Header Logic */
-        .print-header-fixed {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 120px;
-          background: white;
-          z-index: 1000;
-          padding: 10px 20px;
-          display: flex !important;
-          border-bottom: 2px solid #2a3590;
+        /* Force Page Break */
+        .print-page-break {
+            page-break-after: always;
+            break-after: page;
+            height: 297mm; /* Exact A4 Height */
+            width: 210mm;  /* Exact A4 Width */
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: white;
         }
 
-        /* Fixed Footer Logic */
-        .print-footer-fixed {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          height: 100px;
-          background: white;
-          z-index: 1000;
-          padding: 10px 20px;
-          display: flex !important;
-          align-items: center;
-          justify-content: center;
-          border-top: 1px solid #eee;
-        }
-
-        /* Main Content Padding to prevent overlap */
-        .print-content-wrapper {
-          margin-top: 130px;
-          margin-bottom: 110px;
-          padding: 0 20px;
-        }
-
-        /* Avoid breaking inside cards */
-        .print-break-inside {
-          break-inside: avoid;
-          page-break-inside: avoid;
-          margin-bottom: 20px;
-        }
-
-        /* Hide the original on-screen header/footer to avoid duplication if we use fixed ones */
-        .screen-header, .screen-footer {
-          display: none !important;
+        /* Last page shouldn't necessarily force a break if it's the very end, 
+           but usually safe to keep it consistent */
+        .print-page-break:last-child {
+            page-break-after: auto;
         }
       }
     </style>

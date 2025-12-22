@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Visit, WeeklyReport, Statistics, CategoryLogos } from './types';
+import { Visit, WeeklyReport, Statistics, CategoryLogos, PartnerLogo } from './types';
 import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
@@ -93,16 +93,14 @@ export default function App() {
         }
 
         try {
-            // Fetch reports metadata (without visits array if schema was already migrated, 
-            // or with visits array if old schema - we'll handle both)
             const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "desc"));
             const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
             
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
-                // Ensure visits is initialized as empty array locally, we will fetch real visits from subcollection
-                loadedReports.push({ id: doc.id, ...data, visits: [] } as WeeklyReport);
+                // FIX: Fallback to data.visits (old schema) if it exists, to prevent data loss appearance
+                loadedReports.push({ id: doc.id, ...data, visits: data.visits || [] } as WeeklyReport);
             });
 
             if (loadedReports.length > 0) {
@@ -131,7 +129,6 @@ export default function App() {
           try {
               // Fetch visits subcollection
               const visitsRef = collection(db, "weeklyReports", reportId, "visits");
-              // Use simplified query to avoid index issues initially
               const q = query(visitsRef); 
               const snapshot = await getDocs(q);
               
@@ -140,20 +137,20 @@ export default function App() {
                   fetchedVisits.push({ id: doc.id, ...doc.data() } as Visit);
               });
 
-              // Sort visits client-side if needed, e.g. by date or id
               fetchedVisits.sort((a, b) => a.id.localeCompare(b.id));
 
-              // Update ONLY the visits of the current report in state
-              setReports(prev => {
-                  const newReports = [...prev];
-                  if (newReports[currentReportIndex]) {
-                      newReports[currentReportIndex] = {
-                          ...newReports[currentReportIndex],
-                          visits: fetchedVisits
-                      };
-                  }
-                  return newReports;
-              });
+              if (fetchedVisits.length > 0) {
+                  setReports(prev => {
+                      const newReports = [...prev];
+                      if (newReports[currentReportIndex]) {
+                          newReports[currentReportIndex] = {
+                              ...newReports[currentReportIndex],
+                              visits: fetchedVisits
+                          };
+                      }
+                      return newReports;
+                  });
+              }
 
           } catch (e) {
               console.error("Error fetching visits subcollection:", e);
@@ -182,6 +179,7 @@ export default function App() {
         
         const reportToSave = { 
             ...mainReportData, 
+            visits: [], 
             id: reportId,
             createdAt: report.createdAt || serverTimestamp() 
         };
@@ -192,12 +190,10 @@ export default function App() {
         // 3. Sync Visits Subcollection
         const visitsRef = collection(db, "weeklyReports", reportId, "visits");
         
-        // Get existing visits to check for deletions
         const existingSnapshot = await getDocs(visitsRef);
         const existingIds = new Set(existingSnapshot.docs.map(d => d.id));
         const currentIds = new Set(visits.map(v => v.id));
 
-        // Delete removed visits
         const deletePromises: Promise<void>[] = [];
         existingIds.forEach(id => {
             if (!currentIds.has(id)) {
@@ -214,7 +210,6 @@ export default function App() {
         
         setIsDirty(false);
         if (!report.id) {
-            // Update local ID if it was new
             updateCurrentReport({ id: reportId });
         }
     } catch (error: any) {
@@ -244,7 +239,6 @@ export default function App() {
   };
 
   // --- Handlers ---
-
   const handleCreateNewReport = () => {
       const nextWeekNum = reports.length + 1;
       const newId = `week-${Date.now()}`;
@@ -253,7 +247,7 @@ export default function App() {
           id: newId,
           header: { ...INITIAL_REPORT.header, weekTitle: `الأسبوع ${nextWeekNum}` },
           logos: report.logos, 
-          visits: [], // Start with empty visits
+          visits: [], 
           createdAt: serverTimestamp() 
       };
       
@@ -272,13 +266,11 @@ export default function App() {
           const reportId = report.id;
           if (reportId) {
               try {
-                  // 1. Delete all visits in subcollection manually
                   const visitsRef = collection(db, "weeklyReports", reportId, "visits");
                   const snapshot = await getDocs(visitsRef);
                   const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
                   await Promise.all(deletePromises);
 
-                  // 2. Delete main doc
                   await deleteDoc(doc(db, "weeklyReports", reportId));
                   
                   const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
@@ -293,7 +285,6 @@ export default function App() {
   };
 
   // --- Field Updates ---
-
   const handleUpdateVisit = (id: string, data: Partial<Visit>) => {
     updateCurrentReport(prev => ({
       ...prev,
@@ -326,7 +317,6 @@ export default function App() {
   }
 
   // --- Images & Logos ---
-
   const handleManualVisitImageUpload = async (files: File[], visitId: string): Promise<string[]> => {
       if (!report.id) return [];
       const urls: string[] = [];
@@ -395,7 +385,6 @@ export default function App() {
   };
 
   // --- AI & Bulk Ops ---
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -449,7 +438,7 @@ export default function App() {
         
         const newVisits = [...report.visits];
         let matchCount = 0;
-        const visitMap = new Map(newVisits.map(v => [v.id, v]));
+        const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -494,7 +483,7 @@ export default function App() {
         const mapping = await matchLogosToFactories(filenames, report.visits);
         
         const newVisits = [...report.visits];
-        const visitMap = new Map(newVisits.map(v => [v.id, v]));
+        const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
         let matchCount = 0;
 
         for (let i = 0; i < files.length; i++) {
@@ -533,10 +522,21 @@ export default function App() {
       }
   };
 
+  // --- Helpers for Printing ---
+  const chunkArray = <T,>(array: T[], size: number): T[][] => {
+      const result: T[][] = [];
+      for (let i = 0; i < array.length; i += size) {
+          result.push(array.slice(i, i + size));
+      }
+      return result;
+  };
+
+  const visitChunks = chunkArray(report.visits, 3);
+
   // --- Render Components ---
 
   const ReportHeaderContent = () => (
-      <header className="flex justify-between items-center w-full h-full">
+      <header className="flex justify-between items-center w-full mb-6">
             <div className="flex items-center gap-2 h-16">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
@@ -553,15 +553,44 @@ export default function App() {
       </header>
   );
 
+  const ReportTitleBlock = () => (
+    <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-6 shadow-sm">
+        <div className="text-right">
+            <h1 className="text-2xl font-bold mb-1">التقرير الأسبوعي</h1>
+            <p className="text-indigo-100 text-sm">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
+        </div>
+        <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm">
+            <h2 className="text-lg font-bold">{report.header.weekTitle}</h2>
+            <p className="text-sm dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
+        </div>
+    </div>
+  );
+
   const ReportFooterContent = () => (
-      <div className="w-full flex flex-col items-center">
-        <div className="text-center mb-4 text-brand-dark font-bold text-xl relative z-10">شركاء النجاح</div>
-        <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-4 px-4 relative z-10">
-            {report.logos.partners.map((partner, idx) => (
-                <div key={partner.id} className="relative flex flex-col items-center">
-                    <img src={partner.url} style={{ height: `${40 * partner.scale}px`, width: 'auto' }} className="object-contain" alt="" />
-                </div>
-            ))}
+      <div className="w-full flex flex-col items-center mt-auto pb-4 pt-4 border-t border-gray-200">
+        <div className="text-center mb-3 text-brand-dark font-bold text-xl relative z-10">شركاء النجاح</div>
+        <div className="w-full px-4 relative z-10">
+            {/* UPDATED: Use Flex with gap control to ensure 2 rows look balanced */}
+            <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-4 max-w-[90%] mx-auto">
+                {report.logos.partners.map((partner: PartnerLogo, idx) => (
+                    <div key={partner.id} className="relative flex flex-col items-center justify-center">
+                        <img 
+                            src={partner.url} 
+                            style={{ height: `${40 * partner.scale}px`, width: 'auto', maxWidth: '120px' }} 
+                            className="object-contain" 
+                            alt="" 
+                        />
+                    </div>
+                ))}
+            </div>
+        </div>
+        
+        {/* Geometric Corners - Bottom Aligned */}
+        <div className="absolute -bottom-1 -right-1 w-32 h-32 overflow-hidden pointer-events-none z-0">
+            <ConstellationCorner className="w-full h-full" />
+        </div>
+        <div className="absolute -bottom-1 -left-1 w-32 h-32 overflow-hidden pointer-events-none z-0">
+            <ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} />
         </div>
       </div>
   );
@@ -573,9 +602,55 @@ export default function App() {
   return (
     <div className="min-h-screen pb-4 relative">
       
-      {/* --- PRINT OVERLAYS --- */}
-      <div className="print-header-fixed hidden print:flex"><ReportHeaderContent /></div>
-      <div className="print-footer-fixed hidden print:flex"><ReportFooterContent /></div>
+      {/* =======================
+          PRINT VIEW (Hidden on Screen) 
+          ======================= */}
+      <div className="hidden print-only-container">
+          {/* Loop over chunks of visits to create pages */}
+          {visitChunks.map((chunk, pageIndex) => (
+              <div key={pageIndex} className="print-page-break p-8 md:p-12 relative">
+                  <ReportHeaderContent />
+                  {/* Only show title block on first page */}
+                  {pageIndex === 0 && <ReportTitleBlock />}
+                  
+                  <div className="flex-grow flex flex-col gap-6">
+                      {chunk.map((visit: Visit) => (
+                           <VisitCard 
+                                key={visit.id} 
+                                visit={visit} 
+                                isEditing={false} // Force editing off for print
+                                onUpdate={() => {}}
+                                onDelete={() => {}}
+                                onImageClick={() => {}}
+                            />
+                      ))}
+                  </div>
+
+                  <ReportFooterContent />
+              </div>
+          ))}
+
+          {/* Statistics Page (Always the last page) */}
+          <div className="print-page-break p-8 md:p-12 relative">
+               <ReportHeaderContent />
+               <div className="flex-grow flex flex-col justify-center">
+                    <h2 className="text-2xl font-bold text-center mb-6 text-brand-dark">إحصائيات المبادرة</h2>
+                    <StatisticsSection 
+                        stats={report.stats} 
+                        categoryLogos={report.logos.categories}
+                        isEditing={false}
+                        onUpdate={() => {}}
+                        onLogoUpdate={() => (() => {})}
+                    />
+               </div>
+               <ReportFooterContent />
+          </div>
+      </div>
+
+
+      {/* =======================
+          SCREEN VIEW (Hidden on Print) 
+          ======================= */}
 
       {selectedImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 animate-fade-in no-print" onClick={() => setSelectedImage(null)}>
@@ -586,14 +661,14 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Container */}
-      <div className="max-w-[210mm] mx-auto mt-8 bg-white shadow-2xl min-h-[297mm] h-auto p-8 md:p-12 relative flex flex-col print:shadow-none print:mt-0 print:w-full print:max-w-none print:h-auto z-10 rounded-[2.5rem] overflow-hidden print-content-wrapper">
+      {/* Screen Container */}
+      <div className="screen-only-container max-w-[210mm] mx-auto mt-8 bg-white shadow-2xl min-h-[297mm] h-auto p-8 md:p-12 relative flex flex-col z-10 rounded-[2.5rem] overflow-hidden">
         
-        {/* --- ADMIN CONTROL STRIP (Only if Admin) --- */}
+        {/* --- ADMIN CONTROL STRIP --- */}
         {isAdmin && (
             <div className="no-print mb-8 bg-gray-50 rounded-xl p-3 border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 shadow-inner">
                 <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
-                    {reports.map((r, idx) => (
+                    {reports.map((r: WeeklyReport, idx) => (
                         <button
                             key={r.id}
                             onClick={() => setCurrentReportIndex(idx)}
@@ -683,8 +758,8 @@ export default function App() {
             </div>
         )}
 
-        {/* --- REPORT HEADER (Screen Only) --- */}
-        <div className="screen-header border-b-2 border-brand-primary pb-6 mb-8">
+        {/* --- REPORT HEADER (Editable) --- */}
+        <div className="border-b-2 border-brand-primary pb-6 mb-8">
             <header className="flex justify-between items-center">
                 <div className="flex items-center gap-2 h-16">
                     {report.logos.rightLogos.map((logo, idx) => (
@@ -705,7 +780,7 @@ export default function App() {
         </div>
 
         {/* Report Title */}
-        <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg print-break-inside">
+        <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg">
             <div className="text-right">
                 <h1 className="text-2xl md:text-3xl font-bold mb-1">التقرير الأسبوعي</h1>
                 <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
@@ -730,7 +805,7 @@ export default function App() {
             {visitsLoading ? (
                  <div className="flex items-center justify-center h-40"><Loader2 className="w-8 h-8 text-brand-primary animate-spin" /></div>
             ) : (
-                report.visits.map((visit) => (
+                report.visits.map((visit: Visit) => (
                     <VisitCard 
                         key={visit.id} 
                         visit={visit} 
@@ -750,30 +825,20 @@ export default function App() {
                 </button>
             )}
 
-            <div className="print-break-inside">
-                <StatisticsSection 
-                    stats={report.stats} 
-                    categoryLogos={report.logos.categories}
-                    isEditing={isEditing}
-                    onUpdate={handleUpdateStats}
-                    onLogoUpdate={(key) => handleLogoUpdate('categories', key)}
-                />
-            </div>
+            <StatisticsSection 
+                stats={report.stats} 
+                categoryLogos={report.logos.categories}
+                isEditing={isEditing}
+                onUpdate={handleUpdateStats}
+                onLogoUpdate={(key) => handleLogoUpdate('categories', key)}
+            />
         </div>
 
-        {/* --- REPORT FOOTER (Screen Only) --- */}
-        <footer className="screen-footer mt-8 pt-4 border-t border-gray-200 relative pb-4">
-            {/* Geometric Corners - Bottom Aligned */}
-            <div className="absolute -bottom-1 -right-1 w-40 h-40 overflow-hidden pointer-events-none z-0">
-                <ConstellationCorner className="w-full h-full" />
-            </div>
-            <div className="absolute -bottom-1 -left-1 w-40 h-40 overflow-hidden pointer-events-none z-0">
-                <ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} />
-            </div>
-            
-            <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
-            <div className="flex flex-wrap justify-center items-start gap-x-8 gap-y-8 px-4 relative z-10">
-                {report.logos.partners.map((partner, idx) => (
+        {/* --- REPORT FOOTER (Screen Only, uses same component structure) --- */}
+        <div className="mt-8 pt-4 border-t border-gray-200 relative pb-4">
+             <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
+             <div className="flex flex-wrap justify-center items-start gap-x-8 gap-y-8 px-4 relative z-10">
+                {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <div key={partner.id} className="relative flex flex-col items-center gap-2 group/partner">
                         <div 
                            className={`relative ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`}
@@ -788,7 +853,7 @@ export default function App() {
                              <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
                         </div>
                         
-                        {/* Precision Zoom Controls */}
+                        {/* Precision Zoom Controls (Only in Screen Mode) */}
                         {isEditing && (
                             <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20">
                                 <button 
@@ -811,7 +876,14 @@ export default function App() {
                     </div>
                 ))}
             </div>
-        </footer>
+            
+            <div className="absolute -bottom-1 -right-1 w-40 h-40 overflow-hidden pointer-events-none z-0">
+                <ConstellationCorner className="w-full h-full" />
+            </div>
+            <div className="absolute -bottom-1 -left-1 w-40 h-40 overflow-hidden pointer-events-none z-0">
+                <ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} />
+            </div>
+        </div>
 
       </div>
     </div>
