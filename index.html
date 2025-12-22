@@ -124,7 +124,9 @@
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
           width: 210mm;
-          height: 100%;
+          /* Avoid 100% height here to stop forced extra page */
+          height: auto; 
+          margin: 0;
         }
 
         /* Hide Screen UI elements */
@@ -139,7 +141,8 @@
 
         /* Explicit Page Break Wrapper */
         .print-page {
-            height: 296mm; /* Slightly less than 297mm to prevent bleed */
+            /* Use 100vh to fill exactly one printed page */
+            height: 100vh;
             width: 210mm;
             position: relative;
             page-break-after: always;
@@ -154,6 +157,9 @@
         
         .print-page:last-child {
             page-break-after: auto;
+            break-after: auto;
+            height: auto; /* Let last page naturally end */
+            min-height: 290mm; /* Ensure it still looks like A4 */
         }
       }
     </style>

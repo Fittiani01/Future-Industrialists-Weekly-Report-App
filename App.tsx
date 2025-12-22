@@ -527,7 +527,7 @@ export default function App() {
       }
   };
 
-  // CHANGE: Increased chunk size to 4 to fit up to 4 schools per page
+  // CHANGE: Reduced chunk size to 3 for more breathing room (Spacing improvement)
   const chunkArray = <T,>(array: T[], size: number): T[][] => {
       const result: T[][] = [];
       for (let i = 0; i < array.length; i += size) {
@@ -536,7 +536,7 @@ export default function App() {
       return result;
   };
 
-  const visitChunks = chunkArray(report.visits, 4);
+  const visitChunks = chunkArray(report.visits, 3); // CHANGED TO 3
 
   // --- Render Components ---
 
@@ -563,16 +563,37 @@ export default function App() {
       <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
-            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto">
+            {/* Screen Version (Flexible) */}
+            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto print:hidden">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <div key={partner.id} className="relative flex flex-col items-center justify-center">
                         <img 
                             src={partner.url} 
                             style={{ height: `${35 * partner.scale}px`, width: 'auto', maxWidth: '100px' }} 
-                            className="object-contain print:h-7" 
+                            className="object-contain" 
                             alt="" 
                         />
                     </div>
+                ))}
+            </div>
+
+            {/* Print Version (Strict 2 Lines with Separators) */}
+            <div className="hidden print:flex flex-wrap justify-center items-center gap-y-2 gap-x-2 max-w-[90%] mx-auto">
+                {report.logos.partners.map((partner: PartnerLogo, idx) => (
+                    <React.Fragment key={partner.id}>
+                        <div className="relative flex flex-col items-center justify-center h-8">
+                            <img 
+                                src={partner.url} 
+                                style={{ height: '24px', width: 'auto' }} 
+                                className="object-contain" 
+                                alt="" 
+                            />
+                        </div>
+                        {/* Gray separator (only if not last, and try to avoid end of line issues via flex) */}
+                        {idx < report.logos.partners.length - 1 && (
+                            <div className="h-5 w-px bg-gray-300 mx-2"></div>
+                        )}
+                    </React.Fragment>
                 ))}
             </div>
         </div>
@@ -617,10 +638,9 @@ export default function App() {
                   </div>
 
                   {/* Flexible Content Area: 
-                      CHANGE: Use justify-start and gap-4 to stack from top.
-                      This ensures that if there are only 2 items, they are at top, not spaced out.
+                      CHANGE: Use justify-start and gap-8 to stack from top with MORE SPACE.
                   */}
-                  <div className="flex-grow flex flex-col justify-start gap-4 pt-2">
+                  <div className="flex-grow flex flex-col justify-start gap-8 pt-4">
                       {chunk.map((visit: Visit) => (
                            <VisitCard 
                                 key={visit.id} 

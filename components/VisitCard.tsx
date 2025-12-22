@@ -54,7 +54,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   };
 
   return (
-    <div className="mb-8 print:mb-0 break-inside-avoid relative shadow-lg rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent">
+    <div className="mb-8 print:mb-8 break-inside-avoid relative shadow-lg rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent">
       
       {/* Header Bar - Optimized Alignment & Larger Print Fonts */}
       <div className="bg-brand-dark text-white p-3 print:py-2 print:px-3 flex flex-col md:flex-row print:flex-row items-center justify-between gap-3 relative rounded-t-xl print:rounded-lg">
