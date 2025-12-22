@@ -47,6 +47,7 @@ export interface ReportLogos {
 }
 
 export interface WeeklyReport {
+  id?: string;
   header: ReportHeader;
   visits: Visit[];
   stats: Statistics;

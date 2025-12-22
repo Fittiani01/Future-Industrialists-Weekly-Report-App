@@ -12,6 +12,7 @@ export const LOGOS = {
 };
 
 export const INITIAL_REPORT: WeeklyReport = {
+  id: "draft-report-1",
   header: {
     weekTitle: "الأسبوع الأول",
     dateRange: "من 2026/01/18 الى 2026/01/22"

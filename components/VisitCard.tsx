@@ -8,26 +8,75 @@ interface VisitCardProps {
   onUpdate: (id: string, data: Partial<Visit>) => void;
   onDelete: (id: string) => void;
   onImageClick: (imageUrl: string) => void;
+  onUploadImages?: (files: File[]) => Promise<string[]>;
 }
 
-export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate, onDelete, onImageClick }) => {
+// Reuse compression helper logic here (duplicated to stay isolated/robust) - KEEPING ONLY FOR LOGOS OR FALLBACK
+// For visit images, we rely on onUploadImages prop if provided.
+const compressImageLocal = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1000; 
+                const scaleSize = MAX_WIDTH / img.width;
+                const width = (scaleSize < 1) ? MAX_WIDTH : img.width;
+                const height = (scaleSize < 1) ? img.height * scaleSize : img.height;
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                } else {
+                    resolve(event.target?.result as string);
+                }
+            };
+            img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+    });
+};
+
+export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate, onDelete, onImageClick, onUploadImages }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newImages = Array.from(e.target.files).map((file) => URL.createObjectURL(file as Blob));
-      // Keep only up to 4 images total
-      const combined = [...visit.images, ...newImages].slice(0, 4);
-      onUpdate(visit.id, { images: combined });
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files) as File[];
+      
+      if (onUploadImages) {
+          try {
+              const urls = await onUploadImages(files);
+              const combined = [...visit.images, ...urls].slice(0, 4);
+              onUpdate(visit.id, { images: combined });
+          } catch (error) {
+              console.error("Upload failed", error);
+              alert("فشل رفع الصور. حاول مرة أخرى.");
+          }
+      } else {
+          // Fallback to local base64 if no uploader provided
+          const promises = files.map(file => compressImageLocal(file));
+          Promise.all(promises).then(base64Images => {
+              const combined = [...visit.images, ...base64Images].slice(0, 4);
+              onUpdate(visit.id, { images: combined });
+          });
+      }
     }
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-          const logoUrl = URL.createObjectURL(file);
-          onUpdate(visit.id, { factoryLogo: logoUrl });
+          compressImageLocal(file).then(base64 => {
+              onUpdate(visit.id, { factoryLogo: base64 });
+          });
       }
   }
 

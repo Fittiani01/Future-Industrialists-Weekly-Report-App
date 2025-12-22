@@ -44,23 +44,21 @@
       body {
         margin: 0;
         padding: 0;
-        background-color: transparent; /* Changed from dark color to transparent */
+        background-color: transparent;
         min-height: 100vh;
         overflow-x: hidden;
       }
       
-      /* 1. Strong Moving Gradient Background - High Contrast */
       .animated-bg {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        /* Lighter, more vibrant gradient to be visible */
         background: linear-gradient(-45deg, #0f1125, #2a3590, #6c429e, #3d59a5);
         background-size: 400% 400%;
         animation: gradientAnimation 12s ease infinite;
-        z-index: -3; /* Adjusted z-index */
+        z-index: -3;
       }
       
       @keyframes gradientAnimation {
@@ -69,7 +67,6 @@
         100% { background-position: 0% 50%; }
       }
 
-      /* 2. Glowing Orbs Overlay */
       .glow-layer {
         position: fixed;
         top: 0;
@@ -84,7 +81,7 @@
         position: absolute;
         border-radius: 50%;
         filter: blur(80px);
-        opacity: 0.6; /* Increased opacity */
+        opacity: 0.6;
         animation: floatBlob 20s infinite ease-in-out alternate;
       }
 
@@ -110,23 +107,94 @@
         100% { transform: translate(30px, 30px) scale(1.1); }
       }
 
-      /* 3. Particle Network Canvas - Very Visible */
       #network-canvas {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        z-index: -1; /* Top of background stack */
+        z-index: -1;
         display: block;
       }
       
-      /* Print styles */
+      /* --- PRINT STYLES (A4 Fixed Header/Footer) --- */
       @media print {
-        .no-print { display: none !important; }
-        .print-break-inside { break-inside: avoid; }
-        body { background-color: white !important; -webkit-print-color-adjust: exact; }
-        .animated-bg, .glow-layer, #network-canvas { display: none !important; }
+        @page {
+          size: A4;
+          margin: 0; /* We handle margins manually to accommodate fixed headers */
+        }
+
+        body {
+          background-color: white !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          width: 210mm;
+          height: auto;
+        }
+
+        /* Hide Backgrounds and UI elements */
+        .no-print, .animated-bg, .glow-layer, #network-canvas, button { 
+          display: none !important; 
+        }
+
+        /* Container Reset */
+        .max-w-\[210mm\] {
+          max-width: none !important;
+          width: 100% !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border-radius: 0 !important;
+        }
+
+        /* Fixed Header Logic */
+        .print-header-fixed {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 120px; /* Adjust based on your header height */
+          background: white;
+          z-index: 1000;
+          padding: 10px 20px;
+          display: flex !important; /* Force show in print */
+          border-bottom: 2px solid #2a3590;
+        }
+
+        /* Fixed Footer Logic */
+        .print-footer-fixed {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 100px; /* Adjust based on footer height */
+          background: white;
+          z-index: 1000;
+          padding: 10px 20px;
+          display: flex !important; /* Force show in print */
+          align-items: center;
+          justify-content: center;
+          border-top: 1px solid #eee;
+        }
+
+        /* Main Content Padding to prevent overlap */
+        .print-content-wrapper {
+          margin-top: 130px; /* Header height + gap */
+          margin-bottom: 110px; /* Footer height + gap */
+          padding: 0 20px;
+        }
+
+        /* Avoid breaking inside cards */
+        .print-break-inside {
+          break-inside: avoid;
+          page-break-inside: avoid;
+          margin-bottom: 20px;
+        }
+
+        /* Hide the original on-screen header/footer to avoid duplication if we use fixed ones */
+        .screen-header, .screen-footer {
+          display: none !important;
+        }
       }
     </style>
   <script type="importmap">
@@ -137,31 +205,27 @@
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "mammoth": "https://esm.sh/mammoth@1.6.0"
+    "mammoth": "https://esm.sh/mammoth@1.6.0",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
   }
 }
 </script>
 </head>
   <body>
-    <!-- Background Layers -->
     <div class="animated-bg"></div>
     <div class="glow-layer">
         <div class="glow-blob glow-blob-1"></div>
         <div class="glow-blob glow-blob-2"></div>
     </div>
     <canvas id="network-canvas"></canvas>
-    
     <div id="root"></div>
 
-    <!-- Particle Network Script -->
     <script>
       (function() {
         const canvas = document.getElementById('network-canvas');
         const ctx = canvas.getContext('2d');
         let width, height;
         let particles = [];
-
-        // Network Configuration
         const particleCount = 100;
         const connectionDistance = 160;
         const moveSpeed = 0.7; 
@@ -175,29 +239,21 @@
 
         class Particle {
           constructor() {
-            // Start from the center with some randomness
             this.x = (width / 2) + (Math.random() - 0.5) * 200;
             this.y = (height / 2) + (Math.random() - 0.5) * 200;
-            
-            // Velocity explodes outwards initially or flows organically
             this.vx = (Math.random() - 0.5) * moveSpeed;
             this.vy = (Math.random() - 0.5) * moveSpeed;
             this.size = Math.random() * 2 + 1.5;
           }
-
           update() {
             this.x += this.vx;
             this.y += this.vy;
-
-            // Bounce off edges
             if (this.x < 0 || this.x > width) this.vx *= -1;
             if (this.y < 0 || this.y > height) this.vy *= -1;
           }
-
           draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            // Bright white particles for visibility against gradient
             ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
             ctx.fill();
           }
@@ -213,24 +269,18 @@
 
         function animate() {
           ctx.clearRect(0, 0, width, height);
-          
           for (let i = 0; i < particles.length; i++) {
             let p1 = particles[i];
             p1.update();
             p1.draw();
-
-            // Connect lines
             for (let j = i + 1; j < particles.length; j++) {
               let p2 = particles[j];
               let dx = p1.x - p2.x;
               let dy = p1.y - p2.y;
               let distance = Math.sqrt(dx * dx + dy * dy);
-
               if (distance < connectionDistance) {
                 ctx.beginPath();
-                // Opacity based on distance
                 let opacity = 1 - (distance / connectionDistance);
-                // White/Blue lines
                 ctx.strokeStyle = `rgba(200, 220, 255, ${opacity * 0.5})`; 
                 ctx.lineWidth = 1;
                 ctx.moveTo(p1.x, p1.y);
@@ -241,7 +291,6 @@
           }
           requestAnimationFrame(animate);
         }
-
         window.addEventListener('resize', resize);
         init();
         animate();

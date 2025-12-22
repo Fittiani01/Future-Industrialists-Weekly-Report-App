@@ -113,7 +113,7 @@ const MainStat: React.FC<{
 }> = ({ label, value, icon, isEditing, onChange }) => (
     <div className="flex flex-col items-center justify-center w-full text-center p-4">
          <div className="mb-3 text-brand-accent/20 bg-brand-primary/5 p-4 rounded-full">
-            {React.cloneElement(icon as React.ReactElement, { className: "text-brand-primary w-8 h-8" })}
+            {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: "text-brand-primary w-8 h-8" })}
          </div>
          <span className="text-lg font-bold text-gray-600 mb-2 max-w-[250px] leading-tight min-h-[56px] flex items-center justify-center">{label}</span>
          {isEditing ? (
