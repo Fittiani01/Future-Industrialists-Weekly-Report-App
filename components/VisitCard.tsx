@@ -57,7 +57,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
     <div className="mb-8 print:mb-0 break-inside-avoid relative shadow-lg rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent">
       
       {/* Header Bar - Updated for Print Compactness */}
-      <div className="bg-brand-dark text-white p-3 print:py-2 print:px-3 flex flex-col md:flex-row print:flex-row items-stretch md:items-center justify-between gap-3 relative rounded-t-xl print:rounded-md">
+      <div className="bg-brand-dark text-white p-3 print:py-1.5 print:px-3 flex flex-col md:flex-row print:flex-row items-stretch md:items-center justify-between gap-3 relative rounded-t-xl print:rounded-md">
          {isEditing && (
             <button 
                 onClick={() => onDelete(visit.id)}
@@ -70,8 +70,8 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
         
         {/* Right Section: School & Factory */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="bg-white/10 p-2 print:p-1.5 rounded-lg flex-shrink-0">
-            <Building2 className="w-5 h-5 print:w-4 print:h-4 text-white" />
+          <div className="bg-white/10 p-2 print:p-1 rounded-lg flex-shrink-0">
+            <Building2 className="w-5 h-5 print:w-3.5 print:h-3.5 text-white" />
           </div>
           
           <div className="flex flex-col w-full min-w-0">
@@ -86,7 +86,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                         placeholder="اسم المدرسة..."
                     />
                 ) : (
-                    <h3 className="text-lg print:text-base font-bold leading-tight truncate">{visit.schoolName}</h3>
+                    <h3 className="text-lg print:text-sm font-bold leading-tight truncate">{visit.schoolName}</h3>
                 )}
             </div>
 
@@ -102,14 +102,14 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                         placeholder="اسم المصنع..."
                     />
                 ) : (
-                    <span className="text-sm print:text-xs font-medium truncate">{visit.factory}</span>
+                    <span className="text-sm print:text-[10px] font-medium truncate">{visit.factory}</span>
                 )}
             </div>
           </div>
         </div>
 
         {/* Left Section: Stats & Logo */}
-        <div className="flex items-center gap-4 print:gap-3 self-end md:self-center flex-shrink-0">
+        <div className="flex items-center gap-4 print:gap-2 self-end md:self-center flex-shrink-0">
             
             {/* Stats */}
             <div className="flex flex-col items-end gap-0.5 px-2 border-r border-indigo-400/30">
@@ -123,14 +123,14 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                             className="bg-white/10 text-white w-24 px-1 py-0.5 rounded text-center focus:outline-none focus:bg-white/20 text-xs"
                         />
                     ) : (
-                        <span className="font-mono dir-ltr text-sm print:text-[10px] font-medium">{visit.date}</span>
+                        <span className="font-mono dir-ltr text-sm print:text-[9px] font-medium">{visit.date}</span>
                     )}
                     <Calendar size={14} />
                 </div>
                 
                 {/* Participants */}
                 <div className="flex items-center gap-1.5">
-                     <span className="text-[10px] text-indigo-200">مشارك</span>
+                     <span className="text-[10px] text-indigo-200 print:text-[8px]">مشارك</span>
                      {isEditing ? (
                         <input 
                             type="number" 
@@ -139,7 +139,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                             className="bg-white/10 text-white w-12 px-1 py-0.5 rounded text-center focus:outline-none focus:bg-white/20 font-bold text-sm"
                         />
                     ) : (
-                        <span className="text-lg print:text-base font-bold leading-none">{visit.participants}</span>
+                        <span className="text-lg print:text-sm font-bold leading-none">{visit.participants}</span>
                     )}
                      <Users size={16} />
                 </div>
@@ -147,7 +147,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
 
             {/* Factory Logo */}
             <div 
-                className={`w-14 h-14 print:w-11 print:h-11 bg-white rounded-lg p-1 flex items-center justify-center relative group overflow-hidden shadow-sm ${isEditing ? 'cursor-pointer hover:ring-2 ring-indigo-400' : ''}`}
+                className={`w-14 h-14 print:w-10 print:h-10 bg-white rounded-lg p-1 flex items-center justify-center relative group overflow-hidden shadow-sm ${isEditing ? 'cursor-pointer hover:ring-2 ring-indigo-400' : ''}`}
                 onClick={() => isEditing && logoInputRef.current?.click()}
             >
                 {visit.factoryLogo ? (

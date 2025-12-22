@@ -513,6 +513,7 @@ export default function App() {
       }
   };
 
+  // CHANGE: Increased chunk size to 4 to fit up to 4 schools per page
   const chunkArray = <T,>(array: T[], size: number): T[][] => {
       const result: T[][] = [];
       for (let i = 0; i < array.length; i += size) {
@@ -521,7 +522,7 @@ export default function App() {
       return result;
   };
 
-  const visitChunks = chunkArray(report.visits, 3);
+  const visitChunks = chunkArray(report.visits, 4);
 
   // --- Render Components ---
 
@@ -533,21 +534,34 @@ export default function App() {
                         <div className="relative h-full flex items-center">
                             <img src={logo} alt="" className="h-full object-contain max-h-14 print:max-h-10" />
                         </div>
+                        {/* Vertical line separator */}
                         {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-20 print:h-14 items-end">
+            <div className="flex flex-col gap-2 relative h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
+  );
+
+  const ReportTitleBlock = () => (
+    <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-6 shadow-sm">
+        <div className="text-right">
+            <h1 className="text-2xl font-bold mb-1">التقرير الأسبوعي</h1>
+            <p className="text-indigo-100 text-sm">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
+        </div>
+        <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm">
+            <h2 className="text-lg font-bold">{report.header.weekTitle}</h2>
+            <p className="text-sm dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
+        </div>
+    </div>
   );
 
   const ReportFooterContent = () => (
       <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
-            {/* Optimized for Print: Compact Grid */}
             <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <div key={partner.id} className="relative flex flex-col items-center justify-center">
@@ -577,7 +591,7 @@ export default function App() {
       <div className="hidden print-only-container">
           {/* Loop over chunks of visits to create pages */}
           {visitChunks.map((chunk, pageIndex) => (
-              <div key={pageIndex} className="print-page">
+              <div key={pageIndex} className="print-page flex flex-col justify-between">
                   
                   {/* Fixed Header */}
                   <div>
@@ -593,8 +607,11 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Flexible Content Area: Use justify-evenly to space the 3 cards perfectly */}
-                  <div className="flex-grow flex flex-col justify-evenly">
+                  {/* Flexible Content Area: 
+                      CHANGE: Use justify-start and gap-4 to stack from top.
+                      This ensures that if there are only 2 items, they are at top, not spaced out.
+                  */}
+                  <div className="flex-grow flex flex-col justify-start gap-4 pt-2">
                       {chunk.map((visit: Visit) => (
                            <VisitCard 
                                 key={visit.id} 
@@ -612,11 +629,16 @@ export default function App() {
               </div>
           ))}
 
-          {/* Statistics Page (Always the last page) */}
-          <div className="print-page">
-               <ReportHeaderContent />
-               <div className="flex-grow flex flex-col justify-center">
-                    <h2 className="text-2xl font-bold text-center mb-6 text-brand-dark">إحصائيات المبادرة</h2>
+          {/* Statistics Page (Always the last page) - Reorganized to full page with Footer */}
+          <div className="print-page flex flex-col justify-between">
+               <div>
+                   <ReportHeaderContent />
+                   <div className="mb-6 border-b-2 border-brand-primary/20 pb-2 mt-4">
+                        <h2 className="text-3xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
+                   </div>
+               </div>
+               
+               <div className="flex-grow flex flex-col justify-start pt-4">
                     <StatisticsSection 
                         stats={report.stats} 
                         categoryLogos={report.logos.categories}
@@ -625,6 +647,7 @@ export default function App() {
                         onLogoUpdate={() => (() => {})}
                     />
                </div>
+               
                <ReportFooterContent />
           </div>
       </div>
@@ -740,7 +763,7 @@ export default function App() {
             </div>
         )}
 
-        {/* --- REPORT HEADER (Editable) --- */}
+        {/* --- REPORT HEADER (Editable Screen View) --- */}
         <div className="border-b-2 border-brand-primary pb-6 mb-8">
             <header className="flex justify-between items-center">
                 <div className="flex items-center gap-2 h-16">
@@ -754,7 +777,7 @@ export default function App() {
                         </React.Fragment>
                     ))}
                 </div>
-                <div className="flex flex-col gap-2 relative group h-20 items-end">
+                <div className="flex flex-col gap-2 relative group h-20 items-end justify-center">
                     <img src={report.logos.main} alt="Future Industrialists" className={`h-full object-contain ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={() => isEditing && mainLogoRef.current?.click()} />
                     <input type="file" ref={mainLogoRef} onChange={handleLogoUpdate('main')} className="hidden" accept="image/*,.svg" />
                 </div>
