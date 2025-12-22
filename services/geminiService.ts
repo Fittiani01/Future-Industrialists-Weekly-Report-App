@@ -1,44 +1,44 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
-// Robust API Key Retrieval for Vite/Vercel Environment
-const getAIClient = () => {
-    let apiKey = "";
-    
-    // 1. Try Vite Standard (import.meta.env) - This is what Vercel uses for client-side
+// استرجاع مفتاح API بشكل آمن ومخصص لبيئة Vite
+const getApiKey = (): string => {
+    // 1. الطريقة الأساسية في Vite
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+        // @ts-ignore
+        return import.meta.env.VITE_API_KEY;
+    }
+
+    // 2. محاولة احتياطية (قد لا تعمل في المتصفح ولكن مفيدة للتطوير المحلي أحياناً)
     try {
         // @ts-ignore
-        if (import.meta && import.meta.env && import.meta.env.VITE_API_KEY) {
+        if (typeof process !== 'undefined' && process.env) {
             // @ts-ignore
-            apiKey = import.meta.env.VITE_API_KEY;
+            if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
         }
     } catch (e) {
-        console.warn("Error accessing import.meta.env", e);
+        // ignore
     }
 
-    // 2. Fallback to process.env if defined (e.g. Node environment or specific polyfills)
-    if (!apiKey) {
-        try {
-            // @ts-ignore
-            if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-                // @ts-ignore
-                apiKey = process.env.API_KEY;
-            }
-        } catch (e) {
-            // Ignore process undefined errors
-        }
-    }
+    return "";
+};
+
+const getAIClient = () => {
+    const apiKey = getApiKey();
 
     if (!apiKey) {
-        console.error("CRITICAL ERROR: No API Key found. Please set VITE_API_KEY in Vercel Environment Variables.");
+        console.error("API Key Check Failed: VITE_API_KEY is missing in import.meta.env");
+        throw new Error("عذراً، مفتاح الربط مفقود (VITE_API_KEY).\n\nيرجى الذهاب إلى إعدادات Vercel > Environment Variables وإضافة متغير باسم 'VITE_API_KEY' وقيمته هي مفتاح Gemini الخاص بك، ثم أعد النشر (Redeploy).");
     }
 
     return new GoogleGenAI({ apiKey });
 };
 
-// Helper to remove Markdown code blocks (e.g. ```json ... ```)
+// دالة مساعدة لتنظيف مخرجات JSON من Markdown
 const cleanJson = (text: string): string => {
     if (!text) return "";
+    // إزالة ```json و ``` وأي مسافات زائدة
     return text.replace(/```json\n?|```/g, '').trim();
 };
 
