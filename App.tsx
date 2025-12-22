@@ -14,44 +14,38 @@ import { uploadReportImage } from './utils/uploadImage';
 // Local compress for Logos
 import { compressImage } from './utils/compressImage';
 
-// New Subtle Tech Corner Design
+// New Subtle Tech Corner Design - Strictly Corner Hugging
 const ConstellationCorner = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
     <svg 
-        viewBox="0 0 400 400" 
-        className={`${className} pointer-events-none opacity-20`} // Very low opacity
+        viewBox="0 0 300 300" 
+        className={`${className} pointer-events-none`} // Removed opacity-20 here, handled in path colors for better control
         style={style}
     >
         <defs>
-             <linearGradient id="techGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+             <linearGradient id="cornerFade" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#2a3590" stopOpacity="0" />
-                <stop offset="100%" stopColor="#2a3590" stopOpacity="0.8" />
+                <stop offset="50%" stopColor="#2a3590" stopOpacity="0.05" />
+                <stop offset="100%" stopColor="#2a3590" stopOpacity="0.15" />
             </linearGradient>
         </defs>
-        {/* Geometric Tech Lines hugging the corner (400,400 is bottom right) */}
-        <g stroke="url(#techGradient)" strokeWidth="1.5" fill="none" strokeLinecap="round">
-            {/* Horizontal Lines */}
-            <path d="M100,380 L400,380" />
-            <path d="M200,350 L400,350" />
-            <path d="M280,320 L400,320" />
-            
-            {/* Vertical/Diagonal Lines */}
-            <path d="M380,100 L380,400" />
-            <path d="M350,200 L350,400" />
-            <path d="M320,280 L320,400" />
-            
-            {/* Connecting Nodes */}
-            <path d="M200,350 L350,200" opacity="0.5" />
-            <path d="M280,320 L320,280" opacity="0.5" />
-            <path d="M100,380 L380,100" opacity="0.3" />
-        </g>
         
-        {/* Subtle Dots at intersections */}
-        <g fill="#2a3590">
-            <circle cx="380" cy="380" r="3" />
-            <circle cx="350" cy="350" r="2.5" />
-            <circle cx="320" cy="320" r="2" />
-            <circle cx="200" cy="350" r="2" />
-            <circle cx="350" cy="200" r="2" />
+        {/* Geometric Tech Shapes - Hugging bottom right corner (300,300) */}
+        
+        {/* Outer angled line */}
+        <path d="M50 300 L250 300 L300 250 L300 50" fill="none" stroke="url(#cornerFade)" strokeWidth="1" />
+        
+        {/* Inner Tech Decor */}
+        <g opacity="0.1" stroke="#2a3590" strokeWidth="1.5" fill="none">
+            <path d="M120 300 L260 300 L300 260 L300 120" />
+            <path d="M180 300 L280 300 L300 280 L300 180" />
+        </g>
+
+        {/* Nodes */}
+        <g fill="#2a3590" opacity="0.15">
+            <circle cx="300" cy="250" r="3" />
+            <circle cx="250" cy="300" r="3" />
+            <circle cx="300" cy="180" r="2" />
+            <circle cx="180" cy="300" r="2" />
         </g>
     </svg>
 );
@@ -641,11 +635,11 @@ export default function App() {
 
         {/* --- REPORT FOOTER (Screen Only) --- */}
         <footer className="screen-footer mt-8 pt-4 border-t border-gray-200 relative pb-4">
-            {/* New Positioned Corners - Way larger container but drawing is confined to bottom corner */}
-            <div className="absolute -bottom-4 -right-4 w-64 h-64 overflow-hidden pointer-events-none z-0">
+            {/* Geometric Corners - Bottom Aligned */}
+            <div className="absolute -bottom-1 -right-1 w-40 h-40 overflow-hidden pointer-events-none z-0">
                 <ConstellationCorner className="w-full h-full" />
             </div>
-            <div className="absolute -bottom-4 -left-4 w-64 h-64 overflow-hidden pointer-events-none z-0">
+            <div className="absolute -bottom-1 -left-1 w-40 h-40 overflow-hidden pointer-events-none z-0">
                 <ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} />
             </div>
             
@@ -666,7 +660,7 @@ export default function App() {
                              <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
                         </div>
                         
-                        {/* New Precision Zoom Controls - ALWAYS VISIBLE IN EDIT MODE AND BELOW IMAGE */}
+                        {/* Precision Zoom Controls */}
                         {isEditing && (
                             <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20">
                                 <button 
