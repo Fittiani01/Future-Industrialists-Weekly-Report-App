@@ -116,13 +116,15 @@
       @media print {
         @page {
           size: A4;
-          margin: 0;
+          margin: 0; /* Important: Let Flexbox handle margins */
         }
 
         body {
           background-color: white !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
+          width: 210mm;
+          height: 100%;
         }
 
         /* Hide Screen UI elements */
@@ -135,22 +137,22 @@
             display: block !important;
         }
 
-        /* Force Page Break */
-        .print-page-break {
+        /* Explicit Page Break Wrapper */
+        .print-page {
+            height: 296mm; /* Slightly less than 297mm to prevent bleed */
+            width: 210mm;
+            position: relative;
             page-break-after: always;
             break-after: page;
-            height: 297mm; /* Exact A4 Height */
-            width: 210mm;  /* Exact A4 Width */
-            position: relative;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
+            padding: 10mm; /* Internal Padding for content */
             background: white;
+            overflow: hidden;
         }
-
-        /* Last page shouldn't necessarily force a break if it's the very end, 
-           but usually safe to keep it consistent */
-        .print-page-break:last-child {
+        
+        .print-page:last-child {
             page-break-after: auto;
         }
       }

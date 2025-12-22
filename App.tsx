@@ -99,7 +99,6 @@ export default function App() {
             
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
-                // FIX: Fallback to data.visits (old schema) if it exists, to prevent data loss appearance
                 loadedReports.push({ id: doc.id, ...data, visits: data.visits || [] } as WeeklyReport);
             });
 
@@ -173,10 +172,7 @@ export default function App() {
     setSaving(true);
     try {
         const reportId = report.id || `week-${Date.now()}`;
-        
-        // 1. Separate Visits from Main Data
         const { visits, ...mainReportData } = report;
-        
         const reportToSave = { 
             ...mainReportData, 
             visits: [], 
@@ -184,10 +180,7 @@ export default function App() {
             createdAt: report.createdAt || serverTimestamp() 
         };
 
-        // 2. Save Main Document (Metadata)
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
-
-        // 3. Sync Visits Subcollection
         const visitsRef = collection(db, "weeklyReports", reportId, "visits");
         
         const existingSnapshot = await getDocs(visitsRef);
@@ -202,7 +195,6 @@ export default function App() {
         });
         await Promise.all(deletePromises);
 
-        // Save/Update current visits
         const savePromises = visits.map(visit => {
             return setDoc(doc(visitsRef, visit.id), visit);
         });
@@ -284,7 +276,6 @@ export default function App() {
       }
   };
 
-  // --- Field Updates ---
   const handleUpdateVisit = (id: string, data: Partial<Visit>) => {
     updateCurrentReport(prev => ({
       ...prev,
@@ -522,7 +513,6 @@ export default function App() {
       }
   };
 
-  // --- Helpers for Printing ---
   const chunkArray = <T,>(array: T[], size: number): T[][] => {
       const result: T[][] = [];
       for (let i = 0; i < array.length; i += size) {
@@ -536,18 +526,18 @@ export default function App() {
   // --- Render Components ---
 
   const ReportHeaderContent = () => (
-      <header className="flex justify-between items-center w-full mb-6">
-            <div className="flex items-center gap-2 h-16">
+      <header className="flex justify-between items-center w-full mb-2 print:mb-1">
+            <div className="flex items-center gap-2 h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-14" />
+                            <img src={logo} alt="" className="h-full object-contain max-h-14 print:max-h-10" />
                         </div>
                         {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-20 items-end">
+            <div className="flex flex-col gap-2 relative h-20 print:h-14 items-end">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -567,30 +557,22 @@ export default function App() {
   );
 
   const ReportFooterContent = () => (
-      <div className="w-full flex flex-col items-center mt-auto pb-4 pt-4 border-t border-gray-200">
-        <div className="text-center mb-3 text-brand-dark font-bold text-xl relative z-10">شركاء النجاح</div>
-        <div className="w-full px-4 relative z-10">
-            {/* UPDATED: Use Flex with gap control to ensure 2 rows look balanced */}
-            <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-4 max-w-[90%] mx-auto">
+      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-2">
+        <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-base print:mb-0">شركاء النجاح</div>
+        <div className="w-full px-2 relative z-10">
+            {/* Optimized for Print: Compact Grid */}
+            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 max-w-[95%] mx-auto">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <div key={partner.id} className="relative flex flex-col items-center justify-center">
                         <img 
                             src={partner.url} 
-                            style={{ height: `${40 * partner.scale}px`, width: 'auto', maxWidth: '120px' }} 
-                            className="object-contain" 
+                            style={{ height: `${35 * partner.scale}px`, width: 'auto', maxWidth: '100px' }} 
+                            className="object-contain print:h-8" 
                             alt="" 
                         />
                     </div>
                 ))}
             </div>
-        </div>
-        
-        {/* Geometric Corners - Bottom Aligned */}
-        <div className="absolute -bottom-1 -right-1 w-32 h-32 overflow-hidden pointer-events-none z-0">
-            <ConstellationCorner className="w-full h-full" />
-        </div>
-        <div className="absolute -bottom-1 -left-1 w-32 h-32 overflow-hidden pointer-events-none z-0">
-            <ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} />
         </div>
       </div>
   );
@@ -608,12 +590,24 @@ export default function App() {
       <div className="hidden print-only-container">
           {/* Loop over chunks of visits to create pages */}
           {visitChunks.map((chunk, pageIndex) => (
-              <div key={pageIndex} className="print-page-break p-8 md:p-12 relative">
-                  <ReportHeaderContent />
-                  {/* Only show title block on first page */}
-                  {pageIndex === 0 && <ReportTitleBlock />}
+              <div key={pageIndex} className="print-page">
                   
-                  <div className="flex-grow flex flex-col gap-6">
+                  {/* Fixed Header */}
+                  <div>
+                    <ReportHeaderContent />
+                    {/* Compact Title for First Page only */}
+                    {pageIndex === 0 && (
+                        <div className="mb-2 border-b-2 border-brand-primary/20 pb-1">
+                             <div className="flex justify-between items-center px-2">
+                                <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                <span className="text-sm text-gray-500 dir-ltr">{report.header.dateRange}</span>
+                             </div>
+                        </div>
+                    )}
+                  </div>
+
+                  {/* Flexible Content Area: Holds 3 cards comfortably */}
+                  <div className="flex-grow flex flex-col justify-start gap-4">
                       {chunk.map((visit: Visit) => (
                            <VisitCard 
                                 key={visit.id} 
@@ -626,12 +620,13 @@ export default function App() {
                       ))}
                   </div>
 
+                  {/* Fixed Footer */}
                   <ReportFooterContent />
               </div>
           ))}
 
           {/* Statistics Page (Always the last page) */}
-          <div className="print-page-break p-8 md:p-12 relative">
+          <div className="print-page">
                <ReportHeaderContent />
                <div className="flex-grow flex flex-col justify-center">
                     <h2 className="text-2xl font-bold text-center mb-6 text-brand-dark">إحصائيات المبادرة</h2>
