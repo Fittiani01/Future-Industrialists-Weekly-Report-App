@@ -221,21 +221,17 @@
       (function() {
         const canvas = document.getElementById('network-canvas');
         const ctx = canvas.getContext('2d');
-        // Initialize width/height immediately to ensure full coverage from start
-        let width = window.innerWidth;
-        let height = window.innerHeight;
-        canvas.width = width;
-        canvas.height = height;
-
+        
+        let width, height;
         let particles = [];
         const particleCount = 100;
         const connectionDistance = 150;
         const moveSpeed = 0.5; 
 
         class Particle {
-          constructor() {
-            this.x = Math.random() * width;
-            this.y = Math.random() * height;
+          constructor(x, y) {
+            this.x = x !== undefined ? x : Math.random() * width;
+            this.y = y !== undefined ? y : Math.random() * height;
             this.vx = (Math.random() - 0.5) * moveSpeed;
             this.vy = (Math.random() - 0.5) * moveSpeed;
             this.size = Math.random() * 2 + 1;
@@ -249,24 +245,44 @@
           draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            // Increased opacity from 0.3 to 0.7 to make them visible
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; 
             ctx.fill();
           }
         }
 
         function init() {
-          particles = [];
-          for (let i = 0; i < particleCount; i++) {
-            particles.push(new Particle());
-          }
-        }
-
-        function resize() {
             width = window.innerWidth;
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
+
+            particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                // Ensure pure random distribution across the entire current width/height
+                particles.push(new Particle(Math.random() * width, Math.random() * height));
+            }
+        }
+
+        function resize() {
+            const oldWidth = width;
+            const oldHeight = height;
+            
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            
+            // If we have existing particles, scale their positions to match new screen size
+            // This prevents them from clumping in the corner if screen expands
+            if (particles.length > 0 && oldWidth > 0 && oldHeight > 0) {
+                particles.forEach(p => {
+                    p.x = p.x * (width / oldWidth);
+                    p.y = p.y * (height / oldHeight);
+                });
+            } else {
+                // First run or invalid old state
+                init();
+            }
         }
 
         function animate() {
@@ -283,7 +299,6 @@
               if (distance < connectionDistance) {
                 ctx.beginPath();
                 let opacity = 1 - (distance / connectionDistance);
-                // Increased opacity of lines
                 ctx.strokeStyle = `rgba(180, 200, 255, ${opacity * 0.4})`; 
                 ctx.lineWidth = 1;
                 ctx.moveTo(p1.x, p1.y);
@@ -295,7 +310,10 @@
           requestAnimationFrame(animate);
         }
         
+        // Listen for resize
         window.addEventListener('resize', resize);
+        
+        // Initial setup
         init();
         animate();
       })();
