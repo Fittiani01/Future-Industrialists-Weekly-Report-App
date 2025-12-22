@@ -18,7 +18,7 @@ import { compressImage } from './utils/compressImage';
 const ConstellationCorner = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
     <svg 
         viewBox="0 0 300 300" 
-        className={`${className} pointer-events-none`} // Removed opacity-20 here, handled in path colors for better control
+        className={`${className} pointer-events-none`} 
         style={style}
     >
         <defs>
@@ -29,18 +29,12 @@ const ConstellationCorner = ({ className, style }: { className?: string, style?:
             </linearGradient>
         </defs>
         
-        {/* Geometric Tech Shapes - Hugging bottom right corner (300,300) */}
-        
-        {/* Outer angled line */}
+        {/* Geometric Tech Shapes */}
         <path d="M50 300 L250 300 L300 250 L300 50" fill="none" stroke="url(#cornerFade)" strokeWidth="1" />
-        
-        {/* Inner Tech Decor */}
         <g opacity="0.1" stroke="#2a3590" strokeWidth="1.5" fill="none">
             <path d="M120 300 L260 300 L300 260 L300 120" />
             <path d="M180 300 L280 300 L300 280 L300 180" />
         </g>
-
-        {/* Nodes */}
         <g fill="#2a3590" opacity="0.15">
             <circle cx="300" cy="250" r="3" />
             <circle cx="250" cy="300" r="3" />
@@ -81,6 +75,8 @@ export default function App() {
   // Parsing & AI State
   const [rawText, setRawText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null); // New state for inline errors
+  
   const [isAnalyzingImages, setIsAnalyzingImages] = useState(false);
   const [isAnalyzingLogos, setIsAnalyzingLogos] = useState(false);
   const [imageMatchStatus, setImageMatchStatus] = useState<string>("");
@@ -151,7 +147,7 @@ export default function App() {
         }
     } catch (error) {
         console.error("Error saving report:", error);
-        alert("حدث خطأ أثناء الحفظ. يرجى التحقق من الاتصال.");
+        // Silent fail or subtle indicator handled by 'saving' state returning false
     } finally {
         setSaving(false);
     }
@@ -197,7 +193,7 @@ export default function App() {
   const handleDeleteCurrentReport = async () => {
       if (!isAdmin) return;
       if (reports.length <= 1) {
-          alert("لا يمكن حذف التقرير الأخير.");
+          alert("لا يمكن حذف التقرير الأخير."); // Keeping this simple alert as it is a critical destructive action
           return;
       }
       if (window.confirm("هل أنت متأكد من حذف هذا التقرير نهائياً من قاعدة البيانات؟")) {
@@ -211,7 +207,6 @@ export default function App() {
                   setIsDirty(false);
               } catch (e) {
                   console.error("Error deleting doc:", e);
-                  alert("حدث خطأ أثناء الحذف");
               }
           }
       }
@@ -313,7 +308,7 @@ export default function App() {
                   const arrayBuffer = event.target?.result as ArrayBuffer;
                   const result = await mammoth.extractRawText({ arrayBuffer });
                   setRawText(result.value);
-              } catch (err) { alert("تعذر قراءة ملف Word."); }
+              } catch (err) { console.error(err); }
           };
           reader.readAsArrayBuffer(file);
       } else if (file.name.endsWith('.txt')) {
@@ -326,6 +321,8 @@ export default function App() {
   const handleSmartParse = async () => {
     if (!rawText.trim()) return;
     setIsParsing(true);
+    setParseError(null); // Clear previous errors
+    
     try {
       const parsedData = await parseReportFromText(rawText);
       updateCurrentReport(prev => ({
@@ -337,7 +334,7 @@ export default function App() {
       setRawText(""); 
     } catch (error: any) { 
         console.error(error);
-        alert(`حدث خطأ أثناء المعالجة: ${error.message}`); 
+        setParseError(error.message || "حدث خطأ غير متوقع أثناء المعالجة");
     } finally { 
         setIsParsing(false); 
     }
@@ -533,7 +530,18 @@ export default function App() {
                         </div>
                     </div>
                     <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="نص التقرير..." className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm mb-2" dir="rtl" />
-                    <button onClick={handleSmartParse} disabled={isParsing || !rawText.trim()} className="bg-brand-primary text-white px-6 py-2 rounded-lg flex items-center gap-2 w-full md:w-auto justify-center">{isParsing ? <Loader2 className="animate-spin" /> : "تعبئة الجدول تلقائياً"}</button>
+                    
+                    <div className="flex flex-col gap-2">
+                        <button onClick={handleSmartParse} disabled={isParsing || !rawText.trim()} className="bg-brand-primary text-white px-6 py-2 rounded-lg flex items-center gap-2 w-full md:w-auto justify-center transition-opacity hover:opacity-90">
+                            {isParsing ? <Loader2 className="animate-spin" /> : "تعبئة الجدول تلقائياً"}
+                        </button>
+                        {parseError && (
+                            <div className="text-red-600 bg-red-50 border border-red-200 p-2 rounded text-sm flex items-center gap-2 mt-2">
+                                <AlertCircle size={16} />
+                                <span>{parseError}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 
                 {/* Bulk Actions */}
@@ -544,7 +552,6 @@ export default function App() {
                         {imageMatchStatus && <div className="mt-2 p-1 text-xs text-center text-teal-700">{imageMatchStatus}</div>}
                     </div>
                     <div>
-                        {/* THIS IS THE BUTTON FOR FACTORY LOGOS */}
                         <input type="file" multiple accept="image/*" ref={bulkLogoInputRef} onChange={handleBulkFactoryLogoUpload} className="hidden" />
                         <button onClick={() => bulkLogoInputRef.current?.click()} disabled={isAnalyzingLogos} className="w-full border-2 border-dashed border-purple-300 bg-purple-50 text-purple-700 py-4 rounded-lg flex flex-col items-center justify-center hover:bg-purple-100 transition-colors">
                             {isAnalyzingLogos ? <Loader2 className="animate-spin" /> : <Factory size={24} />}
