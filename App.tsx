@@ -9,11 +9,9 @@ import mammoth from 'mammoth';
 
 // Firebase Imports
 import { db, auth } from './firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
-// Local compress for Logos
-import { compressImage } from './utils/compressImage';
 
 // New Subtle Tech Corner Design - Strictly Corner Hugging
 const ConstellationCorner = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
@@ -45,27 +43,11 @@ const ConstellationCorner = ({ className, style }: { className?: string, style?:
     </svg>
 );
 
-const compressImageToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-       const reader = new FileReader();
-       reader.readAsDataURL(file);
-       reader.onload = async () => {
-           try {
-               const compressedFile = await compressImage(file);
-               const reader2 = new FileReader();
-               reader2.readAsDataURL(compressedFile);
-               reader2.onload = (e) => resolve(e.target?.result as string);
-           } catch(e) {
-               resolve(reader.result as string);
-           }
-       };
-    });
-}
-
 export default function App() {
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [currentReportIndex, setCurrentReportIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [visitsLoading, setVisitsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   
@@ -92,9 +74,8 @@ export default function App() {
   const rightLogoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const partnerRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // 1. Initial Load from Firebase
+  // 1. Initial Load from Firebase (Metadata Only)
   useEffect(() => {
-    // STRICT MODE CHECK: Only enable admin if ?mode=admin is in URL
     const params = new URLSearchParams(window.location.search);
     const adminMode = params.get('mode') === 'admin';
     
@@ -104,22 +85,24 @@ export default function App() {
     const init = async () => {
         setLoading(true);
         
-        // 1. Attempt Anonymous Sign-In (Fixes 403 Storage Permission Errors)
         try {
             await signInAnonymously(auth);
             console.log("Signed in anonymously");
         } catch (error) {
-            console.error("Auth Error: Could not sign in anonymously. Check Firebase Console > Auth > Sign-in method.", error);
+            console.error("Auth Error", error);
         }
 
-        // 2. Fetch Reports
         try {
+            // Fetch reports metadata (without visits array if schema was already migrated, 
+            // or with visits array if old schema - we'll handle both)
             const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "desc"));
             const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
             
             querySnapshot.forEach((doc) => {
-                loadedReports.push({ id: doc.id, ...doc.data() } as WeeklyReport);
+                const data = doc.data();
+                // Ensure visits is initialized as empty array locally, we will fetch real visits from subcollection
+                loadedReports.push({ id: doc.id, ...data, visits: [] } as WeeklyReport);
             });
 
             if (loadedReports.length > 0) {
@@ -138,29 +121,105 @@ export default function App() {
     init();
   }, []);
 
+  // 2. Fetch Visits Subcollection when Report Changes
+  useEffect(() => {
+      const fetchVisits = async () => {
+          const reportId = reports[currentReportIndex]?.id;
+          if (!reportId) return;
+
+          setVisitsLoading(true);
+          try {
+              // Fetch visits subcollection
+              const visitsRef = collection(db, "weeklyReports", reportId, "visits");
+              // Use simplified query to avoid index issues initially
+              const q = query(visitsRef); 
+              const snapshot = await getDocs(q);
+              
+              const fetchedVisits: Visit[] = [];
+              snapshot.forEach(doc => {
+                  fetchedVisits.push({ id: doc.id, ...doc.data() } as Visit);
+              });
+
+              // Sort visits client-side if needed, e.g. by date or id
+              fetchedVisits.sort((a, b) => a.id.localeCompare(b.id));
+
+              // Update ONLY the visits of the current report in state
+              setReports(prev => {
+                  const newReports = [...prev];
+                  if (newReports[currentReportIndex]) {
+                      newReports[currentReportIndex] = {
+                          ...newReports[currentReportIndex],
+                          visits: fetchedVisits
+                      };
+                  }
+                  return newReports;
+              });
+
+          } catch (e) {
+              console.error("Error fetching visits subcollection:", e);
+          } finally {
+              setVisitsLoading(false);
+          }
+      };
+
+      if (reports.length > 0) {
+          fetchVisits();
+      }
+  }, [currentReportIndex, reports.length > 0 ? reports[currentReportIndex]?.id : null]);
+
+
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // 2. Save Logic
+  // 3. Save Logic (Split Schema)
   const saveReportToFirestore = async () => {
     if (!report || !isAdmin) return;
     setSaving(true);
     try {
         const reportId = report.id || `week-${Date.now()}`;
-        const reportToSave = { ...report, id: reportId };
         
-        if (!report.createdAt) {
-             reportToSave.createdAt = serverTimestamp();
-        }
+        // 1. Separate Visits from Main Data
+        const { visits, ...mainReportData } = report;
+        
+        const reportToSave = { 
+            ...mainReportData, 
+            id: reportId,
+            createdAt: report.createdAt || serverTimestamp() 
+        };
 
+        // 2. Save Main Document (Metadata)
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
+
+        // 3. Sync Visits Subcollection
+        const visitsRef = collection(db, "weeklyReports", reportId, "visits");
+        
+        // Get existing visits to check for deletions
+        const existingSnapshot = await getDocs(visitsRef);
+        const existingIds = new Set(existingSnapshot.docs.map(d => d.id));
+        const currentIds = new Set(visits.map(v => v.id));
+
+        // Delete removed visits
+        const deletePromises: Promise<void>[] = [];
+        existingIds.forEach(id => {
+            if (!currentIds.has(id)) {
+                deletePromises.push(deleteDoc(doc(visitsRef, id)));
+            }
+        });
+        await Promise.all(deletePromises);
+
+        // Save/Update current visits
+        const savePromises = visits.map(visit => {
+            return setDoc(doc(visitsRef, visit.id), visit);
+        });
+        await Promise.all(savePromises);
         
         setIsDirty(false);
         if (!report.id) {
+            // Update local ID if it was new
             updateCurrentReport({ id: reportId });
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error saving report:", error);
-        alert("فشل الحفظ. تأكد من الاتصال بالإنترنت ومن صلاحيات الكتابة في Firebase.");
+        alert(`فشل الحفظ: ${error.message || "تأكد من الاتصال بالإنترنت"}`);
     } finally {
         setSaving(false);
     }
@@ -194,7 +253,7 @@ export default function App() {
           id: newId,
           header: { ...INITIAL_REPORT.header, weekTitle: `الأسبوع ${nextWeekNum}` },
           logos: report.logos, 
-          visits: [],
+          visits: [], // Start with empty visits
           createdAt: serverTimestamp() 
       };
       
@@ -213,7 +272,15 @@ export default function App() {
           const reportId = report.id;
           if (reportId) {
               try {
+                  // 1. Delete all visits in subcollection manually
+                  const visitsRef = collection(db, "weeklyReports", reportId, "visits");
+                  const snapshot = await getDocs(visitsRef);
+                  const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+                  await Promise.all(deletePromises);
+
+                  // 2. Delete main doc
                   await deleteDoc(doc(db, "weeklyReports", reportId));
+                  
                   const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
                   setReports(newReports);
                   setCurrentReportIndex(0);
@@ -281,29 +348,39 @@ export default function App() {
       return urls;
   };
 
+  const handleVisitLogoUpload = async (file: File, visitId: string): Promise<string> => {
+       if (!report.id) throw new Error("Report ID missing");
+       return await uploadReportImage(file, report.id, visitId);
+  }
+
   const handleLogoUpdate = (section: 'main' | 'right' | 'partners' | 'categories', indexOrKey: number | string = -1) => async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
           try {
-             const base64String = await compressImageToBase64(file);
+             const rId = report.id || `week-${Date.now()}`;
+             const url = await uploadReportImage(file, rId, 'general_logos');
+             
              updateCurrentReport(prev => {
-                if (section === 'main') return { ...prev, logos: { ...prev.logos, main: base64String } };
+                if (section === 'main') return { ...prev, logos: { ...prev.logos, main: url } };
                 if (section === 'right' && typeof indexOrKey === 'number' && indexOrKey >= 0) {
                     const newRightLogos = [...prev.logos.rightLogos];
-                    newRightLogos[indexOrKey] = base64String;
+                    newRightLogos[indexOrKey] = url;
                     return { ...prev, logos: { ...prev.logos, rightLogos: newRightLogos } };
                 }
                 if (section === 'partners' && typeof indexOrKey === 'number' && indexOrKey >= 0) {
                     const newPartners = [...prev.logos.partners];
-                    newPartners[indexOrKey] = { ...newPartners[indexOrKey], url: base64String };
+                    newPartners[indexOrKey] = { ...newPartners[indexOrKey], url: url };
                     return { ...prev, logos: { ...prev.logos, partners: newPartners } };
                 }
                 if (section === 'categories' && typeof indexOrKey === 'string') {
-                    return { ...prev, logos: { ...prev.logos, categories: { ...prev.logos.categories, [indexOrKey]: base64String } } };
+                    return { ...prev, logos: { ...prev.logos, categories: { ...prev.logos.categories, [indexOrKey]: url } } };
                 }
                 return prev;
              });
-          } catch (e) { console.error("Compression failed", e); }
+          } catch (e) { 
+              console.error("Upload failed", e); 
+              alert("فشل رفع الشعار، يرجى المحاولة مرة أخرى");
+          }
       }
   };
 
@@ -317,7 +394,7 @@ export default function App() {
       });
   };
 
-  // --- AI & Bulk Ops (UPDATED TO USE INDEX MATCHING) ---
+  // --- AI & Bulk Ops ---
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -368,17 +445,15 @@ export default function App() {
       setImageMatchStatus("جاري التوزيع الذكي للصور...");
       try {
         const filenames = files.map(f => f.name);
-        // Returns { "0": "visit_id", "1": "visit_id" }
         const mapping = await matchImagesToVisits(filenames, report.visits);
         
         const newVisits = [...report.visits];
         let matchCount = 0;
         const visitMap = new Map(newVisits.map(v => [v.id, v]));
 
-        // Iterate by index to match the AI response keys
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            const visitId = mapping[i.toString()]; // Key is index as string
+            const visitId = mapping[i.toString()];
 
             if (visitId && visitMap.has(visitId)) {
                 const visit = visitMap.get(visitId)!;
@@ -390,9 +465,9 @@ export default function App() {
                     } catch (err: any) { 
                         console.error("Failed to upload image", file.name, err);
                          if (err.code === 'storage/unauthorized') {
-                             alert("خطأ 403 (Permission Denied): يرجى تفعيل Anonymous Auth في Firebase أو تعديل قواعد Storage.");
+                             alert("خطأ 403: يرجى التحقق من صلاحيات Firebase.");
                              setImageMatchStatus("توقف الرفع بسبب خطأ في الصلاحيات.");
-                             return; // Stop the loop
+                             return;
                          }
                     }
                 }
@@ -416,7 +491,6 @@ export default function App() {
       
       try {
         const filenames = files.map(f => f.name);
-        // Returns { "0": ["id1", "id2"], "1": ["id3"] }
         const mapping = await matchLogosToFactories(filenames, report.visits);
         
         const newVisits = [...report.visits];
@@ -428,7 +502,6 @@ export default function App() {
             const matchedVisitIds = mapping[i.toString()];
 
             if (matchedVisitIds && matchedVisitIds.length > 0) {
-                // Upload ONCE for the first visit, then use URL for all matches
                 const primaryVisitId = matchedVisitIds[0];
                 try {
                     const url = await uploadReportImage(file, report.id, primaryVisitId);
@@ -443,8 +516,7 @@ export default function App() {
                 } catch(e: any) {
                     console.error("Failed logo upload", file.name);
                     if (e.code === 'storage/unauthorized') {
-                         alert("خطأ 403 (Permission Denied): يرجى تفعيل Anonymous Auth في Firebase.");
-                         setLogoMatchStatus("توقف الرفع بسبب خطأ في الصلاحيات.");
+                         alert("خطأ 403: يرجى التحقق من صلاحيات Firebase.");
                          return;
                     }
                 }
@@ -655,19 +727,24 @@ export default function App() {
 
         {/* Visits & Stats */}
         <div className="flex-grow">
-            {report.visits.map((visit) => (
-                <VisitCard 
-                    key={visit.id} 
-                    visit={visit} 
-                    isEditing={isEditing} 
-                    onUpdate={handleUpdateVisit}
-                    onDelete={handleDeleteVisit}
-                    onImageClick={(url) => setSelectedImage(url)}
-                    onUploadImages={(files) => handleManualVisitImageUpload(files, visit.id)}
-                />
-            ))}
+            {visitsLoading ? (
+                 <div className="flex items-center justify-center h-40"><Loader2 className="w-8 h-8 text-brand-primary animate-spin" /></div>
+            ) : (
+                report.visits.map((visit) => (
+                    <VisitCard 
+                        key={visit.id} 
+                        visit={visit} 
+                        isEditing={isEditing} 
+                        onUpdate={handleUpdateVisit}
+                        onDelete={handleDeleteVisit}
+                        onImageClick={(url) => setSelectedImage(url)}
+                        onUploadImages={(files) => handleManualVisitImageUpload(files, visit.id)}
+                        onUploadLogo={(file) => handleVisitLogoUpload(file, visit.id)}
+                    />
+                ))
+            )}
             
-            {isEditing && (
+            {isEditing && !visitsLoading && (
                 <button onClick={handleAddVisit} className="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:border-brand-primary hover:text-brand-primary flex items-center justify-center gap-2 mb-8 no-print">
                     <Plus size={24} /> إضافة زيارة يدوياً
                 </button>
