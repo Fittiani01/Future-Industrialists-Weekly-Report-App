@@ -1,39 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
-// Safely retrieve API Key. 
-// In Vite/Vercel, we must use import.meta.env.VITE_API_KEY.
-// We also check process.env.API_KEY for compatibility.
-const getApiKey = (): string => {
-    // 1. Try Vite (import.meta.env)
-    try {
-        // @ts-ignore
-        const viteKey = import.meta.env?.VITE_API_KEY;
-        if (viteKey) return viteKey;
-    } catch (e) {
-        // ignore
-    }
-
-    // 2. Try process.env (Standard Node/Webpack)
-    try {
-        // @ts-ignore
-        if (typeof process !== 'undefined' && process.env?.API_KEY) {
-            // @ts-ignore
-            return process.env.API_KEY;
-        }
-    } catch (e) {
-        // ignore
-    }
-
-    return "";
-};
-
+// Use process.env.API_KEY as mandated by guidelines.
+// Assume it is available and valid in the execution context.
 const getAIClient = () => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        throw new Error("مفتاح API غير موجود. يرجى التأكد من إضافة VITE_API_KEY في إعدادات البيئة في Vercel.");
-    }
-    return new GoogleGenAI({ apiKey });
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 // Helper to remove Markdown code blocks (e.g. ```json ... ```)
@@ -79,11 +50,9 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'user', parts: [{ text: text }] }
-      ],
+      contents: text,
       config: {
+        systemInstruction: systemPrompt,
         responseMimeType: "application/json"
       }
     });
@@ -130,7 +99,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            contents: prompt,
             config: {
                 responseMimeType: "application/json"
             }
@@ -175,7 +144,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            contents: prompt,
             config: {
                 responseMimeType: "application/json"
             }
