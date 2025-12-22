@@ -526,7 +526,7 @@ export default function App() {
   // --- Render Components ---
 
   const ReportHeaderContent = () => (
-      <header className="flex justify-between items-center w-full mb-2 print:mb-1">
+      <header className="flex justify-between items-center w-full mb-1">
             <div className="flex items-center gap-2 h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
@@ -543,31 +543,18 @@ export default function App() {
       </header>
   );
 
-  const ReportTitleBlock = () => (
-    <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-6 shadow-sm">
-        <div className="text-right">
-            <h1 className="text-2xl font-bold mb-1">التقرير الأسبوعي</h1>
-            <p className="text-indigo-100 text-sm">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
-        </div>
-        <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm">
-            <h2 className="text-lg font-bold">{report.header.weekTitle}</h2>
-            <p className="text-sm dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
-        </div>
-    </div>
-  );
-
   const ReportFooterContent = () => (
-      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-2">
-        <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-base print:mb-0">شركاء النجاح</div>
+      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1">
+        <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
             {/* Optimized for Print: Compact Grid */}
-            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 max-w-[95%] mx-auto">
+            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <div key={partner.id} className="relative flex flex-col items-center justify-center">
                         <img 
                             src={partner.url} 
                             style={{ height: `${35 * partner.scale}px`, width: 'auto', maxWidth: '100px' }} 
-                            className="object-contain print:h-8" 
+                            className="object-contain print:h-7" 
                             alt="" 
                         />
                     </div>
@@ -606,8 +593,8 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Flexible Content Area: Holds 3 cards comfortably */}
-                  <div className="flex-grow flex flex-col justify-start gap-4">
+                  {/* Flexible Content Area: Use justify-evenly to space the 3 cards perfectly */}
+                  <div className="flex-grow flex flex-col justify-evenly">
                       {chunk.map((visit: Visit) => (
                            <VisitCard 
                                 key={visit.id} 
