@@ -381,6 +381,51 @@ export default function App() {
       }
   };
 
+  const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files || e.target.files.length === 0 || !report.id) return;
+      const files = Array.from(e.target.files) as File[];
+      setIsAnalyzingLogos(true);
+      setLogoMatchStatus("جاري تحليل ومطابقة الشعارات...");
+      
+      try {
+        const filenames = files.map(f => f.name);
+        const mapping = await matchLogosToFactories(filenames, report.visits);
+        const newVisits = [...report.visits];
+        const visitMap = new Map(newVisits.map(v => [v.id, v]));
+        let matchCount = 0;
+
+        for (const file of files) {
+            const matchedVisitIds = mapping[file.name];
+            if (matchedVisitIds && matchedVisitIds.length > 0) {
+                // Upload once, assign to all matches
+                // Use the first matched visit ID to structure the path in Firebase
+                const primaryVisitId = matchedVisitIds[0];
+                try {
+                    const url = await uploadReportImage(file, report.id, primaryVisitId);
+                    
+                    matchedVisitIds.forEach(id => {
+                        const visit = visitMap.get(id);
+                        if (visit) {
+                            visit.factoryLogo = url;
+                        }
+                    });
+                    matchCount++;
+                } catch(e) {
+                    console.error("Failed logo upload", file.name);
+                }
+            }
+        }
+        
+        updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
+        setLogoMatchStatus(`تم توزيع ${matchCount} شعار بنجاح!`);
+      } catch (e) {
+          setLogoMatchStatus("حدث خطأ في المطابقة");
+      } finally {
+          setIsAnalyzingLogos(false);
+          if (bulkLogoInputRef.current) bulkLogoInputRef.current.value = "";
+      }
+  };
+
   // --- Render Components ---
 
   const ReportHeaderContent = () => (
@@ -505,10 +550,17 @@ export default function App() {
                         {imageMatchStatus && <div className="mt-2 p-1 text-xs text-center text-teal-700">{imageMatchStatus}</div>}
                     </div>
                     <div>
-                        <input type="file" multiple accept="image/*" ref={bulkLogoInputRef} onChange={handleLogoUpdate('partners')} className="hidden" />
-                        {/* Note: Simplified Bulk Logo to Partners for UI clarity, or add dedicated handler if needed */}
-                         <button onClick={() => handleDeleteCurrentReport()} className="w-full border-2 border-dashed border-red-300 bg-red-50 text-red-700 py-4 rounded-lg flex flex-col items-center justify-center"><Trash2 size={24} /><span className="font-bold text-sm">حذف هذا التقرير</span></button>
+                        <input type="file" multiple accept="image/*" ref={bulkLogoInputRef} onChange={handleBulkFactoryLogoUpload} className="hidden" />
+                        <button onClick={() => bulkLogoInputRef.current?.click()} disabled={isAnalyzingLogos} className="w-full border-2 border-dashed border-purple-300 bg-purple-50 text-purple-700 py-4 rounded-lg flex flex-col items-center justify-center hover:bg-purple-100 transition-colors">
+                            {isAnalyzingLogos ? <Loader2 className="animate-spin" /> : <Factory size={24} />}
+                            <span className="font-bold text-sm">توزيع شعارات المصانع</span>
+                        </button>
+                        {logoMatchStatus && <div className="mt-2 p-1 text-xs text-center text-purple-700">{logoMatchStatus}</div>}
                     </div>
+                </div>
+                
+                <div className="border-t border-indigo-100 pt-4 flex justify-end">
+                    <button onClick={() => handleDeleteCurrentReport()} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 border border-red-200 px-3 py-2 rounded bg-red-50"><Trash2 size={14} /> حذف هذا التقرير</button>
                 </div>
             </div>
         )}
