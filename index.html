@@ -241,8 +241,9 @@
 
         class Particle {
           constructor() {
-            this.x = (width / 2) + (Math.random() - 0.5) * 200;
-            this.y = (height / 2) + (Math.random() - 0.5) * 200;
+            // Updated to distribute randomly across the entire canvas immediately
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
             this.vx = (Math.random() - 0.5) * moveSpeed;
             this.vy = (Math.random() - 0.5) * moveSpeed;
             this.size = Math.random() * 2 + 1.5;
