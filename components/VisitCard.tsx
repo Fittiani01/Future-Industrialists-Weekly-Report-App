@@ -89,11 +89,11 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   );
 
   return (
-    <div className="mb-4 md:mb-6 break-inside-avoid relative shadow-md rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent print:mb-4">
+    <div className="mb-4 md:mb-6 break-inside-avoid relative shadow-md rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent print:mb-0">
       
       {/* Header Bar */}
       <div 
-        className="text-white p-3 md:p-4 print:p-3 relative rounded-t-xl print:rounded-lg transition-colors duration-300"
+        className="text-white p-3 md:p-4 print:p-2 relative rounded-t-xl print:rounded-lg transition-colors duration-300"
         style={{ backgroundColor: headerColor }}
       >
          {isEditing && (
@@ -126,7 +126,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                                 placeholder="اسم المدرسة..."
                             />
                         ) : (
-                            <h3 className="text-sm md:text-xl print:text-lg font-bold leading-tight truncate">{visit.schoolName}</h3>
+                            <h3 className="text-sm md:text-xl print:text-base font-bold leading-tight truncate">{visit.schoolName}</h3>
                         )}
                     </div>
                 </div>
@@ -146,7 +146,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                                 placeholder="اسم المصنع..."
                             />
                         ) : (
-                            <h4 className="text-xs md:text-lg print:text-base font-bold text-indigo-50 truncate">{visit.factory}</h4>
+                            <h4 className="text-xs md:text-lg print:text-sm font-bold text-indigo-50 truncate">{visit.factory}</h4>
                         )}
                     </div>
                 </div>
@@ -165,7 +165,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
             {/* LEFT: Big Factory Logo */}
             <div className="flex-shrink-0 flex items-center pt-1 md:pt-0">
                  <div 
-                    className={`w-16 h-16 md:w-24 md:h-24 print:w-20 print:h-20 bg-white rounded-lg md:rounded-xl p-1 md:p-1.5 flex items-center justify-center relative shadow-lg overflow-hidden ${isEditing ? 'cursor-pointer hover:ring-4 ring-indigo-300' : ''}`}
+                    className={`w-16 h-16 md:w-24 md:h-24 print:w-16 print:h-16 bg-white rounded-lg md:rounded-xl p-1 md:p-1.5 flex items-center justify-center relative shadow-lg overflow-hidden ${isEditing ? 'cursor-pointer hover:ring-4 ring-indigo-300' : ''}`}
                     onClick={() => isEditing && logoInputRef.current?.click()}
                 >
                     {visit.factoryLogo ? (

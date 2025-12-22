@@ -589,17 +589,17 @@ export default function App() {
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-2 h-16 print:h-12">
+            <div className="flex items-center gap-4 md:gap-4 h-10 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-14 print:max-h-10" />
+                            <img src={logo} alt="" className="h-full object-contain max-h-6 md:max-h-14 print:max-h-10" />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-0.5 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-20 print:h-14 items-end justify-center">
+            <div className="flex flex-col gap-2 relative h-12 md:h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -609,9 +609,10 @@ export default function App() {
     const partnersTop = report.logos.partners.slice(0, 6);
     const partnersBottom = report.logos.partners.slice(6, 11);
     return (
-      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 relative z-20">
+      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 relative z-50">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
+            {/* Screen View */}
             <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto print:hidden">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <div key={partner.id} className="relative flex flex-col items-center justify-center">
@@ -619,22 +620,24 @@ export default function App() {
                     </div>
                 ))}
             </div>
+
+            {/* Print View (Separated with Lines) */}
             <div className="hidden print:flex flex-col items-center gap-3 w-full pb-2">
-                <div className="flex justify-center items-center gap-x-6 w-full px-4">
+                <div className="flex justify-center items-center w-full px-4">
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[100px]" alt="" />
+                            <div className="relative flex items-center justify-center h-7 px-2">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[80px]" alt="" />
                             </div>
                             {idx < partnersTop.length - 1 && <div className="h-5 w-px bg-gray-300"></div>}
                         </React.Fragment>
                     ))}
                 </div>
-                 <div className="flex justify-center items-center gap-x-6 w-full px-4">
+                 <div className="flex justify-center items-center w-full px-4">
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[100px]" alt="" />
+                            <div className="relative flex items-center justify-center h-7 px-2">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[80px]" alt="" />
                             </div>
                             {idx < partnersBottom.length - 1 && <div className="h-5 w-px bg-gray-300"></div>}
                         </React.Fragment>
@@ -647,9 +650,9 @@ export default function App() {
 
   const DecorationLayer = ({ isPrint = false }) => (
       // Z-Index: 
-      // Editing Mode (Screen): z-[2000] - Must be higher than everything else.
-      // Print Mode: z-[2] - Lower than content.
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
+      // Editing Mode: z-[2000] (Very High)
+      // View/Print Mode: z-[30] (High enough to be ABOVE content cards which are usually z-0 or z-10)
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[30]'}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
@@ -661,13 +664,13 @@ export default function App() {
                     opacity: d.opacity,
                     cursor: isEditing && !isPrint ? 'move' : 'default',
                     pointerEvents: isEditing && !isPrint ? 'auto' : 'none',
-                    touchAction: 'none' // Critical for touch dragging
+                    touchAction: 'none' 
                 }}
                 onMouseDown={(e) => !isPrint && handleDecoStart(e, d.id)}
                 onTouchStart={(e) => !isPrint && handleDecoStart(e, d.id)}
                 className={`origin-center select-none ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded border border-indigo-300' : ''}`}
               >
-                  <img src={d.url} className="max-w-[300px] h-auto object-contain select-none pointer-events-none" draggable={false} alt="" />
+                  <img src={d.url} className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none pointer-events-none" draggable={false} alt="Decoration" />
               </div>
           ))}
       </div>
@@ -723,7 +726,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex-grow flex flex-col justify-start gap-4 pt-4 relative z-10">
+                  <div className="flex-grow flex flex-col justify-start gap-2 print:gap-1 pt-4 relative z-10">
                       {chunk.map((visit: Visit) => (
                            <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
                       ))}
@@ -935,14 +938,14 @@ export default function App() {
              <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
              <div className="w-full px-4 relative z-10">
                 
-                {/* --- MOBILE: Professional Grid with Separators --- */}
-                <div className="md:hidden w-full border border-gray-200 rounded-lg overflow-hidden bg-gray-200 gap-px grid grid-cols-3">
+                {/* --- MOBILE: Modern Flex Layout with Simple Dividers --- */}
+                <div className="md:hidden w-full flex flex-wrap justify-center items-center gap-y-6 px-2">
                     {report.logos.partners.map((partner: PartnerLogo, idx) => (
-                        <div key={partner.id} className="bg-white p-2 flex items-center justify-center relative min-h-[70px] group/partner">
-                            <div className={`relative w-full h-full flex items-center justify-center ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
+                        <div key={partner.id} className="relative flex items-center justify-center px-3 border-r border-gray-200 last:border-none">
+                             <div className={`relative flex items-center justify-center ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
                                 <img 
                                     src={partner.url} 
-                                    className="object-contain max-h-[50px] w-auto max-w-full"
+                                    className="object-contain h-8 w-auto max-w-[80px]"
                                     alt="" 
                                 />
                                 <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
