@@ -1,12 +1,39 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-// Assume this variable is pre-configured, valid, and accessible in the execution context.
-declare const process: any;
+// Safely retrieve API Key. 
+// In Vite/Vercel, we must use import.meta.env.VITE_API_KEY.
+// We also check process.env.API_KEY for compatibility.
+const getApiKey = (): string => {
+    // 1. Try Vite (import.meta.env)
+    try {
+        // @ts-ignore
+        const viteKey = import.meta.env?.VITE_API_KEY;
+        if (viteKey) return viteKey;
+    } catch (e) {
+        // ignore
+    }
+
+    // 2. Try process.env (Standard Node/Webpack)
+    try {
+        // @ts-ignore
+        if (typeof process !== 'undefined' && process.env?.API_KEY) {
+            // @ts-ignore
+            return process.env.API_KEY;
+        }
+    } catch (e) {
+        // ignore
+    }
+
+    return "";
+};
 
 const getAIClient = () => {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error("مفتاح API غير موجود. يرجى التأكد من إضافة VITE_API_KEY في إعدادات البيئة في Vercel.");
+    }
+    return new GoogleGenAI({ apiKey });
 };
 
 // Helper to remove Markdown code blocks (e.g. ```json ... ```)
