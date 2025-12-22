@@ -39,6 +39,15 @@ export interface CategoryLogos {
   creative: string;
 }
 
+export interface Decoration {
+    id: string;
+    url: string;
+    x: number; // Percentage X position (0-100)
+    y: number; // Percentage Y position (0-100)
+    scale: number; // Scale multiplier
+    opacity: number; // Opacity 0-1
+}
+
 export interface ReportLogos {
     main: string;
     rightLogos: string[]; // Array of 4 logos for the right side
@@ -54,4 +63,5 @@ export interface WeeklyReport {
   visits: Visit[];
   stats: Statistics;
   logos: ReportLogos;
+  decorations?: Decoration[]; // Array of free-floating decorations
 }

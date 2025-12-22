@@ -33,6 +33,7 @@ export const INITIAL_REPORT: WeeklyReport = {
           creative: LOGOS.category
       }
   },
+  decorations: [], // Start with no decorations
   visits: [
     {
       id: "1",
