@@ -1,10 +1,39 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
-// Use process.env.API_KEY as mandated by guidelines.
-// Assume it is available and valid in the execution context.
+// Robust API Key Retrieval for Vite/Vercel Environment
 const getAIClient = () => {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    let apiKey = "";
+    
+    // 1. Try Vite Standard (import.meta.env) - This is what Vercel uses for client-side
+    try {
+        // @ts-ignore
+        if (import.meta && import.meta.env && import.meta.env.VITE_API_KEY) {
+            // @ts-ignore
+            apiKey = import.meta.env.VITE_API_KEY;
+        }
+    } catch (e) {
+        console.warn("Error accessing import.meta.env", e);
+    }
+
+    // 2. Fallback to process.env if defined (e.g. Node environment or specific polyfills)
+    if (!apiKey) {
+        try {
+            // @ts-ignore
+            if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+                // @ts-ignore
+                apiKey = process.env.API_KEY;
+            }
+        } catch (e) {
+            // Ignore process undefined errors
+        }
+    }
+
+    if (!apiKey) {
+        console.error("CRITICAL ERROR: No API Key found. Please set VITE_API_KEY in Vercel Environment Variables.");
+    }
+
+    return new GoogleGenAI({ apiKey });
 };
 
 // Helper to remove Markdown code blocks (e.g. ```json ... ```)
@@ -50,9 +79,11 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: text,
+      contents: [
+          { role: 'user', parts: [{ text: systemPrompt }] },
+          { role: 'user', parts: [{ text: text }] }
+      ],
       config: {
-        systemInstruction: systemPrompt,
         responseMimeType: "application/json"
       }
     });
@@ -99,7 +130,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: prompt,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
                 responseMimeType: "application/json"
             }
@@ -144,7 +175,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: prompt,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
                 responseMimeType: "application/json"
             }
