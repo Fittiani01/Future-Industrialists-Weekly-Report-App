@@ -56,7 +56,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   const StatsPills = ({ mobile = false }: { mobile?: boolean }) => (
       <div className={`flex ${mobile ? 'flex-row mt-2 gap-2' : 'flex-col items-end gap-2'} ${!mobile ? 'pl-2 border-l border-white/10 print:border-none' : ''}`}>
           {/* Date Pill */}
-          <div className={`flex items-center gap-2 bg-white/10 rounded-md justify-end ${mobile ? 'px-2 py-1' : 'px-3 py-1 min-w-[110px]'}`}>
+          <div className={`flex items-center gap-2 bg-white/10 rounded-md justify-end ${mobile ? 'px-2 py-1' : 'px-3 py-1 min-w-[110px] print:min-w-[90px] print:px-2 print:py-0.5'}`}>
                {isEditing ? (
                   <input 
                       type="text" 
@@ -65,13 +65,13 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                       className={`bg-transparent text-white text-right focus:outline-none font-bold ${mobile ? 'text-xs w-20' : 'text-sm w-24'}`}
                   />
               ) : (
-                  <span className={`font-bold dir-ltr ${mobile ? 'text-xs' : 'text-sm'}`}>{visit.date}</span>
+                  <span className={`font-bold dir-ltr ${mobile ? 'text-xs' : 'text-sm print:text-xs'}`}>{visit.date}</span>
               )}
-              <Calendar size={mobile ? 12 : 16} className="text-indigo-200" />
+              <Calendar size={mobile ? 12 : 16} className="text-indigo-200 print:w-3 print:h-3" />
           </div>
           
           {/* Participants Pill */}
-          <div className={`flex items-center gap-2 bg-white/10 rounded-md justify-end ${mobile ? 'px-2 py-1' : 'px-3 py-1 min-w-[110px]'}`}>
+          <div className={`flex items-center gap-2 bg-white/10 rounded-md justify-end ${mobile ? 'px-2 py-1' : 'px-3 py-1 min-w-[110px] print:min-w-[90px] print:px-2 print:py-0.5'}`}>
               {isEditing ? (
                       <input 
                       type="number" 
@@ -80,10 +80,10 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                       className={`bg-transparent text-white text-right focus:outline-none font-bold ${mobile ? 'text-xs w-8' : 'text-sm w-12'}`}
                   />
               ) : (
-                  <span className={`font-bold ${mobile ? 'text-xs' : 'text-sm'}`}>{visit.participants}</span>
+                  <span className={`font-bold ${mobile ? 'text-xs' : 'text-sm print:text-xs'}`}>{visit.participants}</span>
               )}
-              <span className={`text-indigo-200 font-normal ${mobile ? 'text-[10px]' : 'text-xs'}`}>مشارك</span>
-              <Users size={mobile ? 12 : 16} className="text-indigo-200" />
+              <span className={`text-indigo-200 font-normal ${mobile ? 'text-[10px]' : 'text-xs print:text-[10px]'}`}>مشارك</span>
+              <Users size={mobile ? 12 : 16} className="text-indigo-200 print:w-3 print:h-3" />
           </div>
       </div>
   );
@@ -106,11 +106,11 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
             </button>
         )}
         
-        {/* Main Flex Container */}
-        <div className="flex flex-row items-start md:items-stretch justify-between gap-3 md:gap-4">
+        {/* Main Flex Container - Added flex-nowrap to prevent print breaking */}
+        <div className="flex flex-row flex-nowrap items-center md:items-stretch justify-between gap-3 md:gap-4 print:gap-2">
             
             {/* RIGHT: Text Info (School & Factory Name) */}
-            <div className="flex flex-col justify-center gap-1 md:gap-2 flex-grow min-w-0 pr-1">
+            <div className="flex flex-col justify-center gap-1 md:gap-2 flex-grow min-w-0 pr-1 text-right">
                 {/* School */}
                 <div className="flex items-center gap-2">
                     <div className="bg-white/20 p-1 md:p-1.5 rounded-lg flex-shrink-0">
@@ -151,21 +151,21 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                     </div>
                 </div>
 
-                {/* Mobile Only: Stats displayed here to save width space */}
-                <div className="md:hidden">
+                {/* Mobile Only: Stats displayed here to save width space - HIDDEN IN PRINT */}
+                <div className="md:hidden print:hidden">
                     <StatsPills mobile={true} />
                 </div>
             </div>
 
-            {/* CENTER (Desktop Only): Stats */}
-            <div className="hidden md:flex flex-col justify-center">
+            {/* CENTER (Desktop Only): Stats - FORCED FLEX IN PRINT */}
+            <div className="hidden md:flex print:flex flex-col justify-center flex-shrink-0">
                 <StatsPills mobile={false} />
             </div>
 
             {/* LEFT: Big Factory Logo */}
             <div className="flex-shrink-0 flex items-center pt-1 md:pt-0">
                  <div 
-                    className={`w-16 h-16 md:w-24 md:h-24 print:w-16 print:h-16 bg-white rounded-lg md:rounded-xl p-1 md:p-1.5 flex items-center justify-center relative shadow-lg overflow-hidden ${isEditing ? 'cursor-pointer hover:ring-4 ring-indigo-300' : ''}`}
+                    className={`w-16 h-16 md:w-24 md:h-24 print:w-14 print:h-14 bg-white rounded-lg md:rounded-xl p-1 md:p-1.5 flex items-center justify-center relative shadow-lg overflow-hidden ${isEditing ? 'cursor-pointer hover:ring-4 ring-indigo-300' : ''}`}
                     onClick={() => isEditing && logoInputRef.current?.click()}
                 >
                     {visit.factoryLogo ? (
@@ -190,8 +190,9 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
       </div>
 
       {/* Content Area - Images */}
-      <div className="p-2 md:p-3 print:p-0 print:pt-1 bg-gray-50/50 print:bg-transparent">
-        <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-2 print:gap-1">
+      {/* Added print:px-1 to prevent images from touching edges */}
+      <div className="p-2 md:p-3 print:px-1 print:pt-1 bg-gray-50/50 print:bg-transparent">
+        <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-2 print:gap-1.5">
             {[0, 1, 2, 3].map((idx) => (
                 <div 
                     key={idx} 

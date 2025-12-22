@@ -623,23 +623,23 @@ export default function App() {
 
             {/* Print View (Separated with Lines) */}
             <div className="hidden print:flex flex-col items-center gap-3 w-full pb-2">
-                <div className="flex justify-center items-center w-full px-4">
+                <div className="flex justify-between items-center w-full px-2 flex-nowrap">
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7 px-2">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[80px]" alt="" />
+                            <div className="relative flex items-center justify-center h-7 px-1 flex-1">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
                             </div>
-                            {idx < partnersTop.length - 1 && <div className="h-5 w-px bg-gray-300"></div>}
+                            {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
                     ))}
                 </div>
-                 <div className="flex justify-center items-center w-full px-4">
+                 <div className="flex justify-center items-center gap-6 w-full px-2 flex-nowrap">
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7 px-2">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[80px]" alt="" />
+                            <div className="relative flex items-center justify-center h-7 px-1">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
                             </div>
-                            {idx < partnersBottom.length - 1 && <div className="h-5 w-px bg-gray-300"></div>}
+                            {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
                     ))}
                 </div>
