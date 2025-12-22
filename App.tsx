@@ -589,35 +589,41 @@ export default function App() {
                 ))}
             </div>
 
-            {/* Print Version (Strict 2 Lines: 6 Top, 5 Bottom) */}
-            <div className="hidden print:flex flex-col items-center gap-1 w-full">
+            {/* Print Version (Strict & Professional: 6 Top, 5 Bottom) */}
+            <div className="hidden print:flex flex-col items-center gap-3 w-full pb-2">
                 {/* Row 1: 6 Items */}
-                <div className="flex justify-center items-center gap-x-2 w-full">
+                <div className="flex justify-center items-center gap-x-6 w-full px-4">
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex flex-col items-center justify-center h-5">
+                            <div className="relative flex items-center justify-center h-7">
                                 <img 
                                     src={partner.url} 
-                                    className="h-full w-auto object-contain" 
+                                    className="h-full w-auto object-contain max-w-[100px]" 
                                     alt="" 
                                 />
                             </div>
-                            {idx < partnersTop.length - 1 && <div className="h-3 w-px bg-gray-300"></div>}
+                            {/* Separator */}
+                            {idx < partnersTop.length - 1 && (
+                                <div className="h-5 w-px bg-gray-300"></div>
+                            )}
                         </React.Fragment>
                     ))}
                 </div>
                 {/* Row 2: 5 Items */}
-                 <div className="flex justify-center items-center gap-x-2 w-full">
+                 <div className="flex justify-center items-center gap-x-6 w-full px-4">
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex flex-col items-center justify-center h-5">
+                            <div className="relative flex items-center justify-center h-7">
                                 <img 
                                     src={partner.url} 
-                                    className="h-full w-auto object-contain" 
+                                    className="h-full w-auto object-contain max-w-[100px]" 
                                     alt="" 
                                 />
                             </div>
-                            {idx < partnersBottom.length - 1 && <div className="h-3 w-px bg-gray-300"></div>}
+                            {/* Separator */}
+                            {idx < partnersBottom.length - 1 && (
+                                <div className="h-5 w-px bg-gray-300"></div>
+                            )}
                         </React.Fragment>
                     ))}
                 </div>
@@ -658,14 +664,14 @@ export default function App() {
                   {/* Fixed Header */}
                   <div>
                     <ReportHeaderContent />
-                    {/* Header Title Block - Visible on ALL pages now */}
+                    {/* Header Title Block - Visible on ALL pages now - UPDATED ALIGNMENT */}
                     <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                            <div className="flex justify-between items-center px-2">
+                            <div className="flex justify-between items-end px-2">
                                 <div className="flex flex-col">
                                     <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
                                     <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                 </div>
-                                <span className="text-sm text-gray-500 dir-ltr font-medium">{report.header.dateRange}</span>
+                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
                             </div>
                     </div>
                   </div>
@@ -696,14 +702,14 @@ export default function App() {
           <div className="print-page flex flex-col justify-between">
                <div>
                    <ReportHeaderContent />
-                    {/* Header Title Block - Visible on Stats page too */}
+                    {/* Header Title Block - Visible on Stats page too - UPDATED ALIGNMENT */}
                     <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                            <div className="flex justify-between items-center px-2">
+                            <div className="flex justify-between items-end px-2">
                                 <div className="flex flex-col">
                                     <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
                                     <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                 </div>
-                                <span className="text-sm text-gray-500 dir-ltr font-medium">{report.header.dateRange}</span>
+                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
                             </div>
                     </div>
                    <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
@@ -806,15 +812,25 @@ export default function App() {
                 {/* Cover Page Uploader */}
                  <div className="border-b border-indigo-100 pb-6">
                     <div className="flex items-center gap-2 mb-3 text-brand-dark"><LayoutTemplate className="text-pink-500" /><h2 className="font-bold text-lg">0. صورة الغلاف (اختياري)</h2></div>
-                    <div className="flex gap-4 items-center">
-                        <input type="file" ref={coverImageRef} accept="image/*" onChange={handleCoverImageUpload} className="hidden" />
-                        <button onClick={() => coverImageRef.current?.click()} className="bg-white border border-pink-300 text-pink-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-pink-50">
-                            <ImageIcon size={16} /> رفع تصميم صفحة الغلاف (A4 كاملة)
-                        </button>
+                    <div className="flex flex-col gap-4">
+                         <div className="flex gap-4 items-center">
+                            <input type="file" ref={coverImageRef} accept="image/*" onChange={handleCoverImageUpload} className="hidden" />
+                            <button onClick={() => coverImageRef.current?.click()} className="bg-white border border-pink-300 text-pink-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-pink-50">
+                                <ImageIcon size={16} /> رفع تصميم صفحة الغلاف (A4 كاملة)
+                            </button>
+                            {report.coverImage && (
+                                <button onClick={() => updateCurrentReport({ coverImage: undefined })} className="text-red-500 text-xs underline">حذف الصورة</button>
+                            )}
+                        </div>
+                        
+                        {/* COVER PREVIEW IN ADMIN PANEL */}
                         {report.coverImage && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-green-600 text-sm font-bold flex items-center gap-1"><CheckCircle2 size={14}/> تم الرفع</span>
-                                <button onClick={() => updateCurrentReport({ coverImage: undefined })} className="text-red-500 text-xs underline">حذف</button>
+                            <div className="mt-2 w-48 h-64 border-2 border-pink-200 rounded-lg overflow-hidden relative group">
+                                <img src={report.coverImage} className="w-full h-full object-cover" alt="Cover Preview" />
+                                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="text-xs font-bold mb-1">معاينة الغلاف</span>
+                                    <CheckCircle2 size={24} className="text-green-400" />
+                                </div>
                             </div>
                         )}
                     </div>
