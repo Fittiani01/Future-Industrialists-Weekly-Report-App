@@ -19,16 +19,6 @@ const getArabicOrdinal = (n: number) => {
     return ordinals[n] || n.toString();
 };
 
-const ConstellationCorner: React.FC<{ className?: string, style?: React.CSSProperties }> = ({ className, style }) => (
-    <svg className={className} style={style} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M200 200V0C200 110.457 110.457 200 0 200H200Z" fill="#F3F4F6"/>
-        <circle cx="150" cy="50" r="2" fill="#d1d5db" />
-        <circle cx="180" cy="80" r="1.5" fill="#d1d5db" />
-        <circle cx="120" cy="160" r="2.5" fill="#d1d5db" />
-        <circle cx="60" cy="190" r="2" fill="#d1d5db" />
-    </svg>
-);
-
 export default function App() {
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [currentReportIndex, setCurrentReportIndex] = useState(0);
@@ -613,7 +603,8 @@ export default function App() {
   )};
 
   const DecorationLayer = ({ isPrint = false }) => (
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isPrint ? 'print-layer z-0' : 'z-0'}`}>
+      // Corrected Z-Index to ensure it appears above white background but below content
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isPrint ? 'print-layer z-[2]' : 'z-[5]'}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
@@ -654,8 +645,9 @@ export default function App() {
           
           {/* 1. Cover Page */}
           {report.coverImage && (
-            <div className="print-page w-full h-full p-0 overflow-hidden relative">
-                <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" />
+            // Ensure z-0 allows img to be seen, content is z-10
+            <div className="print-page w-full h-full p-0 overflow-hidden relative" style={{ height: '297mm', width: '210mm' }}>
+                <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" style={{ objectFit: 'cover' }} />
                 <div className="absolute bottom-[13%] left-0 w-full flex flex-col items-center justify-center z-10 text-white">
                     <h1 className="text-6xl font-extrabold mb-4 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-wide text-center" style={{textShadow: '2px 2px 4px black'}}>{report.header.weekTitle}</h1>
                     <p className="text-2xl font-bold dir-ltr drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-95 text-center" style={{textShadow: '1px 1px 3px black'}}>{report.header.dateRange}</p>
@@ -897,8 +889,7 @@ export default function App() {
                     </React.Fragment>
                 ))}
             </div>
-            <div className="absolute -bottom-1 -right-1 w-40 h-40 overflow-hidden pointer-events-none z-0"><ConstellationCorner className="w-full h-full" /></div>
-            <div className="absolute -bottom-1 -left-1 w-40 h-40 overflow-hidden pointer-events-none z-0"><ConstellationCorner className="w-full h-full" style={{ transform: 'scaleX(-1)' }} /></div>
+            {/* Removed ConstellationCorner as requested */}
         </div>
 
       </div>

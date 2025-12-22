@@ -48,16 +48,18 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
       }
   }
 
-  const removeImage = (index: number) => {
-    const newImages = visit.images.filter((_, i) => i !== index);
-    onUpdate(visit.id, { images: newImages });
-  };
+  // Logic to determine header color based on gender
+  const isGirls = visit.schoolName.includes("بنات");
+  const headerColor = isGirls ? "#867bba" : "#2b3592";
 
   return (
     <div className="mb-8 print:mb-3 break-inside-avoid relative shadow-lg rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent">
       
-      {/* Header Bar - Optimized Alignment & Larger Print Fonts */}
-      <div className="bg-brand-dark text-white p-3 print:py-2 print:px-3 flex flex-col md:flex-row print:flex-row items-center justify-between gap-3 relative rounded-t-xl print:rounded-lg">
+      {/* Header Bar - Stacked Layout with Dynamic Color */}
+      <div 
+        className="text-white p-3 print:py-2 print:px-3 flex flex-col md:flex-row print:flex-row items-center justify-between gap-3 relative rounded-t-xl print:rounded-lg transition-colors duration-300"
+        style={{ backgroundColor: headerColor }}
+      >
          {isEditing && (
             <button 
                 onClick={() => onDelete(visit.id)}
@@ -68,52 +70,55 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
             </button>
         )}
         
-        {/* Right Section: School & Factory */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* School Icon - Fixed Alignment */}
-          <div className="bg-white/10 w-10 h-10 print:w-9 print:h-9 flex items-center justify-center rounded-lg flex-shrink-0">
-            <Building2 className="w-6 h-6 print:w-5 print:h-5 text-white" />
-          </div>
-          
-          <div className="flex flex-col w-full min-w-0 justify-center">
-            {/* School Name */}
-            <div className="mb-0.5">
-                 {isEditing ? (
-                    <input 
-                        type="text" 
-                        value={visit.schoolName}
-                        onChange={(e) => onUpdate(visit.id, { schoolName: e.target.value })}
-                        className="bg-transparent border-b border-indigo-400/50 text-white px-0 py-0.5 placeholder-indigo-300 w-full focus:outline-none focus:border-white transition-colors text-lg font-bold"
-                        placeholder="اسم المدرسة..."
-                    />
-                ) : (
-                    <h3 className="text-lg print:text-base font-bold leading-tight truncate">{visit.schoolName}</h3>
-                )}
+        {/* Right Section: School & Factory - Stacked Vertically */}
+        <div className="flex flex-col gap-2 w-full flex-1">
+            
+            {/* Row 1: School */}
+            <div className="flex items-center gap-3">
+                <div className="bg-white/10 w-8 h-8 print:w-7 print:h-7 flex items-center justify-center rounded-lg flex-shrink-0">
+                    <Building2 className="w-5 h-5 print:w-4 print:h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                     {isEditing ? (
+                        <input 
+                            type="text" 
+                            value={visit.schoolName}
+                            onChange={(e) => onUpdate(visit.id, { schoolName: e.target.value })}
+                            className="bg-transparent border-b border-indigo-400/50 text-white px-0 py-0.5 placeholder-indigo-300 w-full focus:outline-none focus:border-white transition-colors text-lg font-bold"
+                            placeholder="اسم المدرسة..."
+                        />
+                    ) : (
+                        <h3 className="text-lg print:text-base font-bold leading-tight truncate">{visit.schoolName}</h3>
+                    )}
+                </div>
             </div>
 
-            {/* Factory Name - Increased Print Size */}
-            <div className="flex items-center gap-1.5 text-indigo-200">
-                 <Factory size={14} className="print:w-4 print:h-4" />
-                 {isEditing ? (
-                    <input 
-                        type="text" 
-                        value={visit.factory}
-                        onChange={(e) => onUpdate(visit.id, { factory: e.target.value })}
-                        className="bg-transparent border-b border-indigo-400/30 text-indigo-100 px-0 py-0 placeholder-indigo-400/70 w-full focus:outline-none focus:border-indigo-200 transition-colors text-sm font-medium"
-                        placeholder="اسم المصنع..."
-                    />
-                ) : (
-                    <span className="text-sm print:text-sm font-bold truncate text-indigo-100">{visit.factory}</span>
-                )}
+            {/* Row 2: Factory */}
+            <div className="flex items-center gap-3">
+                <div className="bg-white/5 w-8 h-8 print:w-7 print:h-7 flex items-center justify-center rounded-lg flex-shrink-0">
+                    <Factory className="w-5 h-5 print:w-4 print:h-4 text-indigo-200" />
+                </div>
+                <div className="flex-1 min-w-0">
+                     {isEditing ? (
+                        <input 
+                            type="text" 
+                            value={visit.factory}
+                            onChange={(e) => onUpdate(visit.id, { factory: e.target.value })}
+                            className="bg-transparent border-b border-indigo-400/30 text-indigo-100 px-0 py-0 placeholder-indigo-400/70 w-full focus:outline-none focus:border-indigo-200 transition-colors text-sm font-medium"
+                            placeholder="اسم المصنع..."
+                        />
+                    ) : (
+                        <h4 className="text-sm print:text-sm font-medium truncate text-indigo-100">{visit.factory}</h4>
+                    )}
+                </div>
             </div>
-          </div>
         </div>
 
         {/* Left Section: Stats & Logo */}
-        <div className="flex items-center gap-4 print:gap-3 self-end md:self-center flex-shrink-0">
+        <div className="flex items-center gap-4 print:gap-3 self-end md:self-center flex-shrink-0 mt-2 md:mt-0">
             
             {/* Stats - Increased Print Size */}
-            <div className="flex flex-col items-end justify-center gap-0.5 px-2 border-r border-indigo-400/30 h-full">
+            <div className="flex flex-col items-end justify-center gap-1 px-2 border-r border-indigo-400/30 h-full">
                 {/* Date */}
                 <div className="flex items-center gap-1.5 text-indigo-100">
                     {isEditing ? (
@@ -179,52 +184,44 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                 >
                     {visit.images[idx] ? (
                         <>
-                            <img src={visit.images[idx]} alt={`Visit ${idx + 1}`} className="w-full h-full object-cover" />
-                            {isEditing ? (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
-                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity no-print shadow-md"
-                                >
-                                    <X size={14} />
-                                </button>
-                            ) : (
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center no-print">
-                                    <ZoomIn className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" size={24} />
+                           <img src={visit.images[idx]} alt={`Visit ${idx + 1}`} className="w-full h-full object-cover" />
+                           {isEditing && (
+                             <button 
+                                onClick={(e) => { e.stopPropagation(); const newImages = [...visit.images]; newImages.splice(idx, 1); onUpdate(visit.id, { images: newImages }); }}
+                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                             >
+                                <X size={12} />
+                             </button>
+                           )}
+                           {!isEditing && (
+                                <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                                    <ZoomIn className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" size={20} />
                                 </div>
-                            )}
+                           )}
                         </>
                     ) : (
-                        <div className="text-gray-400 flex flex-col items-center justify-center h-full w-full bg-gray-100 print:bg-gray-50">
-                             {isEditing ? (
-                                <div className="flex flex-col items-center gap-1">
-                                    <ImagePlus size={20} className="text-gray-300" />
-                                </div>
-                            ) : null}
+                        <div className="flex flex-col items-center justify-center text-gray-400">
+                            {isEditing ? (
+                                <>
+                                    <input 
+                                        type="file" 
+                                        multiple 
+                                        accept="image/*"
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                        onChange={handleImageUpload}
+                                        title="رفع صور"
+                                    />
+                                    <Upload size={20} className="mb-1" />
+                                    <span className="text-[10px]">رفع صور</span>
+                                </>
+                            ) : (
+                                <ImagePlus size={20} className="opacity-50" />
+                            )}
                         </div>
                     )}
                 </div>
             ))}
         </div>
-
-        {isEditing && (
-            <div className="mt-3 flex justify-center no-print">
-                 <input 
-                    type="file" 
-                    accept="image/*" 
-                    multiple 
-                    ref={fileInputRef}
-                    className="hidden"
-                    onChange={handleImageUpload}
-                />
-                <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="bg-indigo-50 text-indigo-600 text-xs font-bold py-1.5 px-4 rounded-full border border-indigo-200 hover:bg-indigo-100 flex items-center gap-2 transition-all shadow-sm"
-                >
-                    <Upload size={14} />
-                    رفع / تغيير الصور
-                </button>
-            </div>
-        )}
       </div>
     </div>
   );
