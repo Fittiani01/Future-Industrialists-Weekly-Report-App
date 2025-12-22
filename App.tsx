@@ -33,7 +33,6 @@ export default function App() {
 
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Parsing & AI State
@@ -159,37 +158,43 @@ export default function App() {
       if (isAdmin) setIsDirty(true);
   };
 
-  // --- Drag & Drop Decoration Handlers ---
+  // --- Drag & Drop Decoration Handlers (Center Anchor Logic) ---
   const handleDecoMouseDown = (e: React.MouseEvent, id: string) => {
       if (!isEditing) return;
       e.stopPropagation();
       e.preventDefault();
+      
       const decoration = report.decorations?.find(d => d.id === id);
       if (!decoration || !containerRef.current) return;
 
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const initialLeft = (decoration.x / 100) * containerRect.width;
-      const initialTop = (decoration.y / 100) * containerRect.height;
-
       setActiveDecoId(id);
-      setDragOffset({ x: startX - initialLeft, y: startY - initialTop });
+      
+      // Starting Coordinates
+      const startMouseX = e.clientX;
+      const startMouseY = e.clientY;
+      const startDecoX = decoration.x;
+      const startDecoY = decoration.y;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
           if (!containerRef.current) return;
           const rect = containerRef.current.getBoundingClientRect();
-          const currentX = moveEvent.clientX - rect.left - (startX - initialLeft);
-          const currentY = moveEvent.clientY - rect.top - (startY - initialTop);
           
-          // Convert back to percentage
-          const percentX = (currentX / rect.width) * 100;
-          const percentY = (currentY / rect.height) * 100;
+          // Calculate delta in pixels
+          const deltaX_px = moveEvent.clientX - startMouseX;
+          const deltaY_px = moveEvent.clientY - startMouseY;
+
+          // Convert delta to percentage of container
+          const deltaX_percent = (deltaX_px / rect.width) * 100;
+          const deltaY_percent = (deltaY_px / rect.height) * 100;
+
+          // Calculate new position (clamped 0-100 to prevent disappearing)
+          const newX = Math.max(0, Math.min(100, startDecoX + deltaX_percent));
+          const newY = Math.max(0, Math.min(100, startDecoY + deltaY_percent));
 
           updateCurrentReport(prev => ({
               ...prev,
               decorations: prev.decorations?.map(d => 
-                  d.id === id ? { ...d, x: percentX, y: percentY } : d
+                  d.id === id ? { ...d, x: newX, y: newY } : d
               )
           }));
       };
@@ -212,37 +217,28 @@ export default function App() {
               const url = await uploadReportImage(file, report.id, 'decorations');
               
               // Spawning Logic:
-              // Make sure they spawn centrally so they aren't hidden
-              const defaultX = index === 0 ? 10 : 60; 
-              const defaultY = 30; // 30% down the page (safe zone)
+              // Spawn in the visual center of the top half
+              const defaultX = 50; 
+              const defaultY = index === 0 ? 15 : 40;
 
               const newDeco: Decoration = {
                   id: `deco-${index}-${Date.now()}`,
                   url,
                   x: defaultX, 
                   y: defaultY,
-                  scale: 1.5, // Start slightly bigger
+                  scale: 1.0, 
                   opacity: 1
               };
               
               updateCurrentReport(prev => {
                   const newDecos = [...(prev.decorations || [])];
-                  // If we have a decoration at this index, replace it. Otherwise add.
-                  // We'll filter existing ones to ensure we don't duplicate logic, 
-                  // but simplest is to just rebuild array ensuring order.
-                  
-                  // Strategy: ensure the array has up to 2 items.
-                  // We map specific uploaded files to specific array slots.
                   if (index === 0) {
                       if (newDecos.length > 0) newDecos[0] = newDeco;
                       else newDecos.push(newDeco);
                   } else {
-                      // Index 1
-                      if (newDecos.length < 1) newDecos.push({} as any); // Filler if 0 is empty (unlikely but safe)
+                      if (newDecos.length < 1) newDecos.push({} as any);
                       newDecos[1] = newDeco;
                   }
-                  
-                  // Clean up empty slots if any
                   return { ...prev, decorations: newDecos.filter(d => d && d.url) };
               });
           } catch(e) {
@@ -628,33 +624,36 @@ export default function App() {
   )};
 
   const DecorationLayer = ({ isPrint = false }) => (
-      // Z-Index Logic:
-      // If Editing and NOT printing: z-[1000] (Front of everything to be clickable)
-      // If Printing or Viewing: z-[2] (Behind text, but above background)
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[1000]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
+      // Z-Index: 
+      // Editing Mode (Screen): z-[2000] - Must be higher than everything else (cards, modals) to catch clicks.
+      // Print Mode: z-[2] - Lower than content but above background.
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : (isPrint ? 'print-layer z-[2]' : 'z-[2]')}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
                 style={{
                     position: 'absolute',
+                    // Use Center as the anchor point
                     left: `${d.x}%`,
                     top: `${d.y}%`,
-                    transform: `scale(${d.scale})`,
+                    // Translate -50% -50% to truly center it on the coordinates
+                    transform: `translate(-50%, -50%) scale(${d.scale})`,
                     opacity: d.opacity,
                     cursor: isEditing && !isPrint ? 'move' : 'default',
                     pointerEvents: isEditing && !isPrint ? 'auto' : 'none',
                 }}
                 onMouseDown={(e) => !isPrint && handleDecoMouseDown(e, d.id)}
-                className={`origin-top-left ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded shadow-2xl' : ''} ${isEditing ? 'border border-dashed border-gray-300/50' : ''}`}
+                className={`origin-center ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded shadow-2xl' : ''} ${isEditing && !isPrint ? 'border border-dashed border-gray-400/50' : ''}`}
               >
                   <img src={d.url} className="max-w-[300px] h-auto object-contain select-none pointer-events-none" draggable={false} alt="" />
                   
                   {/* Controls for Editing - Visible on top */}
-                  {isEditing && !isPrint && (
-                      <div className="absolute -top-10 left-0 flex items-center gap-1 bg-white shadow-xl rounded p-1 pointer-events-auto z-[1000] border border-gray-200">
-                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, 0.1); }} className="p-1 hover:bg-gray-100 rounded text-green-600"><Plus size={14}/></button>
-                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, -0.1); }} className="p-1 hover:bg-gray-100 rounded text-red-600"><Minus size={14}/></button>
-                          <button onClick={(e) => { e.stopPropagation(); deleteDecoration(d.id); }} className="p-1 hover:bg-gray-100 rounded text-red-600 ml-2"><Trash2 size={14}/></button>
+                  {isEditing && !isPrint && activeDecoId === d.id && (
+                      <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white shadow-xl rounded-lg p-1.5 pointer-events-auto z-[2001] border border-gray-200 w-max">
+                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, 0.1); }} className="p-1 hover:bg-gray-100 rounded text-green-600 font-bold"><Plus size={16}/></button>
+                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, -0.1); }} className="p-1 hover:bg-gray-100 rounded text-red-600 font-bold"><Minus size={16}/></button>
+                          <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                          <button onClick={(e) => { e.stopPropagation(); deleteDecoration(d.id); }} className="p-1 hover:bg-red-50 rounded text-red-600"><Trash2 size={16}/></button>
                       </div>
                   )}
               </div>
@@ -912,25 +911,39 @@ export default function App() {
         {/* Footer */}
         <div className="mt-8 pt-4 border-t border-gray-200 relative pb-4 z-20">
              <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
-             <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-8 px-4 relative z-10">
-                {report.logos.partners.map((partner: PartnerLogo, idx) => (
-                    <React.Fragment key={partner.id}>
-                        <div className="relative flex flex-col items-center gap-2 group/partner">
-                            <div className={`relative ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
-                                <img src={partner.url} style={{ height: `${48 * partner.scale}px`, width: 'auto' }} className="object-contain transition-all duration-200" alt="" />
-                                <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
-                            </div>
-                            {isEditing && (
-                                <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20">
-                                    <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={12} /></button>
-                                    <div className="w-px h-3 bg-gray-300"></div>
-                                    <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={12} /></button>
+             <div className="w-full px-4 relative z-10">
+                {/* --- MOBILE: Grid Layout (3 Columns) --- */}
+                {/* --- DESKTOP: Flex Layout (Original) --- */}
+                <div className="grid grid-cols-3 gap-4 md:flex md:flex-wrap md:justify-center md:items-center md:gap-x-4 md:gap-y-8">
+                    {report.logos.partners.map((partner: PartnerLogo, idx) => (
+                        <React.Fragment key={partner.id}>
+                            <div className="relative flex flex-col items-center gap-2 group/partner">
+                                <div className={`relative w-full flex items-center justify-center ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
+                                    {/* On Mobile: Force smaller height/contain. On Desktop: Use scale logic */}
+                                    <img 
+                                        src={partner.url} 
+                                        style={{ 
+                                            // Dynamic inline style mainly for desktop scaling preference
+                                            height: window.innerWidth > 768 ? `${48 * partner.scale}px` : undefined 
+                                        }} 
+                                        className="object-contain transition-all duration-200 h-12 w-full md:w-auto md:h-auto" 
+                                        alt="" 
+                                    />
+                                    <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
                                 </div>
-                            )}
-                        </div>
-                        {idx < report.logos.partners.length - 1 && <div className="h-10 w-px bg-gray-200 mx-2 hidden md:block"></div>}
-                    </React.Fragment>
-                ))}
+                                {isEditing && (
+                                    <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20 absolute -bottom-6 left-1/2 -translate-x-1/2">
+                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={10} /></button>
+                                        <div className="w-px h-3 bg-gray-300"></div>
+                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={10} /></button>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Vertical Divider - Desktop Only */}
+                            {idx < report.logos.partners.length - 1 && <div className="hidden md:block h-10 w-px bg-gray-200 mx-2"></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
             </div>
         </div>
 
