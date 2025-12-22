@@ -68,9 +68,9 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   
-  // Admin Mode State - Default to TRUE as requested
-  const [isAdmin, setIsAdmin] = useState(true);
-  const [isEditing, setIsEditing] = useState(true);
+  // Admin Mode State - Default to FALSE (Public view)
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Parsing & AI State
   const [rawText, setRawText] = useState("");
@@ -93,17 +93,12 @@ export default function App() {
 
   // 1. Initial Load from Firebase
   useEffect(() => {
-    // Check URL override, but default to true if not present
+    // STRICT MODE CHECK: Only enable admin if ?mode=admin is in URL
     const params = new URLSearchParams(window.location.search);
-    if (params.has('mode')) {
-        const adminMode = params.get('mode') === 'admin';
-        setIsAdmin(adminMode);
-        setIsEditing(adminMode);
-    } else {
-        // Default behavior: Admin Mode ON
-        setIsAdmin(true);
-        setIsEditing(true);
-    }
+    const adminMode = params.get('mode') === 'admin';
+    
+    setIsAdmin(adminMode);
+    setIsEditing(adminMode);
 
     const fetchReports = async () => {
         setLoading(true);
