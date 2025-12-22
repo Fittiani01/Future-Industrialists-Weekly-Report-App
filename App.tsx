@@ -347,7 +347,13 @@ export default function App() {
         visits: parsedData.visits?.map((v, idx) => ({ ...v, id: Date.now().toString() + idx, images: [] })) || prev.visits
       }));
       setRawText(""); 
-    } catch (error) { alert("حدث خطأ أثناء المعالجة."); } finally { setIsParsing(false); }
+    } catch (error: any) { 
+        console.error(error);
+        // Show specific error message
+        alert(`حدث خطأ أثناء المعالجة: ${error.message || "تأكد من إعداد مفتاح API بشكل صحيح"}`); 
+    } finally { 
+        setIsParsing(false); 
+    }
   };
 
   const handleBulkImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -377,7 +383,9 @@ export default function App() {
         }
         updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
         setImageMatchStatus(`تم مطابقة ورفع ${matchCount} صورة بنجاح!`);
-      } catch (error) { setImageMatchStatus("فشل التوزيع."); } finally {
+      } catch (error: any) { 
+          setImageMatchStatus(`فشل التوزيع: ${error.message || "خطأ غير معروف"}`); 
+      } finally {
           setIsAnalyzingImages(false);
           if (bulkImageInputRef.current) bulkImageInputRef.current.value = "";
       }
@@ -420,8 +428,8 @@ export default function App() {
         
         updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
         setLogoMatchStatus(`تم توزيع ${matchCount} شعار بنجاح!`);
-      } catch (e) {
-          setLogoMatchStatus("حدث خطأ في المطابقة");
+      } catch (e: any) {
+          setLogoMatchStatus(`حدث خطأ في المطابقة: ${e.message}`);
       } finally {
           setIsAnalyzingLogos(false);
           if (bulkLogoInputRef.current) bulkLogoInputRef.current.value = "";

@@ -6,10 +6,25 @@ if (!process.env.API_KEY) {
 }
 
 const getAIClient = () => {
-    if (!process.env.API_KEY) {
-        throw new Error("API Key is missing");
+    // Basic check to prevent runtime crash if process is not defined in some envs, 
+    // although strictly per instructions we expect it to work.
+    let apiKey = '';
+    try {
+        apiKey = process.env.API_KEY || '';
+    } catch(e) {
+        // ignore
     }
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    if (!apiKey) {
+        throw new Error("API Key is missing. Ensure process.env.API_KEY is set.");
+    }
+    return new GoogleGenAI({ apiKey });
+};
+
+// Helper to remove Markdown code blocks (e.g. ```json ... ```)
+const cleanJson = (text: string): string => {
+    if (!text) return "";
+    return text.replace(/```json\n?|```/g, '').trim();
 };
 
 export const parseReportFromText = async (text: string): Promise<Partial<WeeklyReport>> => {
@@ -43,7 +58,7 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   }
 
   If a value is missing, use 0 for numbers or empty string for strings.
-  Ensure the output is pure JSON without markdown code fences.
+  Ensure the output is pure JSON.
   `;
 
   try {
@@ -61,7 +76,7 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
     const responseText = response.text;
     if (!responseText) throw new Error("No response from AI");
 
-    return JSON.parse(responseText);
+    return JSON.parse(cleanJson(responseText));
   } catch (error) {
     console.error("Error parsing text with Gemini:", error);
     throw error;
@@ -108,7 +123,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
 
         const text = response.text;
         if (!text) return {};
-        return JSON.parse(text);
+        return JSON.parse(cleanJson(text));
     } catch (error) {
         console.error("Error matching images:", error);
         return {}; // Fallback to empty matching if AI fails
@@ -153,7 +168,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
 
         const text = response.text;
         if (!text) return {};
-        return JSON.parse(text);
+        return JSON.parse(cleanJson(text));
     } catch (error) {
         console.error("Error matching logos:", error);
         return {}; 
