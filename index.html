@@ -20,16 +20,6 @@
                 accent: '#837cb9',  // Lavender/Purple
                 light: '#f8f9fa'    // Off-white
               }
-            },
-            animation: {
-              'blob': 'blob 7s infinite',
-              'fade-in': 'fadeIn 0.3s ease-out forwards',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              }
             }
           }
         }
@@ -39,69 +29,11 @@
       body {
         margin: 0;
         padding: 0;
-        background-color: transparent;
+        background-color: #f8f9fa;
         min-height: 100vh;
         overflow-x: hidden;
       }
       
-      .animated-bg {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(-45deg, #0f1125, #2a3590, #6c429e, #3d59a5);
-        background-size: 400% 400%;
-        animation: gradientAnimation 12s ease infinite;
-        z-index: -3;
-      }
-      
-      @keyframes gradientAnimation {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-
-      .glow-layer {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: -2;
-        pointer-events: none;
-      }
-
-      .glow-blob {
-        position: absolute;
-        border-radius: 50%;
-        filter: blur(80px);
-        opacity: 0.6;
-        animation: floatBlob 20s infinite ease-in-out alternate;
-      }
-
-      .glow-blob-1 {
-        top: -10%;
-        left: -10%;
-        width: 50vw;
-        height: 50vw;
-        background: radial-gradient(circle, rgba(131, 124, 185, 0.5) 0%, transparent 70%);
-      }
-
-      .glow-blob-2 {
-        bottom: -10%;
-        right: -10%;
-        width: 50vw;
-        height: 50vw;
-        background: radial-gradient(circle, rgba(61, 89, 165, 0.5) 0%, transparent 70%);
-        animation-delay: -10s;
-      }
-
-      @keyframes floatBlob {
-        0% { transform: translate(0, 0) scale(1); }
-        100% { transform: translate(30px, 30px) scale(1.1); }
-      }
-
       #network-canvas {
         position: fixed;
         top: 0;
@@ -116,7 +48,7 @@
       @media print {
         @page {
           size: A4;
-          margin: 0; /* We handle margins manually to accommodate fixed headers */
+          margin: 0;
         }
 
         body {
@@ -127,12 +59,10 @@
           height: auto;
         }
 
-        /* Hide Backgrounds and UI elements */
-        .no-print, .animated-bg, .glow-layer, #network-canvas, button { 
+        .no-print, #network-canvas, button { 
           display: none !important; 
         }
 
-        /* Container Reset */
         .max-w-\[210mm\] {
           max-width: none !important;
           width: 100% !important;
@@ -142,51 +72,46 @@
           border-radius: 0 !important;
         }
 
-        /* Fixed Header Logic */
         .print-header-fixed {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
-          height: 120px; /* Adjust based on your header height */
+          height: 120px;
           background: white;
           z-index: 1000;
           padding: 10px 20px;
-          display: flex !important; /* Force show in print */
+          display: flex !important;
           border-bottom: 2px solid #2a3590;
         }
 
-        /* Fixed Footer Logic */
         .print-footer-fixed {
           position: fixed;
           bottom: 0;
           left: 0;
           right: 0;
-          height: 100px; /* Adjust based on footer height */
+          height: 100px;
           background: white;
           z-index: 1000;
           padding: 10px 20px;
-          display: flex !important; /* Force show in print */
+          display: flex !important;
           align-items: center;
           justify-content: center;
           border-top: 1px solid #eee;
         }
 
-        /* Main Content Padding to prevent overlap */
         .print-content-wrapper {
-          margin-top: 130px; /* Header height + gap */
-          margin-bottom: 110px; /* Footer height + gap */
+          margin-top: 130px;
+          margin-bottom: 110px;
           padding: 0 20px;
         }
 
-        /* Avoid breaking inside cards */
         .print-break-inside {
           break-inside: avoid;
           page-break-inside: avoid;
           margin-bottom: 20px;
         }
 
-        /* Hide the original on-screen header/footer to avoid duplication if we use fixed ones */
         .screen-header, .screen-footer {
           display: none !important;
         }
@@ -207,11 +132,6 @@
 </script>
 </head>
   <body>
-    <div class="animated-bg"></div>
-    <div class="glow-layer">
-        <div class="glow-blob glow-blob-1"></div>
-        <div class="glow-blob glow-blob-2"></div>
-    </div>
     <canvas id="network-canvas"></canvas>
     <div id="root"></div>
 
@@ -233,7 +153,6 @@
 
         class Particle {
           constructor() {
-            // Use window inner dimensions directly for immediate distribution
             this.x = Math.random() * window.innerWidth;
             this.y = Math.random() * window.innerHeight;
             this.vx = (Math.random() - 0.5) * moveSpeed;
@@ -249,8 +168,7 @@
           draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            // Subtle blueish tint instead of pure white
-            ctx.fillStyle = 'rgba(100, 149, 237, 0.2)'; 
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; 
             ctx.fill();
           }
         }
@@ -283,8 +201,7 @@
               if (distance < connectionDistance) {
                 ctx.beginPath();
                 let opacity = 1 - (distance / connectionDistance);
-                // Subtle connecting lines
-                ctx.strokeStyle = `rgba(100, 149, 237, ${opacity * 0.15})`; 
+                ctx.strokeStyle = `rgba(0, 0, 0, ${opacity * 0.05})`; 
                 ctx.lineWidth = 1;
                 ctx.moveTo(p1.x, p1.y);
                 ctx.lineTo(p2.x, p2.y);
@@ -296,8 +213,6 @@
         }
         
         window.addEventListener('resize', resize);
-        
-        // Initialize
         init();
         animate();
       })();
