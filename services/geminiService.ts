@@ -12,9 +12,18 @@ const getAIClient = () => {
     return new GoogleGenAI({ apiKey });
 };
 
-// دالة مساعدة لتنظيف مخرجات JSON من Markdown
+// تحسين دالة التنظيف لاستخراج الكائن JSON فقط بغض النظر عن النصوص المحيطة
 const cleanJson = (text: string): string => {
     if (!text) return "";
+    // محاولة العثور على أول قوس { وآخر قوس }
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1) {
+        return text.substring(firstBrace, lastBrace + 1);
+    }
+    
+    // Fallback: إزالة الرموز الخاصة فقط
     return text.replace(/```json\n?|```/g, '').trim();
 };
 
@@ -83,14 +92,25 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
         factory: v.factory
     }));
 
+    // تحسين الأمر البرمجي لضمان عدم تغيير أسماء الملفات
     const prompt = `
     You are an intelligent file organizer. 
     I have a list of image filenames and a list of School Visits.
-    Match each filename to the most likely Visit ID based on semantic similarity.
+    
+    Task: Match each filename to the most likely Visit ID based on the text in the filename (School Name OR Factory Name).
+
+    CRITICAL RULES:
+    1. The Output JSON Keys MUST be the **EXACT** filenames from the provided list (do not remove extensions like .jpg or .png).
+    2. If a file matches "Jeddah School", find the visit ID for that school.
+    3. If a file matches "York Factory", find the visit ID for that factory.
+    4. Return ONLY a JSON object.
+
     Input Data:
     Visits: ${JSON.stringify(visitsSummary)}
     Filenames: ${JSON.stringify(filenames)}
-    Return ONLY a JSON object where keys are filenames and values are the Visit IDs.
+    
+    Expected Output Format:
+    { "exact_filename_1.jpg": "visit_id_1", "exact_filename_2.png": "visit_id_2" }
     `;
 
     try {
@@ -102,6 +122,8 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
 
         const text = response.text;
         if (!text) return {};
+        // طباعة الرد للتأكد أثناء التطوير
+        console.log("AI Image Match Response:", text);
         return JSON.parse(cleanJson(text));
     } catch (error) {
         console.error("Error matching images:", error);
@@ -117,13 +139,22 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
         factory: v.factory
     }));
 
+    // تحسين الأمر البرمجي لضمان الدقة في أسماء الملفات
     const prompt = `
     You are an intelligent bilingual assistant organizing factory logos.
     Task: Match logo filenames to **ALL** Visit IDs that correspond to that Factory Name.
+    
+    CRITICAL RULES:
+    1. The Output JSON Keys MUST be the **EXACT** filenames from the provided list.
+    2. Map Arabic factory names to English filenames if needed (e.g., "Almarai.png" -> "المراعي").
+    3. Return an ARRAY of visit IDs for each matched logo.
+
     Data:
     Factory List (Visits): ${JSON.stringify(factoryList)}
     Logo Filenames: ${JSON.stringify(filenames)}
-    Return ONLY a JSON object mapping the filename to an ARRAY of Visit IDs.
+    
+    Expected Output Format:
+    { "exact_logo_name.png": ["id_1", "id_2"] }
     `;
 
     try {
@@ -135,6 +166,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
 
         const text = response.text;
         if (!text) return {};
+        console.log("AI Logo Match Response:", text);
         return JSON.parse(cleanJson(text));
     } catch (error) {
         console.error("Error matching logos:", error);
