@@ -119,15 +119,24 @@
           margin: 0 !important; /* CRITICAL: Removes browser headers/footers */
         }
 
+        /* 1. Reset Global Styles for Print */
         html, body {
           width: 210mm;
-          height: auto !important;
+          height: auto !important; /* Allow body to fit content naturally */
           margin: 0 !important;
           padding: 0 !important;
           background-color: white !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
           overflow: visible !important;
+        }
+
+        /* 2. OPTIMIZATION: Remove Shadows & Filters to Reduce File Size */
+        * {
+          box-shadow: none !important;
+          text-shadow: none !important;
+          filter: none !important;
+          backdrop-filter: none !important;
         }
 
         /* Hide Screen UI elements */
@@ -139,13 +148,14 @@
         .print-only-container {
             display: block !important;
             width: 100%;
+            height: auto !important; /* Fix: Don't force 100% height which might trigger overflow */
         }
 
         /* Explicit Page Break Wrapper */
         .print-page {
             width: 210mm;
-            /* Using 296mm creates a tiny buffer ensuring no blank page triggers */
-            height: 296.5mm; 
+            /* Reduced slightly from 297mm/296.5mm to ensure buffer against footer overflow */
+            height: 296mm; 
             position: relative;
             page-break-after: always;
             break-after: page;
@@ -156,6 +166,7 @@
             overflow: hidden;
             padding: 0;
             margin: 0;
+            box-sizing: border-box;
         }
         
         /* Force remove page break after the last page to prevent blank sheet */
@@ -163,6 +174,8 @@
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;
+            height: auto !important; /* Allow last page to end naturally if needed, though usually fixed height is fine */
+            min-height: 296mm;
         }
         
         /* Inner container to ensure content has safe margin but background is full */
