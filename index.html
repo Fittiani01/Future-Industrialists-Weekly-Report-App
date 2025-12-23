@@ -116,17 +116,18 @@
       @media print {
         @page {
           size: A4;
-          margin: 0 !important; /* Forces removal of browser header/footer */
+          margin: 0 !important; /* CRITICAL: Removes browser headers/footers */
         }
 
         html, body {
           width: 210mm;
-          height: 297mm;
+          height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
           background-color: white !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
+          overflow: visible !important;
         }
 
         /* Hide Screen UI elements */
@@ -138,13 +139,13 @@
         .print-only-container {
             display: block !important;
             width: 100%;
-            height: 100%;
         }
 
         /* Explicit Page Break Wrapper */
         .print-page {
             width: 210mm;
-            height: 297mm; /* Exact A4 Height */
+            /* Using 296mm creates a tiny buffer ensuring no blank page triggers */
+            height: 296.5mm; 
             position: relative;
             page-break-after: always;
             break-after: page;
@@ -153,8 +154,15 @@
             justify-content: space-between;
             background: white;
             overflow: hidden;
-            padding: 0; /* No external padding, handled by inner container */
+            padding: 0;
             margin: 0;
+        }
+        
+        /* Force remove page break after the last page to prevent blank sheet */
+        .print-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+            margin-bottom: 0 !important;
         }
         
         /* Inner container to ensure content has safe margin but background is full */
@@ -166,11 +174,6 @@
             justify-content: flex-start;
             position: relative;
             z-index: 10;
-        }
-        
-        .print-page:last-child {
-            page-break-after: auto;
-            break-after: auto;
         }
       }
     </style>

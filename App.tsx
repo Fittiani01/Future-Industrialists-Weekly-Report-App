@@ -149,14 +149,15 @@ export default function App() {
       // Format: Week Title - Date - Report Name
       const originalTitle = document.title;
       // Sanitize filename to be safe
-      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-');
-      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-');
+      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
       
-      document.title = `${safeWeek} - ${safeDate} - تقرير صناعيو المستقبل`;
+      // Ensures the week title comes first as requested
+      document.title = `${safeWeek} - ${safeDate}`;
       
       window.print();
       
-      // Restore title after print dialog closes (though typically happens immediately in JS event loop)
+      // Restore title after print dialog closes
       setTimeout(() => {
           document.title = originalTitle;
       }, 1000);
