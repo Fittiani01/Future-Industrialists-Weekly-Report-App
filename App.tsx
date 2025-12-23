@@ -143,6 +143,25 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
+  // --- Printing Handler (Set File Name) ---
+  const handlePrint = () => {
+      // Set the document title to control the filename
+      // Format: Week Title - Date - Report Name
+      const originalTitle = document.title;
+      // Sanitize filename to be safe
+      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-');
+      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-');
+      
+      document.title = `${safeWeek} - ${safeDate} - تقرير صناعيو المستقبل`;
+      
+      window.print();
+      
+      // Restore title after print dialog closes (though typically happens immediately in JS event loop)
+      setTimeout(() => {
+          document.title = originalTitle;
+      }, 1000);
+  };
+
   // --- Update Helpers ---
   const updateCurrentReport = (newData: Partial<WeeklyReport> | ((prev: WeeklyReport) => WeeklyReport)) => {
       setReports(prevReports => {
@@ -160,12 +179,10 @@ export default function App() {
       if (isAdmin) setIsDirty(true);
   };
 
-  // --- Drag & Drop Decoration Handlers (Unified Mouse & Touch) ---
+  // --- Drag & Drop Decoration Handlers ---
   const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
       if (!isEditing) return;
       e.stopPropagation();
-      // Prevent default to stop scrolling while dragging on touch
-      // e.preventDefault(); // NOTE: Calling this on touchstart might block click, be careful.
 
       const decoration = report.decorations?.find(d => d.id === id);
       if (!decoration || !containerRef.current) return;
@@ -173,7 +190,6 @@ export default function App() {
       setActiveDecoId(id);
       isDraggingRef.current = false;
       
-      // Get client coordinates
       let clientX, clientY;
       if ('touches' in e) {
           clientX = e.touches[0].clientX;
@@ -239,14 +255,14 @@ export default function App() {
           try {
               const url = await uploadReportImage(file, report.id, 'decorations');
               const defaultX = 50; 
-              const defaultY = 20; // Safe visible area
+              const defaultY = 20; 
 
               const newDeco: Decoration = {
                   id: `deco-${index}-${Date.now()}`,
                   url,
                   x: defaultX, 
                   y: defaultY,
-                  scale: 0.8, // Slightly smaller default
+                  scale: 0.8,
                   opacity: 1
               };
               
@@ -286,7 +302,6 @@ export default function App() {
       setActiveDecoId(null);
   };
 
-  // --- Handlers (Existing) ---
   const saveReportToFirestore = async () => {
     if (!report || !isAdmin) return;
     setSaving(true);
@@ -332,7 +347,6 @@ export default function App() {
     }
   };
 
-  // ... (Other handlers: Create, Delete, Update Visit, etc. kept same)
   const handleCreateNewReport = () => {
       const nextWeekNum = reports.length + 1;
       const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
@@ -343,7 +357,7 @@ export default function App() {
           header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
           logos: report.logos, 
           visits: [], 
-          decorations: report.decorations || [], // Copy decorations
+          decorations: report.decorations || [],
           createdAt: serverTimestamp() 
       };
       setReports(prev => [newReport, ...prev]); 
@@ -408,7 +422,6 @@ export default function App() {
       updateCurrentReport(prev => ({ ...prev, header: { ...prev.header, [key]: value } }));
   }
 
-  // --- Upload Handlers ---
   const handleManualVisitImageUpload = async (files: File[], visitId: string): Promise<string[]> => {
       if (!report.id) return [];
       const urls: string[] = [];
@@ -476,7 +489,6 @@ export default function App() {
       });
   };
 
-  // --- AI Handlers ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -651,8 +663,8 @@ export default function App() {
   const DecorationLayer = ({ isPrint = false }) => (
       // Z-Index: 
       // Editing Mode: z-[2000] (Very High)
-      // View/Print Mode: z-[30] (High enough to be ABOVE content cards which are usually z-0 or z-10)
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[30]'}`}>
+      // View/Print Mode: z-[0] (Under content, but in full page absolute context)
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[0]'}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
@@ -698,8 +710,11 @@ export default function App() {
           {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
-            <div className="print-page w-full h-full p-0 overflow-hidden relative" style={{ height: '297mm', width: '210mm' }}>
-                <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" style={{ objectFit: 'cover' }} />
+            <div className="print-page">
+                {/* Full Bleed Image */}
+                <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
+                
+                {/* Overlay Text */}
                 <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
                     <h1 className="text-2xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
                     <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
@@ -710,56 +725,63 @@ export default function App() {
 
           {/* 2. Content Pages */}
           {visitChunks.map((chunk, pageIndex) => (
-              <div key={pageIndex} className="print-page flex flex-col justify-between relative">
+              <div key={pageIndex} className="print-page">
                   <DecorationLayer isPrint={true} />
                   
-                  <div className="relative z-10">
-                    <ReportHeaderContent />
-                    <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                            <div className="flex justify-between items-end px-2">
-                                <div className="flex flex-col">
-                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                    <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                  {/* Content Container (Safe Area) */}
+                  <div className="print-content-safe-area">
+                      <div className="relative z-10">
+                        <ReportHeaderContent />
+                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                                <div className="flex justify-between items-end px-2">
+                                    <div className="flex flex-col">
+                                        <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                    </div>
+                                    <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
                                 </div>
-                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
-                            </div>
-                    </div>
-                  </div>
+                        </div>
+                      </div>
 
-                  <div className="flex-grow flex flex-col justify-start gap-2 print:gap-1 pt-4 relative z-10">
-                      {chunk.map((visit: Visit) => (
-                           <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
-                      ))}
-                  </div>
+                      <div className="flex-grow flex flex-col justify-start gap-2 print:gap-1 pt-4 relative z-10">
+                          {chunk.map((visit: Visit) => (
+                               <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
+                          ))}
+                      </div>
 
-                  <ReportFooterContent />
+                      <ReportFooterContent />
+                  </div>
               </div>
           ))}
 
           {/* 3. Statistics Page */}
-          <div className="print-page flex flex-col justify-between relative">
+          <div className="print-page">
                <DecorationLayer isPrint={true} />
-               <div className="relative z-10">
-                   <ReportHeaderContent />
-                    <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                            <div className="flex justify-between items-end px-2">
-                                <div className="flex flex-col">
-                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                    <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+               
+               {/* Content Container (Safe Area) */}
+               <div className="print-content-safe-area">
+                   <div className="relative z-10">
+                       <ReportHeaderContent />
+                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                                <div className="flex justify-between items-end px-2">
+                                    <div className="flex flex-col">
+                                        <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                    </div>
+                                    <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
                                 </div>
-                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
-                            </div>
-                    </div>
-                   <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
-                        <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
+                        </div>
+                       <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
+                            <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
+                       </div>
                    </div>
+                   
+                   <div className="flex-grow flex flex-col justify-start py-4 print:py-0 relative z-10">
+                        <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
+                   </div>
+                   
+                   <ReportFooterContent />
                </div>
-               
-               <div className="flex-grow flex flex-col justify-start py-4 print:py-0 relative z-10">
-                    <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
-               </div>
-               
-               <ReportFooterContent />
           </div>
       </div>
 
@@ -783,7 +805,7 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Printer size={16} /> طباعة PDF</button>
+                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Printer size={16} /> طباعة PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>
