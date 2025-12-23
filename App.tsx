@@ -622,7 +622,7 @@ export default function App() {
     const partnersTop = report.logos.partners.slice(0, 6);
     const partnersBottom = report.logos.partners.slice(6, 11);
     return (
-      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 relative z-50">
+      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 pb-1 relative z-50">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
             {/* Screen View */}

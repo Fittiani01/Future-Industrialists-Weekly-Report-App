@@ -121,7 +121,6 @@
 
         html, body {
           width: 210mm;
-          /* Remove fixed height auto to prevent overflow triggers */
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
@@ -131,7 +130,7 @@
           overflow: visible !important;
         }
 
-        /* Optimize for file size & font rendering: No shadows, No blurs */
+        /* Optimization: Remove shadows and filters to fix file size and rendering artifacts */
         * {
           box-shadow: none !important;
           text-shadow: none !important;
@@ -150,8 +149,8 @@
 
         .print-page {
             width: 210mm;
-            /* Reduced height to 290mm to provide a safe buffer against footer bleed */
-            height: 290mm; 
+            /* Full A4 Height */
+            height: 297mm; 
             position: relative;
             page-break-after: always;
             break-after: page;
@@ -159,26 +158,27 @@
             flex-direction: column;
             justify-content: space-between;
             background: white;
-            overflow: hidden; /* Critical to cut off anything pushing the page */
+            overflow: hidden;
             padding: 0;
             margin: 0;
         }
         
-        /* The last page must not force a page break */
         .print-page:last-child {
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;
-            height: auto !important; 
-            min-height: 290mm;
+            height: 297mm; /* Ensure last page is also full height */
+            min-height: 297mm;
         }
         
         .print-content-safe-area {
-            padding: 10mm 10mm 5mm 10mm;
+            /* Reduced bottom padding to 0 to allow footer to hit the bottom */
+            padding: 10mm 10mm 0mm 10mm;
+            height: 100%; /* Take full height of parent */
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
+            justify-content: space-between; /* Force footer to bottom */
             position: relative;
             z-index: 10;
         }
