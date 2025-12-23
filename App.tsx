@@ -589,17 +589,17 @@ export default function App() {
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-4 md:gap-4 h-10 md:h-16 print:h-12">
+            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-6 md:max-h-14 print:max-h-10" />
+                            <img src={logo} alt="" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-0.5 md:mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-12 md:h-20 print:h-14 items-end justify-center">
+            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -773,32 +773,34 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Container */}
-      <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-auto mt-8 bg-white shadow-2xl min-h-[297mm] h-auto p-8 md:p-12 relative flex flex-col z-10 rounded-[2.5rem] overflow-hidden border-8 border-gray-100">
-        
-        {/* Only Render Decorations here if NOT editing, otherwise we render later for z-index issues, wait... 
-            Actually, to ensure it's on top of everything including white backgrounds of cards, it MUST be last.
-        */}
-
-        {/* --- CONTROLS --- */}
-        <div className="no-print mb-8 bg-gray-50 rounded-xl p-3 border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 shadow-inner relative z-50">
+      {/* --- CONTROLS (MOVED OUTSIDE PAPER) --- */}
+      <div className="max-w-[210mm] mx-auto mt-4 md:mt-8 relative z-50 no-print px-4 md:px-0">
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-white/40 flex flex-col items-end md:flex-row md:justify-between md:items-center gap-4 shadow-xl">
             <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
                 {reports.map((r: WeeklyReport, idx) => (
-                    <button key={r.id} onClick={() => setCurrentReportIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}>{r.header.weekTitle}</button>
+                    <button key={r.id} onClick={() => setCurrentReportIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white/50 text-gray-700 hover:bg-white border border-transparent hover:border-gray-200'}`}>{r.header.weekTitle}</button>
                 ))}
-                {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-200"><Plus size={18} /></button>}
+                {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
-                <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700 text-xs font-bold shadow-sm transition-colors"><Printer size={14} /> طباعة PDF</button>
+            <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
+                <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Printer size={16} /> طباعة PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-200 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}</button>
+                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}</button>
                         <button onClick={saveReportToFirestore} disabled={!isDirty || saving} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-gray-200 text-gray-400'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "تم الحفظ"}</button>
                     </>
                 )}
             </div>
         </div>
+      </div>
+
+      {/* Main Paper Container */}
+      <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto p-6 md:p-12 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
+        
+        {/* Only Render Decorations here if NOT editing, otherwise we render later for z-index issues, wait... 
+            Actually, to ensure it's on top of everything including white backgrounds of cards, it MUST be last.
+        */}
 
         {/* --- ADMIN IMPORT AREA --- */}
         {isEditing && isAdmin && (
@@ -885,22 +887,36 @@ export default function App() {
         </div>
 
         {/* Title */}
-        <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
-            <div className="text-right">
+        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
+            <div className="text-right order-2 md:order-1">
                 <h1 className="text-2xl md:text-3xl font-bold mb-1">التقرير الأسبوعي</h1>
                 <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
             </div>
-            <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm">
+            <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm order-1 md:order-2 w-full md:w-auto">
                 {isEditing ? (
-                    <div className="flex flex-col gap-1">
-                        <input type="text" value={report.header.weekTitle} onChange={(e) => handleUpdateHeader('weekTitle', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white font-bold" />
-                        <input type="text" value={report.header.dateRange} onChange={(e) => handleUpdateHeader('dateRange', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white text-sm" />
+                    <div className="flex flex-col gap-1 w-full">
+                        <input type="text" value={report.header.weekTitle} onChange={(e) => handleUpdateHeader('weekTitle', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white font-bold w-full" />
+                        <input type="text" value={report.header.dateRange} onChange={(e) => handleUpdateHeader('dateRange', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white text-sm w-full" />
                     </div>
                 ) : (
-                    <>
-                        <h2 className="text-lg font-bold">{report.header.weekTitle}</h2>
-                        <p className="text-sm md:text-base dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
-                    </>
+                    <div className="flex flex-row md:flex-col justify-between md:justify-start items-center md:items-start gap-4 md:gap-0">
+                        <h2 className="text-sm md:text-lg font-bold whitespace-nowrap">{report.header.weekTitle}</h2>
+                        
+                        {/* Mobile Date Split */}
+                        <div className="block md:hidden text-[10px] opacity-90 font-medium leading-snug text-left dir-ltr">
+                           {report.header.dateRange.includes(' الى ') ? (
+                                <div className="flex flex-col items-end">
+                                    <span>{report.header.dateRange.split(' الى ')[0]}</span>
+                                    <span>الى {report.header.dateRange.split(' الى ')[1]}</span>
+                                </div>
+                           ) : (
+                                <span>{report.header.dateRange}</span>
+                           )}
+                        </div>
+
+                        {/* Desktop Date */}
+                        <p className="hidden md:block text-sm md:text-base dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
+                    </div>
                 )}
             </div>
         </div>
