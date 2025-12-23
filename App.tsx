@@ -733,11 +733,13 @@ export default function App() {
                   <div className="print-content-safe-area">
                       <div className="relative z-10">
                         <ReportHeaderContent />
-                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                        {/* Changed border opacity and text opacity to solid colors for better print quality */}
+                        <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
                                 <div className="flex justify-between items-end px-2">
                                     <div className="flex flex-col">
                                         <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                        {/* Changed from text-brand-primary/80 to text-brand-primary for print clarity */}
+                                        <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                     </div>
                                     <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
                                 </div>
@@ -763,16 +765,16 @@ export default function App() {
                <div className="print-content-safe-area">
                    <div className="relative z-10">
                        <ReportHeaderContent />
-                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                        <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
                                 <div className="flex justify-between items-end px-2">
                                     <div className="flex flex-col">
                                         <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                        <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                     </div>
                                     <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
                                 </div>
                         </div>
-                       <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
+                       <div className="mb-6 print:mb-2 border-b-2 border-indigo-200 pb-2 mt-4 print:mt-1">
                             <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
                        </div>
                    </div>
