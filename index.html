@@ -149,8 +149,8 @@
 
         .print-page {
             width: 210mm;
-            /* Full A4 Height */
-            height: 297mm; 
+            /* Slightly reduced from 297mm to prevent blank page overflow */
+            height: 296mm; 
             position: relative;
             page-break-after: always;
             break-after: page;
@@ -167,8 +167,8 @@
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;
-            height: 297mm; /* Ensure last page is also full height */
-            min-height: 297mm;
+            height: 296mm; 
+            min-height: 296mm;
         }
         
         .print-content-safe-area {
