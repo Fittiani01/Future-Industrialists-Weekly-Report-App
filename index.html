@@ -111,16 +111,66 @@
         z-index: -1;
         display: block;
       }
+
+      /* ========================================= */
+      /* PDF GENERATION STYLES (Strict Isolation)  */
+      /* ========================================= */
+      
+      /* 
+         DEFAULT STATE: 
+         Hidden far off-screen.
+      */
+      .print-only-container {
+          position: fixed; 
+          top: 0;
+          left: -20000px;
+          width: 210mm;
+          min-height: 100vh;
+          background: white;
+          z-index: -100;
+          visibility: hidden;
+      }
+
+      /* 
+         EXPORT MODE (Applied to BODY): 
+         When this class is present, we HIDE everything else in the app.
+         This forces the browser to only see the print container.
+      */
+      body.export-mode {
+          background: white !important;
+          overflow: auto !important;
+          height: auto !important;
+          width: 100% !important;
+      }
+
+      /* Hide App UI elements when exporting */
+      body.export-mode #root,
+      body.export-mode .animated-bg,
+      body.export-mode .glow-layer,
+      body.export-mode #network-canvas {
+          display: none !important;
+      }
+
+      /* Show Print Container when exporting */
+      body.export-mode .print-only-container {
+          position: relative !important; /* Static flow */
+          top: 0 !important;
+          left: 0 !important;
+          z-index: 9999 !important;
+          visibility: visible !important;
+          display: block !important;
+          margin: 0 auto !important;
+      }
       
       /* --- PRINT STYLES (Controlled A4 Layout) --- */
       @media print {
         @page {
-          size: A4;
-          margin: 0 !important;
+          size: A4 portrait; /* STRICTLY A4 */
+          margin: 0 !important; /* NO MARGINS - Removes browser headers/footers */
         }
 
         html, body {
-          width: 210mm;
+          width: 100%; /* Fix: Don't force 210mm on body, let it flow */
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
@@ -136,6 +186,7 @@
           text-shadow: none !important;
           filter: none !important;
           backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
         }
 
         .no-print, .animated-bg, .glow-layer, #network-canvas, .screen-only-container { 
@@ -144,13 +195,16 @@
 
         .print-only-container {
             display: block !important;
+            visibility: visible !important;
+            position: relative !important;
+            left: auto !important;
+            top: auto !important;
             width: 100%;
         }
 
         .print-page {
-            width: 210mm;
-            /* Slightly reduced from 297mm to prevent blank page overflow */
-            height: 296mm; 
+            width: 100%;
+            height: 296.5mm; /* Standard page height */
             position: relative;
             page-break-after: always;
             break-after: page;
@@ -158,27 +212,31 @@
             flex-direction: column;
             justify-content: space-between;
             background: white;
-            overflow: hidden;
+            overflow: hidden; /* Critical: Prevent bleed creating new pages */
             padding: 0;
             margin: 0;
         }
         
-        .print-page:last-child {
+        /* 
+           FIX FOR BLANK PAGE AT END:
+           The last page should not force a height or a page break.
+        */
+        .print-page.last-page {
+            height: auto !important;
+            min-height: 296.5mm; /* Maintain background size */
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;
-            height: 296mm; 
-            min-height: 296mm;
+            padding-bottom: 0 !important;
         }
         
         .print-content-safe-area {
-            /* Reduced bottom padding to 0 to allow footer to hit the bottom */
             padding: 10mm 10mm 0mm 10mm;
-            height: 100%; /* Take full height of parent */
+            height: 100%;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            justify-content: space-between; /* Force footer to bottom */
+            justify-content: space-between;
             position: relative;
             z-index: 10;
         }

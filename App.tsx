@@ -144,22 +144,26 @@ export default function App() {
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
   // --- Printing Handler (Set File Name) ---
-  const handlePrint = () => {
-      // Set the document title to control the filename
-      // Format: Week Title - Date - Report Name
+  const handlePrint = async () => {
+      // 1. Enter Export Mode (Hides UI, Shows Print Container)
+      document.body.classList.add('export-mode');
+      
+      // Wait for DOM to update and images to settle
+      await new Promise(r => setTimeout(r, 500));
+
+      // 2. Set file name
       const originalTitle = document.title;
-      // Sanitize filename to be safe
       const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
       const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      
-      // Ensures the week title comes first as requested
       document.title = `${safeWeek} - ${safeDate}`;
       
+      // 3. Print
       window.print();
       
-      // Restore title after print dialog closes
+      // 4. Cleanup after a delay (Wait for OS dialog)
       setTimeout(() => {
           document.title = originalTitle;
+          document.body.classList.remove('export-mode');
       }, 1000);
   };
 
@@ -662,9 +666,6 @@ export default function App() {
   )};
 
   const DecorationLayer = ({ isPrint = false }) => (
-      // Z-Index: 
-      // Editing Mode: z-[2000] (Very High)
-      // View/Print Mode: z-[0] (Under content, but in full page absolute context)
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[0]'}`}>
           {report.decorations?.map(d => (
               <div 
@@ -707,7 +708,7 @@ export default function App() {
       )}
 
       {/* ======================= PRINT VIEW ======================= */}
-      <div className="hidden print-only-container">
+      <div className="print-only-container">
           {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
@@ -757,8 +758,8 @@ export default function App() {
               </div>
           ))}
 
-          {/* 3. Statistics Page */}
-          <div className="print-page">
+          {/* 3. Statistics Page - Added 'last-page' class to force auto height */}
+          <div className="print-page last-page">
                <DecorationLayer isPrint={true} />
                
                {/* Content Container (Safe Area) */}
