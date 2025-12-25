@@ -757,7 +757,7 @@ export default function App() {
               </div>
           ))}
 
-          {/* 3. Statistics Page - Added 'last-page' class to force page break behavior */}
+          {/* 3. Statistics Page - The KEY FIX: Ensure this div is the exact LAST child and has NO margin-bottom or extra spacing */}
           <div className="print-page last-page">
                <DecorationLayer isPrint={true} />
                
