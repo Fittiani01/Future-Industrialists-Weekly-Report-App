@@ -166,13 +166,19 @@ export default function App() {
     const element = document.querySelector('.print-only-container') as HTMLElement;
     if (!element) return;
 
-    // 1. Activate CSS mode (Bring on-screen but keep layout)
+    // 0. IMPORTANT: Scroll to top. If the user is scrolled down, 
+    // html2canvas absolute positioning capture will be offset and result in blank top pages.
+    window.scrollTo(0, 0);
+
+    // 1. Activate CSS mode (Bring on-screen overlay)
     element.classList.add('is-exporting');
     
     // 2. Wait for rendering and images
-    await new Promise(r => requestAnimationFrame(() => r(null))); // Allow DOM update
+    // Wait a full frame paint
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
     await waitImages(element);
-    await new Promise(r => setTimeout(r, 500)); // Extra buffer for layout stability
+    // Extra buffer for fonts and layout
+    await new Promise(r => setTimeout(r, 800)); 
 
     const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
     const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
@@ -188,8 +194,9 @@ export default function App() {
             allowTaint: false,
             backgroundColor: "#ffffff",
             logging: false,
-            scrollY: 0,
-            windowWidth: element.scrollWidth // Ensure full width capture
+            // scrollY: 0 is CRITICAL when using absolute positioning overlay
+            scrollY: 0, 
+            windowWidth: 794 // Approx A4 width in pixels at 96 DPI, ensures mobile doesn't crop
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
