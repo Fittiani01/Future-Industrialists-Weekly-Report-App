@@ -133,8 +133,7 @@
 
       /* 
          EXPORT MODE (Applied to BODY): 
-         When this class is present, we HIDE everything else in the app.
-         This forces the browser to only see the print container.
+         When this class is present, we modify the view for printing.
       */
       body.export-mode {
           background: white !important;
@@ -143,11 +142,15 @@
           width: 100% !important;
       }
 
-      /* Hide App UI elements when exporting */
-      body.export-mode #root,
+      /* Hide Screen UI elements when exporting */
+      /* CRITICAL FIX: Do NOT hide #root, only hide screen-specific containers */
       body.export-mode .animated-bg,
       body.export-mode .glow-layer,
-      body.export-mode #network-canvas {
+      body.export-mode #network-canvas,
+      body.export-mode .screen-only-container,
+      body.export-mode .no-print,
+      body.export-mode .fixed /* Hide any fixed elements if they exist */
+      {
           display: none !important;
       }
 
@@ -166,11 +169,11 @@
       @media print {
         @page {
           size: A4 portrait; /* STRICTLY A4 */
-          margin: 0 !important; /* NO MARGINS - Removes browser headers/footers */
+          margin: 0 !important; /* NO MARGINS */
         }
 
-        html, body {
-          width: 100%; /* Fix: Don't force 210mm on body, let it flow */
+        html, body, #root {
+          width: 100%; 
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
@@ -180,7 +183,7 @@
           overflow: visible !important;
         }
 
-        /* Optimization: Remove shadows and filters to fix file size and rendering artifacts */
+        /* Optimization: Remove shadows and filters */
         * {
           box-shadow: none !important;
           text-shadow: none !important;
@@ -189,10 +192,12 @@
           -webkit-backdrop-filter: none !important;
         }
 
+        /* Hide screen elements during print (redundant safety) */
         .no-print, .animated-bg, .glow-layer, #network-canvas, .screen-only-container { 
           display: none !important; 
         }
 
+        /* Show print container */
         .print-only-container {
             display: block !important;
             visibility: visible !important;
@@ -212,18 +217,15 @@
             flex-direction: column;
             justify-content: space-between;
             background: white;
-            overflow: hidden; /* Critical: Prevent bleed creating new pages */
+            overflow: hidden; 
             padding: 0;
             margin: 0;
         }
         
-        /* 
-           FIX FOR BLANK PAGE AT END:
-           The last page should not force a height or a page break.
-        */
+        /* FIX FOR BLANK PAGE AT END */
         .print-page.last-page {
             height: auto !important;
-            min-height: 296.5mm; /* Maintain background size */
+            min-height: 296.5mm; 
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;
