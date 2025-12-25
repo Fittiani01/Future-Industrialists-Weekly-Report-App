@@ -13,9 +13,6 @@ import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, dele
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
 
-// Declare html2pdf for TypeScript
-declare var html2pdf: any;
-
 // Helper for Arabic Ordinals
 const getArabicOrdinal = (n: number) => {
     const ordinals = ["", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر"];
@@ -29,7 +26,6 @@ export default function App() {
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // New state for PDF generation
   
   // Admin Mode State - Default to FALSE (Public view)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -147,91 +143,24 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- PDF GENERATION HELPERS ---
-  
-  // Wait for images to load before capturing
-  const waitImages = async (element: HTMLElement) => {
-    const imgs = Array.from(element.querySelectorAll('img'));
-    await Promise.all(imgs.map(img => {
-      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        img.onload = () => resolve();
-        img.onerror = () => resolve(); // Don't block on error
-      });
-    }));
-  };
-
-  const handleDownloadPDF = async () => {
-    setIsGeneratingPDF(true);
-    const element = document.querySelector('.print-only-container') as HTMLElement;
-    if (!element) return;
-
-    // 0. IMPORTANT: Scroll to top.
-    window.scrollTo(0, 0);
-
-    // 1. Activate EXPORT MODE on the BODY
-    // This hides #root and all other elements via CSS, leaving ONLY the print container visible.
-    document.body.classList.add('export-mode');
-    
-    // 2. Wait for rendering and images
-    // Wait a full frame paint
-    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
-    await waitImages(element);
-    // Extra buffer for fonts and layout
-    await new Promise(r => setTimeout(r, 800)); 
-
-    const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-    const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-    const filename = `${safeWeek} - ${safeDate}.pdf`;
-
-    const opt = {
-        margin: 0,
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2, 
-            useCORS: true, 
-            allowTaint: false,
-            backgroundColor: "#ffffff",
-            logging: false,
-            scrollY: 0, 
-            windowWidth: 794 // Approx A4 width
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-    };
-
-    try {
-        const worker = html2pdf().set(opt).from(element);
-        
-        // Check for iOS Share capability to allow "Save to Files"
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-        
-        if (isIOS && navigator.share) {
-             // Generate Blob for iOS Sharing
-             const pdfBlob = await worker.output('blob');
-             const file = new File([pdfBlob], filename, { type: 'application/pdf' });
-             
-             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                 await navigator.share({
-                     files: [file],
-                     title: filename,
-                 });
-             } else {
-                 await worker.save();
-             }
-        } else {
-            // Standard Download for Android/Desktop
-            await worker.save();
-        }
-    } catch (e) {
-        console.error("PDF Generation Error:", e);
-        alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
-    } finally {
-        // Cleanup: Remove the export-mode class to restore the app UI
-        document.body.classList.remove('export-mode');
-        setIsGeneratingPDF(false);
-    }
+  // --- Printing Handler (Set File Name) ---
+  const handlePrint = () => {
+      // Set the document title to control the filename
+      // Format: Week Title - Date - Report Name
+      const originalTitle = document.title;
+      // Sanitize filename to be safe
+      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      
+      // Ensures the week title comes first as requested
+      document.title = `${safeWeek} - ${safeDate}`;
+      
+      window.print();
+      
+      // Restore title after print dialog closes
+      setTimeout(() => {
+          document.title = originalTitle;
+      }, 1000);
   };
 
   // --- Update Helpers ---
@@ -380,21 +309,12 @@ export default function App() {
     try {
         const reportId = report.id || `week-${Date.now()}`;
         const { visits, ...mainReportData } = report;
-        
-        // Prepare object and sanitize undefined values
-        const reportToSave: any = { 
+        const reportToSave = { 
             ...mainReportData, 
             visits: [], 
             id: reportId,
             createdAt: report.createdAt || serverTimestamp() 
         };
-
-        // CRITICAL FIX: Remove undefined keys to prevent Firestore crashes
-        Object.keys(reportToSave).forEach(key => {
-            if (reportToSave[key] === undefined) {
-                delete reportToSave[key];
-            }
-        });
 
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
         const visitsRef = collection(db, "weeklyReports", reportId, "visits");
@@ -412,12 +332,7 @@ export default function App() {
         await Promise.all(deletePromises);
 
         const savePromises = visits.map(visit => {
-            // Ensure no undefined in visits as well, though usually they are clean
-            const visitToSave: any = { ...visit };
-            Object.keys(visitToSave).forEach(key => {
-                if (visitToSave[key] === undefined) delete visitToSave[key];
-            });
-            return setDoc(doc(visitsRef, visit.id), visitToSave);
+            return setDoc(doc(visitsRef, visit.id), visit);
         });
         await Promise.all(savePromises);
         
@@ -686,10 +601,8 @@ export default function App() {
 
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
-      // UPDATED: Use justify-between and w-full to force separation
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            {/* Right Group (4 Logos) */}
-            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12 flex-shrink-0">
+            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
@@ -699,12 +612,7 @@ export default function App() {
                     </React.Fragment>
                  ))}
             </div>
-
-            {/* SPACER - Forces the groups apart with significant margin */}
-            <div className="flex-grow mx-8"></div>
-
-            {/* Left Group (Main Logo) */}
-            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center flex-shrink-0">
+            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -799,7 +707,7 @@ export default function App() {
       )}
 
       {/* ======================= PRINT VIEW ======================= */}
-      <div className="print-only-container">
+      <div className="hidden print-only-container">
           {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
@@ -849,7 +757,7 @@ export default function App() {
               </div>
           ))}
 
-          {/* 3. Statistics Page - The KEY FIX: Ensure this div is the exact LAST child and has NO margin-bottom or extra spacing */}
+          {/* 3. Statistics Page - Added 'last-page' class to force page break behavior */}
           <div className="print-page last-page">
                <DecorationLayer isPrint={true} />
                
@@ -900,7 +808,7 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5 ${isGeneratingPDF ? 'bg-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-gray-800'}`}>{isGeneratingPDF ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {isGeneratingPDF ? "جاري التجهيز..." : "تنزيل PDF"}</button>
+                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Download size={16} /> حفظ كملف PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>
