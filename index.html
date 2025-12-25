@@ -222,10 +222,11 @@
             margin: 0;
         }
         
-        /* FIX FOR BLANK PAGE AT END */
+        /* FIX FOR LAST PAGE FOOTER POSITION */
+        /* We revert height to match standard page (295mm) so flex justify-between pushes footer down */
+        /* We keep page-break-after: auto to prevent an extra blank page after it */
         .print-page.last-page {
-            height: auto !important;
-            min-height: 0 !important;
+            height: 295mm !important; 
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;
