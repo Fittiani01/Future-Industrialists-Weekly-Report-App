@@ -309,12 +309,21 @@ export default function App() {
     try {
         const reportId = report.id || `week-${Date.now()}`;
         const { visits, ...mainReportData } = report;
-        const reportToSave = { 
+        
+        // Prepare object and sanitize undefined values
+        const reportToSave: any = { 
             ...mainReportData, 
             visits: [], 
             id: reportId,
             createdAt: report.createdAt || serverTimestamp() 
         };
+
+        // CRITICAL FIX: Remove undefined keys to prevent Firestore crashes
+        Object.keys(reportToSave).forEach(key => {
+            if (reportToSave[key] === undefined) {
+                delete reportToSave[key];
+            }
+        });
 
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
         const visitsRef = collection(db, "weeklyReports", reportId, "visits");
@@ -332,7 +341,12 @@ export default function App() {
         await Promise.all(deletePromises);
 
         const savePromises = visits.map(visit => {
-            return setDoc(doc(visitsRef, visit.id), visit);
+            // Ensure no undefined in visits as well, though usually they are clean
+            const visitToSave: any = { ...visit };
+            Object.keys(visitToSave).forEach(key => {
+                if (visitToSave[key] === undefined) delete visitToSave[key];
+            });
+            return setDoc(doc(visitsRef, visit.id), visitToSave);
         });
         await Promise.all(savePromises);
         
