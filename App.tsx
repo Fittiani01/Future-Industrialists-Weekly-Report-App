@@ -13,6 +13,9 @@ import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, dele
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
 
+// Declare html2pdf for TypeScript
+declare var html2pdf: any;
+
 // Helper for Arabic Ordinals
 const getArabicOrdinal = (n: number) => {
     const ordinals = ["", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر"];
@@ -26,6 +29,7 @@ export default function App() {
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // New state for PDF generation
   
   // Admin Mode State - Default to FALSE (Public view)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -143,29 +147,60 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- Printing Handler (Set File Name) ---
-  const handlePrint = () => {
-      // Set the document title to control the filename
-      // Format: Week Title - Date - Report Name
-      const originalTitle = document.title;
-      // Sanitize filename to be safe
-      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      const newTitle = `${safeWeek} - ${safeDate}`;
-      
-      // Only update if different to avoid reflows
-      if (document.title !== newTitle) {
-          document.title = newTitle;
-      }
-      
-      // Small delay to ensure title update allows iOS to catch it, but not too long to feel laggy
-      setTimeout(() => {
-          window.print();
-          // Restore title after a reasonable delay for the print dialog to open
-          setTimeout(() => {
-              document.title = originalTitle;
-          }, 2000);
-      }, 100);
+  // --- PDF GENERATION HANDLER ---
+  const handleDownloadPDF = async () => {
+    setIsGeneratingPDF(true);
+    // 1. Activate CSS mode that shows the hidden print container
+    document.body.classList.add('pdf-generating');
+
+    // 2. Small delay to ensure images/layout render in the "visible" container
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    const element = document.querySelector('.print-only-container');
+    const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+    const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+    const filename = `${safeWeek} - ${safeDate}.pdf`;
+
+    const opt = {
+        margin: 0,
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+    };
+
+    try {
+        const worker = html2pdf().set(opt).from(element);
+        
+        // Check for iOS Share capability to allow "Save to Files"
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+        
+        if (isIOS && navigator.share) {
+             // Generate Blob for iOS Sharing
+             const pdfBlob = await worker.output('blob');
+             const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+             
+             if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                 await navigator.share({
+                     files: [file],
+                     title: filename,
+                 });
+             } else {
+                 await worker.save();
+             }
+        } else {
+            // Standard Download for Android/Desktop
+            await worker.save();
+        }
+    } catch (e) {
+        console.error("PDF Generation Error:", e);
+        alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
+    } finally {
+        // Cleanup
+        document.body.classList.remove('pdf-generating');
+        setIsGeneratingPDF(false);
+    }
   };
 
   // --- Update Helpers ---
@@ -620,9 +655,10 @@ export default function App() {
 
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
-      // UPDATED: gap-12 to separate the two logo groups more effectively
-      <header className="flex justify-between items-center w-full mb-1 relative z-20 gap-12">
-            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12 flex-grow">
+      // UPDATED: Use justify-between and w-full to force separation
+      <header className="flex justify-between items-center w-full mb-1 relative z-20">
+            {/* Right Group (4 Logos) */}
+            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12 flex-shrink-0">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
@@ -632,7 +668,12 @@ export default function App() {
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
+
+            {/* SPACER - Forces the groups apart with significant margin */}
+            <div className="flex-grow mx-8"></div>
+
+            {/* Left Group (Main Logo) */}
+            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center flex-shrink-0">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -828,7 +869,7 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Download size={16} /> طباعة / حفظ PDF</button>
+                <button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5 ${isGeneratingPDF ? 'bg-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-gray-800'}`}>{isGeneratingPDF ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {isGeneratingPDF ? "جاري التجهيز..." : "تنزيل PDF"}</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>

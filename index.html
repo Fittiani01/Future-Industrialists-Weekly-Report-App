@@ -6,6 +6,8 @@
     <title>تقرير صناعيو المستقبل</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <!-- html2pdf Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -111,31 +113,103 @@
         z-index: -1;
         display: block;
       }
+
+      /* ========================================= */
+      /* PDF GENERATION STYLES (Client Side)       */
+      /* ========================================= */
+      body.pdf-generating {
+          overflow: hidden !important;
+          height: 100vh !important;
+          background: #fff !important;
+      }
+
+      body.pdf-generating .screen-only-container,
+      body.pdf-generating .no-print,
+      body.pdf-generating .animated-bg,
+      body.pdf-generating .glow-layer,
+      body.pdf-generating #network-canvas {
+          display: none !important;
+      }
+
+      body.pdf-generating .print-only-container {
+          display: block !important;
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 210mm; /* Exact A4 width */
+          z-index: 9999;
+          background: white;
+      }
       
-      /* --- PRINT STYLES (Controlled A4 Layout) --- */
+      /* Ensure colors are exact in PDF */
+      body.pdf-generating * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      /* PDF Page Styling */
+      body.pdf-generating .print-page {
+          width: 210mm;
+          /* 
+            Slightly less than 297mm to prevent overflow causing a blank page. 
+            296.5mm works best with html2pdf logic.
+          */
+          height: 296.5mm; 
+          position: relative;
+          background: white;
+          overflow: hidden;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          page-break-after: always; /* Force break */
+      }
+
+      body.pdf-generating .print-page:last-child {
+          page-break-after: avoid !important; /* No blank page at end */
+          margin-bottom: 0 !important;
+      }
+
+      body.pdf-generating .print-content-safe-area {
+          padding: 10mm;
+          height: 100%;
+          flex-grow: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          position: relative;
+          z-index: 10;
+      }
+
+      /* --- LEGACY BROWSER PRINT STYLES (Fallback) --- */
       @media print {
         @page {
           size: A4 portrait;
           margin: 0 !important;
         }
 
-        html {
-            height: auto !important;
-        }
-
-        body {
+        html, body {
           width: 210mm;
-          min-height: 0 !important; /* Prevent body from forcing extra height */
-          height: auto !important; 
+          height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
-          background-color: white !important;
+          background: white !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
           overflow: visible !important;
         }
 
-        /* Hide screen elements */
+        * {
+          box-shadow: none !important;
+          text-shadow: none !important;
+          filter: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          transition: none !important;
+          animation: none !important;
+        }
+
         .no-print, .animated-bg, .glow-layer, #network-canvas, .screen-only-container { 
           display: none !important; 
         }
@@ -147,50 +221,32 @@
             padding: 0;
         }
 
-        /* Generic Print Page */
         .print-page {
             width: 210mm;
-            /* 
-               CRITICAL FIX FOR IOS/IPHONE:
-               A4 is 297mm. 
-               We reduce to 294mm to account for iOS Safari's non-removable print headers/footers scaling.
-            */
-            height: 294mm; 
-            max-height: 294mm;
-            
+            min-height: 296mm; 
+            height: auto;
             position: relative;
             background: white;
-            overflow: hidden !important; /* Force clip content */
+            overflow: hidden !important;
             padding: 0;
             margin: 0;
-            
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            
-            /* Reset default break behavior */
-            page-break-after: auto;
-            break-after: auto;
-            break-inside: avoid;
+            page-break-after: always;
+            break-after: page;
         }
 
-        /* 
-           THE LOGIC INVERSION: 
-           Only apply page break if it is NOT the last page.
-        */
-        .print-page:not(:last-of-type) {
-            page-break-after: always !important;
-            break-after: page !important;
-        }
-        
-        /* Ensure last page has absolutely NO margin causing spillover */
-        .print-page:last-of-type {
+        .print-only-container > .print-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+            min-height: auto !important;
+            height: auto !important;
             margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
         }
 
         .print-content-safe-area {
-            padding: 10mm 10mm 0mm 10mm;
+            padding: 10mm;
             height: 100%;
             flex-grow: 1;
             display: flex;
@@ -198,13 +254,6 @@
             justify-content: space-between;
             position: relative;
             z-index: 10;
-        }
-
-        * {
-          box-shadow: none !important;
-          text-shadow: none !important;
-          filter: none !important;
-          backdrop-filter: none !important;
         }
       }
     </style>
