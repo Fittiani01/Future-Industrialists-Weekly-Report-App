@@ -4,8 +4,10 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Download } from 'lucide-react';
 import mammoth from 'mammoth';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 // Firebase Imports
 import { db, auth } from './firebase';
@@ -30,6 +32,10 @@ export default function App() {
   // Admin Mode State - Default to FALSE (Public view)
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  // PDF Generation State
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
 
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
@@ -143,28 +149,63 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- Printing Handler (Set File Name) ---
-  const handlePrint = async () => {
-      // 1. Enter Export Mode (Hides UI, Shows Print Container)
-      document.body.classList.add('export-mode');
-      
-      // Wait for DOM to update and images to settle (INCREASED TO 1500ms FOR IPHONE)
-      await new Promise(r => setTimeout(r, 1500));
+  // --- NEW PDF Generation Handler (html2canvas + jsPDF) ---
+  const handleDownloadPDF = async () => {
+      setIsGeneratingPdf(true);
+      setPdfProgress(10);
+      document.body.classList.add('pdf-generating');
 
-      // 2. Set file name
-      const originalTitle = document.title;
-      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      document.title = `${safeWeek} - ${safeDate}`;
-      
-      // 3. Print
-      window.print();
-      
-      // 4. Cleanup after a delay (Wait for OS dialog)
-      setTimeout(() => {
-          document.title = originalTitle;
-          document.body.classList.remove('export-mode');
-      }, 1000);
+      // Allow DOM to settle
+      await new Promise(r => setTimeout(r, 1000));
+      setPdfProgress(30);
+
+      try {
+          // Initialize PDF - A4 Portrait, mm units
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pages = document.querySelectorAll('.print-page');
+          const totalPages = pages.length;
+
+          for (let i = 0; i < totalPages; i++) {
+              const pageElement = pages[i] as HTMLElement;
+              
+              // Capture the page
+              const canvas = await html2canvas(pageElement, {
+                  scale: 2, // High resolution
+                  useCORS: true, // Allow loading cross-origin images (firebase/placeholders)
+                  allowTaint: true,
+                  logging: false,
+                  backgroundColor: '#ffffff',
+                  width: 794, // ~210mm in pixels at 96DPI
+                  height: 1104, // ~292mm in pixels
+                  windowWidth: 794,
+              });
+
+              setPdfProgress(30 + Math.round(((i + 1) / totalPages) * 60));
+
+              const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller size
+              const imgWidth = 210;
+              const imgHeight = 292; // Match the CSS height
+
+              pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+
+              if (i < totalPages - 1) {
+                  pdf.addPage();
+              }
+          }
+
+          // Save
+          const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+          const fileName = `${safeWeek}.pdf`;
+          pdf.save(fileName);
+
+      } catch (error) {
+          console.error("PDF Generation Failed:", error);
+          alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
+      } finally {
+          document.body.classList.remove('pdf-generating');
+          setIsGeneratingPdf(false);
+          setPdfProgress(0);
+      }
   };
 
   // --- Update Helpers ---
@@ -610,14 +651,14 @@ export default function App() {
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" />
+                            <img src={logo} alt="" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" crossOrigin="anonymous" />
                         </div>
                         {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
             <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
-                 <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
+                 <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" crossOrigin="anonymous" />
             </div>
       </header>
   );
@@ -644,7 +685,7 @@ export default function App() {
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex items-center justify-center h-7 px-1 flex-1">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" crossOrigin="anonymous" />
                             </div>
                             {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
@@ -654,7 +695,7 @@ export default function App() {
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex items-center justify-center h-7 px-1">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" crossOrigin="anonymous" />
                             </div>
                             {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
@@ -684,7 +725,7 @@ export default function App() {
                 onTouchStart={(e) => !isPrint && handleDecoStart(e, d.id)}
                 className={`origin-center select-none ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded border border-indigo-300' : ''}`}
               >
-                  <img src={d.url} className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none pointer-events-none" draggable={false} alt="Decoration" />
+                  <img src={d.url} className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none pointer-events-none" draggable={false} alt="Decoration" crossOrigin="anonymous" />
               </div>
           ))}
       </div>
@@ -695,6 +736,18 @@ export default function App() {
   return (
     <div className="min-h-screen pb-4 relative">
       
+      {/* ======================= PDF GENERATION LOADING OVERLAY ======================= */}
+      {isGeneratingPdf && (
+          <div className="fixed inset-0 z-[10000] bg-black/90 flex flex-col items-center justify-center p-4">
+              <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-4" />
+              <h2 className="text-white text-xl font-bold mb-2">جاري إنشاء ملف PDF...</h2>
+              <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-brand-primary transition-all duration-300" style={{ width: `${pdfProgress}%` }}></div>
+              </div>
+              <p className="text-gray-400 text-sm mt-2">{pdfProgress}%</p>
+          </div>
+      )}
+
       {/* ======================= FIXED EDIT CONTROLS (Active Decoration) ======================= */}
       {isEditing && activeDecoId && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[3000] bg-white shadow-2xl rounded-full px-6 py-3 border border-gray-200 flex items-center gap-6 animate-fade-in no-print">
@@ -707,14 +760,13 @@ export default function App() {
           </div>
       )}
 
-      {/* ======================= PRINT VIEW ======================= */}
+      {/* ======================= PRINT VIEW (Used for HTML2Canvas) ======================= */}
       <div className="print-only-container">
-          {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
             <div className="print-page">
                 {/* Full Bleed Image */}
-                <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
+                <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" crossOrigin="anonymous" />
                 
                 {/* Overlay Text */}
                 <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
@@ -809,7 +861,9 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Printer size={16} /> طباعة PDF</button>
+                <button onClick={handleDownloadPDF} disabled={isGeneratingPdf} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isGeneratingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} تحميل PDF
+                </button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>

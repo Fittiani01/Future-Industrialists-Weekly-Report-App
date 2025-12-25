@@ -113,137 +113,78 @@
       }
 
       /* ========================================= */
-      /* PDF GENERATION STYLES (Strict Isolation)  */
+      /* PDF GENERATION STYLES (Canvas Method)     */
       /* ========================================= */
       
       /* 
-         DEFAULT STATE: 
-         Hidden far off-screen.
+         The container is hidden by default. 
+         When generating PDF (class .pdf-generating on body),
+         we display it but keep it out of normal flow or z-index behind loader
       */
       .print-only-container {
           position: fixed; 
           top: 0;
-          left: -20000px;
-          width: 210mm;
-          min-height: 100vh;
+          left: 0;
+          width: 210mm; /* Strict A4 width */
           background: white;
-          z-index: -100;
-          visibility: hidden;
+          z-index: -9999;
+          visibility: hidden; /* Hidden to user, but we will toggle visibility for html2canvas */
       }
 
       /* 
-         EXPORT MODE (Applied to BODY): 
-         When this class is present, we modify the view for printing.
+         PDF GENERATION MODE:
+         We show the container so html2canvas can "see" it.
+         We put it on top (z-index) but maybe cover it with a loading spinner.
       */
-      body.export-mode {
-          background: white !important;
-          overflow: auto !important;
-          height: auto !important;
-          width: 100% !important;
+      body.pdf-generating .print-only-container {
+          visibility: visible !important;
+          position: absolute !important; 
+          top: 0 !important;
+          left: 0 !important;
+          z-index: -1 !important; /* Behind the loader overlay */
+          display: block !important;
       }
 
-      /* Hide Screen UI elements when exporting */
-      body.export-mode .animated-bg,
-      body.export-mode .glow-layer,
-      body.export-mode #network-canvas,
-      body.export-mode .screen-only-container,
-      body.export-mode .no-print,
-      body.export-mode .fixed /* Hide any fixed elements if they exist */
-      {
+      /* Hide screen elements when generating PDF to save resources/conflicts */
+      body.pdf-generating .screen-only-container,
+      body.pdf-generating .animated-bg,
+      body.pdf-generating #network-canvas {
           display: none !important;
       }
 
-      /* Show Print Container when exporting */
-      body.export-mode .print-only-container {
-          position: relative !important; /* Static flow */
-          top: 0 !important;
-          left: 0 !important;
-          z-index: 9999 !important;
-          visibility: visible !important;
-          display: block !important;
-          margin: 0 auto !important;
+      /* Page Structure for html2canvas */
+      .print-page {
+          width: 210mm !important;
+          height: 292mm !important; /* Exact height for canvas capture */
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          background: white;
+          overflow: hidden; 
+          padding: 0;
+          margin: 0;
+          /* Ensure text rendering is sharp */
+          -webkit-font-smoothing: antialiased;
       }
       
-      /* --- PRINT STYLES (Controlled A4 Layout) --- */
-      @media print {
-        @page {
-          size: A4 portrait; /* STRICTLY A4 */
-          margin: 0 !important; /* NO MARGINS (Hides browser header/footer) */
-        }
-
-        /* RESET BODY FOR PRINT TO AVOID MOBILE LAYOUTS */
-        html, body, #root {
-          width: 210mm !important; /* Force A4 width to prevent stacking */
-          min-width: 210mm !important;
-          height: auto !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background-color: white !important;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-          overflow: visible !important;
-        }
-
-        /* Optimization: Remove shadows and filters */
-        * {
-          box-shadow: none !important;
-          text-shadow: none !important;
-          filter: none !important;
-          backdrop-filter: none !important;
-          -webkit-backdrop-filter: none !important;
-        }
-
-        /* Hide screen elements during print */
-        .no-print, .animated-bg, .glow-layer, #network-canvas, .screen-only-container { 
-          display: none !important; 
-        }
-
-        /* Show print container */
-        .print-only-container {
-            display: block !important;
-            visibility: visible !important;
-            position: relative !important;
-            left: auto !important;
-            top: auto !important;
-            width: 210mm !important; /* Ensure it matches page width */
-            overflow: hidden !important;
-        }
-
-        .print-page {
-            width: 210mm !important;
-            height: 290mm !important; /* Reduced to 290mm to absolutely guarantee no bleed/blank page */
-            position: relative;
-            page-break-after: always;
-            break-after: page;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            background: white;
-            overflow: hidden !important; /* Critical: Cut off anything that might spill */
-            padding: 0;
-            margin: 0 auto;
-        }
-        
-        /* FIX FOR LAST PAGE FOOTER POSITION & BLANK PAGE */
-        .print-page.last-page {
-            height: 290mm !important; 
-            page-break-after: auto !important;
-            break-after: auto !important;
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        .print-content-safe-area {
-            padding: 10mm 10mm 0mm 10mm;
-            height: 100%;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            position: relative;
-            z-index: 10;
-        }
+      .print-content-safe-area {
+          padding: 10mm 10mm 0mm 10mm;
+          height: 100%;
+          flex-grow: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          position: relative;
+          z-index: 10;
       }
+
+      /* Ensure background colors print correctly in canvas */
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
     </style>
   <script type="importmap">
 {
@@ -254,7 +195,9 @@
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "mammoth": "https://esm.sh/mammoth@^1.11.0"
+    "mammoth": "https://esm.sh/mammoth@^1.11.0",
+    "html2canvas": "https://esm.sh/html2canvas@1.4.1",
+    "jspdf": "https://esm.sh/jspdf@2.5.1"
   }
 }
 </script>
@@ -272,15 +215,12 @@
 
     <script>
       (function() {
-        // Simple performance check for mobile
         const isMobile = window.innerWidth < 768;
-        
         const canvas = document.getElementById('network-canvas');
         const ctx = canvas.getContext('2d');
         
         let width, height;
         let particles = [];
-        // Reduce particle count significantly on mobile to improve loading speed
         const particleCount = isMobile ? 30 : 100;
         const connectionDistance = 150;
         const moveSpeed = 0.5; 
@@ -339,8 +279,8 @@
         }
 
         function animate() {
-          // Optimization: Skip animation render if in print mode
-          if (document.body.classList.contains('export-mode')) {
+          // Optimization: Skip animation render if generating PDF
+          if (document.body.classList.contains('pdf-generating')) {
               requestAnimationFrame(animate);
               return;
           }
