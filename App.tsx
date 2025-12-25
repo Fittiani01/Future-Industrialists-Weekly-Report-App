@@ -164,9 +164,20 @@ export default function App() {
   };
 
   const handleDownloadPDF = async () => {
-    // 1. MOBILE/iOS OPTIMIZATION:
-    // Browser-based JS PDF generation crashes iOS memory. 
-    // We use native window.print() for mobile devices which is 100% stable.
+    setIsGeneratingPDF(true);
+    
+    // 1. Prepare for Export (Visible mode)
+    // IMPORTANT: This must happen BEFORE window.print() or html2pdf
+    document.body.classList.add('export-mode');
+    window.scrollTo(0, 0);
+
+    const element = document.querySelector('.print-only-container') as HTMLElement;
+    if (element) {
+        await new Promise(r => requestAnimationFrame(() => setTimeout(r, 100))); // Small delay to let DOM render
+        await waitImages(element);
+    }
+
+    // 2. MOBILE/iOS OPTIMIZATION:
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
     if (isMobile) {
@@ -175,22 +186,25 @@ export default function App() {
         const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
         document.title = `${safeWeek} - ${safeDate}`;
         
+        // Native Print Dialog
         window.print();
         
-        setTimeout(() => { document.title = originalTitle; }, 1000);
+        // Cleanup after print dialog closes (approximate)
+        setTimeout(() => { 
+            document.title = originalTitle; 
+            document.body.classList.remove('export-mode');
+            setIsGeneratingPDF(false);
+        }, 1000); // 1s delay gives enough time for the OS to grab the content
         return;
     }
 
-    // 2. DESKTOP LOGIC (html2pdf):
-    setIsGeneratingPDF(true);
-    const element = document.querySelector('.print-only-container') as HTMLElement;
-    if (!element) return;
+    // 3. DESKTOP LOGIC (html2pdf):
+    if (!element) {
+        setIsGeneratingPDF(false);
+        document.body.classList.remove('export-mode');
+        return;
+    }
 
-    window.scrollTo(0, 0);
-    document.body.classList.add('export-mode');
-    
-    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
-    await waitImages(element);
     await new Promise(r => setTimeout(r, 800)); 
 
     const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
@@ -772,7 +786,7 @@ export default function App() {
       )}
 
       {/* ======================= PRINT VIEW ======================= */}
-      <div className="print-only-container">
+      <div className="print-only-container" dir="rtl">
           {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
@@ -796,7 +810,7 @@ export default function App() {
                   
                   {/* Content Container (Safe Area) */}
                   <div className="print-content-safe-area">
-                      <div className="relative z-10">
+                      <div className="relative z-10 w-full">
                         <ReportHeaderContent />
                         {/* Changed border opacity and text opacity to solid colors for better print quality */}
                         <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
@@ -810,7 +824,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="flex-grow flex flex-col justify-start gap-1 pt-4 relative z-10">
+                      <div className="flex-grow flex flex-col justify-start gap-1 pt-4 relative z-10 w-full">
                           {chunk.map((visit: Visit) => (
                                <VisitCard key={visit.id} visit={visit} isEditing={false} isPrint={true} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
                           ))}
@@ -827,7 +841,7 @@ export default function App() {
                
                {/* Content Container (Safe Area) */}
                <div className="print-content-safe-area">
-                   <div className="relative z-10">
+                   <div className="relative z-10 w-full">
                        <ReportHeaderContent />
                         <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
                                 <div className="flex justify-between items-end px-2">
@@ -843,7 +857,7 @@ export default function App() {
                        </div>
                    </div>
                    
-                   <div className="flex-grow flex flex-col justify-start py-0 relative z-10">
+                   <div className="flex-grow flex flex-col justify-start py-0 relative z-10 w-full">
                         <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} isPrint={true} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
                    </div>
                    
@@ -853,6 +867,7 @@ export default function App() {
       </div>
 
       {/* ======================= SCREEN VIEW ======================= */}
+      {/* ... rest of the app ... */}
       {selectedImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 animate-fade-in no-print" onClick={() => setSelectedImage(null)}>
             <div className="relative max-w-5xl max-h-[90vh] animate-zoom-in">

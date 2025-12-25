@@ -129,7 +129,7 @@ const MainStat: React.FC<{
                 className="text-5xl font-extrabold text-brand-dark bg-transparent text-center w-40 border-b-2 border-brand-accent/30 focus:border-brand-primary outline-none"
             />
          ) : (
-            <span className={`font-extrabold text-brand-dark tracking-tight ${isPrint ? 'text-4xl mt-2' : 'text-5xl mt-2'}`}>{value.toLocaleString()}</span>
+            <span className={`font-extrabold text-brand-dark tracking-tight ${isPrint ? 'text-3xl mt-1' : 'text-5xl mt-2'}`}>{value.toLocaleString()}</span>
          )}
     </div>
 );

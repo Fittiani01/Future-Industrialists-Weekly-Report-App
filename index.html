@@ -171,8 +171,9 @@
 
       /* PDF Page Styling */
       .print-page {
-          width: 210mm;
-          height: 296.5mm; 
+          width: 100%;
+          /* height: 296.5mm; Removed strict height for native print to flow better */
+          min-height: 296.5mm;
           position: relative;
           background: white;
           overflow: hidden;
@@ -190,7 +191,7 @@
       }
 
       .print-content-safe-area {
-          padding: 10mm;
+          padding: 8mm; /* Slightly reduced padding to avoid overflow */
           height: 100%;
           flex-grow: 1;
           display: flex;
@@ -198,6 +199,7 @@
           justify-content: space-between;
           position: relative;
           z-index: 10;
+          width: 100%;
       }
 
       /* --- LEGACY BROWSER PRINT STYLES (Fallback) --- */
@@ -208,7 +210,7 @@
         }
 
         html, body {
-          width: 210mm;
+          width: 100%; /* Changed from 210mm to 100% for mobile compatibility */
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
@@ -238,7 +240,8 @@
             top: 0;
             display: block !important;
             visibility: visible;
-            width: 100%;
+            width: 100%; /* Ensure full width */
+            max-width: 100%;
             height: auto;
             margin: 0;
             padding: 0;
