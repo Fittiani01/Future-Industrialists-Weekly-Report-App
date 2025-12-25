@@ -166,12 +166,12 @@ export default function App() {
     const element = document.querySelector('.print-only-container') as HTMLElement;
     if (!element) return;
 
-    // 0. IMPORTANT: Scroll to top. If the user is scrolled down, 
-    // html2canvas absolute positioning capture will be offset and result in blank top pages.
+    // 0. IMPORTANT: Scroll to top.
     window.scrollTo(0, 0);
 
-    // 1. Activate CSS mode (Bring on-screen overlay)
-    element.classList.add('is-exporting');
+    // 1. Activate EXPORT MODE on the BODY
+    // This hides #root and all other elements via CSS, leaving ONLY the print container visible.
+    document.body.classList.add('export-mode');
     
     // 2. Wait for rendering and images
     // Wait a full frame paint
@@ -194,9 +194,8 @@ export default function App() {
             allowTaint: false,
             backgroundColor: "#ffffff",
             logging: false,
-            // scrollY: 0 is CRITICAL when using absolute positioning overlay
             scrollY: 0, 
-            windowWidth: 794 // Approx A4 width in pixels at 96 DPI, ensures mobile doesn't crop
+            windowWidth: 794 // Approx A4 width
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
@@ -229,8 +228,8 @@ export default function App() {
         console.error("PDF Generation Error:", e);
         alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
     } finally {
-        // Cleanup
-        element.classList.remove('is-exporting');
+        // Cleanup: Remove the export-mode class to restore the app UI
+        document.body.classList.remove('export-mode');
         setIsGeneratingPDF(false);
     }
   };

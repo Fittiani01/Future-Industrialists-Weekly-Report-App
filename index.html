@@ -115,18 +115,17 @@
       }
 
       /* ========================================= */
-      /* PDF GENERATION STYLES (Overlay Method)    */
+      /* PDF GENERATION STYLES (Strict Isolation)  */
       /* ========================================= */
       
       /* 
          DEFAULT STATE: 
-         Hidden far off-screen. We use fixed to prevent it from affecting scroll 
-         of the main app, but we don't use display:none so images can load.
+         Hidden far off-screen.
       */
       .print-only-container {
           position: fixed; 
           top: 0;
-          left: -20000px; /* Far off-screen */
+          left: -20000px;
           width: 210mm;
           min-height: 100vh;
           background: white;
@@ -135,19 +134,33 @@
       }
 
       /* 
-         EXPORT STATE: 
-         Crucial: Switch to ABSOLUTE positioning at 0,0.
-         This overlays the entire app. This allows html2canvas to scroll down
-         and capture the full height without clipping.
+         EXPORT MODE (Applied to BODY): 
+         When this class is present, we HIDE everything else in the app.
+         This forces the browser to only see the print container.
       */
-      .print-only-container.is-exporting {
-          position: absolute !important;
+      body.export-mode {
+          background: white !important;
+          overflow: auto !important;
+          height: auto !important;
+      }
+
+      /* Hide App UI elements when exporting */
+      body.export-mode #root,
+      body.export-mode .animated-bg,
+      body.export-mode .glow-layer,
+      body.export-mode #network-canvas {
+          display: none !important;
+      }
+
+      /* Show Print Container when exporting */
+      body.export-mode .print-only-container {
+          position: relative !important; /* Static flow */
           top: 0 !important;
           left: 0 !important;
-          z-index: 2147483647 !important; /* Max Z-Index */
+          z-index: 9999 !important;
           visibility: visible !important;
           display: block !important;
-          background: white !important;
+          margin: 0 auto !important;
       }
       
       /* Ensure colors are exact in PDF */
@@ -159,10 +172,6 @@
       /* PDF Page Styling */
       .print-page {
           width: 210mm;
-          /* 
-            Slightly less than 297mm to prevent overflow causing a blank page. 
-            296.5mm works best with html2pdf logic.
-          */
           height: 296.5mm; 
           position: relative;
           background: white;
@@ -172,11 +181,11 @@
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          page-break-after: always; /* Force break */
+          page-break-after: always;
       }
 
       .print-page:last-child {
-          page-break-after: avoid !important; /* No blank page at end */
+          page-break-after: avoid !important;
           margin-bottom: 0 !important;
       }
 
@@ -240,13 +249,13 @@
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "react": "https://esm.sh/react@^19.2.3",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "mammoth": "https://esm.sh/mammoth@^1.11.0",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+    "mammoth": "https://esm.sh/mammoth@^1.11.0"
   }
 }
 </script>
