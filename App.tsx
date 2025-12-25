@@ -4,7 +4,7 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Download } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand } from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
@@ -12,9 +12,6 @@ import { db, auth } from './firebase';
 import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
-
-// Declare html2pdf for TypeScript
-declare var html2pdf: any;
 
 // Helper for Arabic Ordinals
 const getArabicOrdinal = (n: number) => {
@@ -29,7 +26,6 @@ export default function App() {
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // New state for PDF generation
   
   // Admin Mode State - Default to FALSE (Public view)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -147,97 +143,24 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- PDF GENERATION HELPERS ---
-  
-  // Wait for images to load before capturing
-  const waitImages = async (element: HTMLElement) => {
-    const imgs = Array.from(element.querySelectorAll('img'));
-    await Promise.all(imgs.map(img => {
-      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        // Add a timeout to prevent hanging forever if an image fails
-        const timer = setTimeout(() => resolve(), 3000);
-        img.onload = () => { clearTimeout(timer); resolve(); };
-        img.onerror = () => { clearTimeout(timer); resolve(); };
-      });
-    }));
-  };
-
-  const handleDownloadPDF = async () => {
-    setIsGeneratingPDF(true);
-    
-    // 1. Prepare for Export (Visible mode)
-    // IMPORTANT: This must happen BEFORE window.print() or html2pdf
-    document.body.classList.add('export-mode');
-    window.scrollTo(0, 0);
-
-    const element = document.querySelector('.print-only-container') as HTMLElement;
-    if (element) {
-        await new Promise(r => requestAnimationFrame(() => setTimeout(r, 100))); // Small delay to let DOM render
-        await waitImages(element);
-    }
-
-    // 2. MOBILE/iOS OPTIMIZATION:
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        const originalTitle = document.title;
-        const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-        const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-        document.title = `${safeWeek} - ${safeDate}`;
-        
-        // Native Print Dialog
-        window.print();
-        
-        // Cleanup after print dialog closes (approximate)
-        setTimeout(() => { 
-            document.title = originalTitle; 
-            document.body.classList.remove('export-mode');
-            setIsGeneratingPDF(false);
-        }, 1000); // 1s delay gives enough time for the OS to grab the content
-        return;
-    }
-
-    // 3. DESKTOP LOGIC (html2pdf):
-    if (!element) {
-        setIsGeneratingPDF(false);
-        document.body.classList.remove('export-mode');
-        return;
-    }
-
-    await new Promise(r => setTimeout(r, 800)); 
-
-    const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-    const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-    const filename = `${safeWeek} - ${safeDate}.pdf`;
-
-    const opt = {
-        margin: 0,
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2, 
-            useCORS: true, 
-            allowTaint: true,
-            backgroundColor: "#ffffff",
-            logging: false,
-            scrollY: 0, 
-            windowWidth: 794 
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-    };
-
-    try {
-        const worker = html2pdf().set(opt).from(element);
-        await worker.save();
-    } catch (e) {
-        console.error("PDF Generation Error:", e);
-        alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
-    } finally {
-        document.body.classList.remove('export-mode');
-        setIsGeneratingPDF(false);
-    }
+  // --- Printing Handler (Set File Name) ---
+  const handlePrint = () => {
+      // Set the document title to control the filename
+      // Format: Week Title - Date - Report Name
+      const originalTitle = document.title;
+      // Sanitize filename to be safe
+      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      
+      // Ensures the week title comes first as requested
+      document.title = `${safeWeek} - ${safeDate}`;
+      
+      window.print();
+      
+      // Restore title after print dialog closes
+      setTimeout(() => {
+          document.title = originalTitle;
+      }, 1000);
   };
 
   // --- Update Helpers ---
@@ -386,21 +309,12 @@ export default function App() {
     try {
         const reportId = report.id || `week-${Date.now()}`;
         const { visits, ...mainReportData } = report;
-        
-        // Prepare object and sanitize undefined values
-        const reportToSave: any = { 
+        const reportToSave = { 
             ...mainReportData, 
             visits: [], 
             id: reportId,
             createdAt: report.createdAt || serverTimestamp() 
         };
-
-        // CRITICAL FIX: Remove undefined keys to prevent Firestore crashes
-        Object.keys(reportToSave).forEach(key => {
-            if (reportToSave[key] === undefined) {
-                delete reportToSave[key];
-            }
-        });
 
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
         const visitsRef = collection(db, "weeklyReports", reportId, "visits");
@@ -418,12 +332,7 @@ export default function App() {
         await Promise.all(deletePromises);
 
         const savePromises = visits.map(visit => {
-            // Ensure no undefined in visits as well, though usually they are clean
-            const visitToSave: any = { ...visit };
-            Object.keys(visitToSave).forEach(key => {
-                if (visitToSave[key] === undefined) delete visitToSave[key];
-            });
-            return setDoc(doc(visitsRef, visit.id), visitToSave);
+            return setDoc(doc(visitsRef, visit.id), visit);
         });
         await Promise.all(savePromises);
         
@@ -693,19 +602,18 @@ export default function App() {
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12 flex-shrink-0">
+            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" crossOrigin="anonymous" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" />
+                            <img src={logo} alt="" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" />
                         </div>
                         {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex-grow mx-8"></div>
-            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center flex-shrink-0">
-                 <img src={report.logos.main} alt="Future Industrialists" crossOrigin="anonymous" className="h-full object-contain" />
+            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
+                 <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
   );
@@ -715,14 +623,24 @@ export default function App() {
     const partnersBottom = report.logos.partners.slice(6, 11);
     return (
       <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 pb-1 relative z-50">
-        <div className="text-center mb-1 text-brand-dark font-bold text-sm">شركاء النجاح</div>
+        <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-2">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
-            <div className="flex flex-col items-center gap-3 w-full pb-2">
+            {/* Screen View */}
+            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto print:hidden">
+                {report.logos.partners.map((partner: PartnerLogo, idx) => (
+                    <div key={partner.id} className="relative flex flex-col items-center justify-center">
+                        <img src={partner.url} style={{ height: `${35 * partner.scale}px`, width: 'auto', maxWidth: '100px' }} className="object-contain" alt="" />
+                    </div>
+                ))}
+            </div>
+
+            {/* Print View (Separated with Lines) */}
+            <div className="hidden print:flex flex-col items-center gap-3 w-full pb-2">
                 <div className="flex justify-between items-center w-full px-2 flex-nowrap">
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex items-center justify-center h-7 px-1 flex-1">
-                                <img src={partner.url} crossOrigin="anonymous" className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
                             </div>
                             {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
@@ -732,7 +650,7 @@ export default function App() {
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex items-center justify-center h-7 px-1">
-                                <img src={partner.url} crossOrigin="anonymous" className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
                             </div>
                             {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
@@ -744,6 +662,9 @@ export default function App() {
   )};
 
   const DecorationLayer = ({ isPrint = false }) => (
+      // Z-Index: 
+      // Editing Mode: z-[2000] (Very High)
+      // View/Print Mode: z-[0] (Under content, but in full page absolute context)
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[0]'}`}>
           {report.decorations?.map(d => (
               <div 
@@ -762,7 +683,7 @@ export default function App() {
                 onTouchStart={(e) => !isPrint && handleDecoStart(e, d.id)}
                 className={`origin-center select-none ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded border border-indigo-300' : ''}`}
               >
-                  <img src={d.url} crossOrigin="anonymous" className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none pointer-events-none" draggable={false} alt="Decoration" />
+                  <img src={d.url} className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none pointer-events-none" draggable={false} alt="Decoration" />
               </div>
           ))}
       </div>
@@ -786,13 +707,13 @@ export default function App() {
       )}
 
       {/* ======================= PRINT VIEW ======================= */}
-      <div className="print-only-container" dir="rtl">
+      <div className="hidden print-only-container">
           {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
             <div className="print-page">
                 {/* Full Bleed Image */}
-                <img src={report.coverImage} crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
+                <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
                 
                 {/* Overlay Text */}
                 <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
@@ -810,13 +731,14 @@ export default function App() {
                   
                   {/* Content Container (Safe Area) */}
                   <div className="print-content-safe-area">
-                      <div className="relative z-10 w-full">
+                      <div className="relative z-10">
                         <ReportHeaderContent />
                         {/* Changed border opacity and text opacity to solid colors for better print quality */}
                         <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
                                 <div className="flex justify-between items-end px-2">
                                     <div className="flex flex-col">
                                         <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                        {/* Changed from text-brand-primary/80 to text-brand-primary for print clarity */}
                                         <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                     </div>
                                     <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
@@ -824,9 +746,9 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="flex-grow flex flex-col justify-start gap-1 pt-4 relative z-10 w-full">
+                      <div className="flex-grow flex flex-col justify-start gap-2 print:gap-1 pt-4 relative z-10">
                           {chunk.map((visit: Visit) => (
-                               <VisitCard key={visit.id} visit={visit} isEditing={false} isPrint={true} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
+                               <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
                           ))}
                       </div>
 
@@ -835,13 +757,13 @@ export default function App() {
               </div>
           ))}
 
-          {/* 3. Statistics Page - Added 'last-page' class to force page break behavior */}
-          <div className="print-page last-page">
+          {/* 3. Statistics Page */}
+          <div className="print-page">
                <DecorationLayer isPrint={true} />
                
                {/* Content Container (Safe Area) */}
                <div className="print-content-safe-area">
-                   <div className="relative z-10 w-full">
+                   <div className="relative z-10">
                        <ReportHeaderContent />
                         <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
                                 <div className="flex justify-between items-end px-2">
@@ -852,13 +774,13 @@ export default function App() {
                                     <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
                                 </div>
                         </div>
-                       <div className="mb-2 border-b-2 border-indigo-200 pb-2 mt-1">
-                            <h2 className="text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
+                       <div className="mb-6 print:mb-2 border-b-2 border-indigo-200 pb-2 mt-4 print:mt-1">
+                            <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
                        </div>
                    </div>
                    
-                   <div className="flex-grow flex flex-col justify-start py-0 relative z-10 w-full">
-                        <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} isPrint={true} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
+                   <div className="flex-grow flex flex-col justify-start py-4 print:py-0 relative z-10">
+                        <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
                    </div>
                    
                    <ReportFooterContent />
@@ -867,7 +789,6 @@ export default function App() {
       </div>
 
       {/* ======================= SCREEN VIEW ======================= */}
-      {/* ... rest of the app ... */}
       {selectedImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 animate-fade-in no-print" onClick={() => setSelectedImage(null)}>
             <div className="relative max-w-5xl max-h-[90vh] animate-zoom-in">
@@ -887,7 +808,7 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5 ${isGeneratingPDF ? 'bg-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-gray-800'}`}>{isGeneratingPDF ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {isGeneratingPDF ? "جاري التجهيز..." : "تنزيل PDF"}</button>
+                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Printer size={16} /> طباعة PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>
