@@ -2,11 +2,10 @@ import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
 const getAIClient = () => {
-    // @ts-ignore
-    const apiKey = import.meta.env.VITE_API_KEY ?? import.meta.env['VITE_API_KEY'];
+    const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
-      throw new Error('VITE_API_KEY is missing');
+      throw new Error('API_KEY is missing');
     }
 
     return new GoogleGenAI({ apiKey });
@@ -60,11 +59,11 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [
-          { role: 'user', parts: [{ text: systemPrompt }] },
-          { role: 'user', parts: [{ text: text }] }
-      ],
-      config: { responseMimeType: "application/json" }
+      contents: text,
+      config: { 
+          responseMimeType: "application/json",
+          systemInstruction: systemPrompt
+      }
     });
 
     const responseText = response.text;
@@ -108,7 +107,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            contents: prompt,
             config: { responseMimeType: "application/json" }
         });
 
@@ -148,7 +147,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            contents: prompt,
             config: { responseMimeType: "application/json" }
         });
 

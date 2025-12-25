@@ -6,6 +6,7 @@ interface StatisticsSectionProps {
   stats: Statistics;
   categoryLogos: CategoryLogos;
   isEditing: boolean;
+  isPrint?: boolean; // New prop
   onUpdate: (key: keyof Statistics, value: number) => void;
   onLogoUpdate: (key: keyof CategoryLogos) => (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
@@ -16,19 +17,21 @@ const CategoryBox: React.FC<{
     imageSrc: string; 
     colorClass: string; 
     isEditing: boolean;
+    isPrint?: boolean;
     onChange: (val: number) => void;
     onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}> = ({ label, value, imageSrc, colorClass, isEditing, onChange, onImageUpload }) => {
+}> = ({ label, value, imageSrc, colorClass, isEditing, isPrint, onChange, onImageUpload }) => {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     return (
-    <div className="flex flex-col items-center text-center p-3 print:p-2 bg-gray-50 print:bg-white rounded-lg border border-gray-100 print:border-gray-200 h-full justify-start gap-3 print:gap-2">
+    <div className={`flex flex-col items-center text-center rounded-lg h-full justify-start ${isPrint ? 'p-2 bg-white border-gray-200 gap-2' : 'p-3 bg-gray-50 border border-gray-100 gap-3'}`}>
         <div 
-            className={`relative group w-20 h-20 print:w-16 print:h-16 flex items-center justify-center flex-shrink-0 ${isEditing ? 'cursor-pointer' : ''}`}
+            className={`relative group flex items-center justify-center flex-shrink-0 ${isPrint ? 'w-16 h-16' : 'w-20 h-20'} ${isEditing ? 'cursor-pointer' : ''}`}
             onClick={() => isEditing && fileInputRef.current?.click()}
         >
             <img 
                 src={imageSrc} 
+                crossOrigin="anonymous"
                 alt={label} 
                 className="w-full h-full object-contain filter drop-shadow-sm" 
             />
@@ -48,7 +51,7 @@ const CategoryBox: React.FC<{
             )}
         </div>
         
-        <span className="text-base font-bold text-brand-dark min-h-[24px] print:min-h-0 flex items-center print:text-sm print:font-extrabold">{label}</span>
+        <span className={`font-bold text-brand-dark flex items-center ${isPrint ? 'text-sm font-extrabold min-h-0' : 'text-base min-h-[24px]'}`}>{label}</span>
         
         <div className="w-full mt-auto">
              {isEditing ? (
@@ -59,7 +62,7 @@ const CategoryBox: React.FC<{
                     className={`w-full text-center text-white font-bold py-1.5 rounded-md ${colorClass} outline-none focus:ring-2 focus:ring-offset-1 focus:ring-brand-primary`}
                 />
             ) : (
-                <div className={`w-full text-white font-bold text-2xl print:text-xl py-1.5 print:py-1 rounded-md shadow-sm ${colorClass}`}>
+                <div className={`w-full text-white font-bold rounded-md shadow-sm ${colorClass} ${isPrint ? 'text-xl py-1' : 'text-2xl py-1.5'}`}>
                     {value}
                 </div>
             )}
@@ -73,17 +76,18 @@ const SocialStatBox: React.FC<{
     icon: React.ReactNode; 
     colorClass: string; 
     isEditing: boolean;
+    isPrint?: boolean;
     onChange: (val: number) => void;
-}> = ({ label, value, icon, colorClass, isEditing, onChange }) => (
-    <div className="flex flex-col items-center text-center p-3 print:p-2 bg-gray-50 print:bg-white rounded-lg border border-gray-100 print:border-gray-200 h-full">
+}> = ({ label, value, icon, colorClass, isEditing, isPrint, onChange }) => (
+    <div className={`flex flex-col items-center text-center rounded-lg h-full ${isPrint ? 'p-2 bg-white border-gray-200' : 'p-3 bg-gray-50 border border-gray-100'}`}>
         {/* Icon Container */}
-        <div className="mb-3 print:mb-2 text-brand-dark bg-white p-3 print:p-2 rounded-full shadow-sm border border-gray-100 h-14 w-14 print:w-10 print:h-10 flex items-center justify-center flex-shrink-0">
-            {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: "text-brand-primary w-6 h-6 print:w-5 print:h-5" })}
+        <div className={`text-brand-dark bg-white rounded-full shadow-sm border border-gray-100 flex items-center justify-center flex-shrink-0 ${isPrint ? 'mb-2 p-2 w-10 h-10' : 'mb-3 p-3 h-14 w-14'}`}>
+            {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: `text-brand-primary ${isPrint ? 'w-5 h-5' : 'w-6 h-6'}` })}
         </div>
         
         {/* Label */}
-        <div className="h-10 print:h-auto flex items-center justify-center mb-2 print:mb-2 w-full">
-            <span className="text-sm font-bold text-brand-dark leading-tight print:text-xs">{label}</span>
+        <div className={`flex items-center justify-center w-full ${isPrint ? 'mb-2 h-auto' : 'mb-2 h-10'}`}>
+            <span className={`font-bold text-brand-dark leading-tight ${isPrint ? 'text-xs' : 'text-sm'}`}>{label}</span>
         </div>
         
         {/* Value */}
@@ -96,7 +100,7 @@ const SocialStatBox: React.FC<{
                     className={`w-full text-center text-white font-bold py-1.5 rounded ${colorClass} outline-none`}
                 />
             ) : (
-                <div className={`w-full text-white font-bold text-xl print:text-lg py-1.5 print:py-1 rounded shadow-sm ${colorClass}`}>
+                <div className={`w-full text-white font-bold rounded shadow-sm ${colorClass} ${isPrint ? 'text-lg py-1' : 'text-xl py-1.5'}`}>
                     {value}
                 </div>
             )}
@@ -109,13 +113,14 @@ const MainStat: React.FC<{
     value: number;
     icon: React.ReactNode;
     isEditing: boolean;
+    isPrint?: boolean;
     onChange: (val: number) => void;
-}> = ({ label, value, icon, isEditing, onChange }) => (
-    <div className="flex flex-col items-center justify-center w-full text-center p-4 print:p-3 border border-gray-100 print:border-gray-300 rounded-xl print:bg-gray-50">
-         <div className="mb-3 print:mb-2 text-brand-accent/20 bg-brand-primary/5 p-4 print:p-2 rounded-full">
-            {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: "text-brand-primary w-8 h-8 print:w-8 print:h-8" })}
+}> = ({ label, value, icon, isEditing, isPrint, onChange }) => (
+    <div className={`flex flex-col items-center justify-center w-full text-center rounded-xl ${isPrint ? 'p-3 border-gray-300 bg-gray-50' : 'p-4 border border-gray-100'}`}>
+         <div className={`text-brand-accent/20 bg-brand-primary/5 rounded-full ${isPrint ? 'mb-2 p-2' : 'mb-3 p-4'}`}>
+            {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: `text-brand-primary ${isPrint ? 'w-8 h-8' : 'w-8 h-8'}` })}
          </div>
-         <span className="text-lg print:text-base font-bold text-gray-600 mb-2 print:mb-0 max-w-[250px] leading-tight flex items-center justify-center">{label}</span>
+         <span className={`font-bold text-gray-600 max-w-[250px] leading-tight flex items-center justify-center ${isPrint ? 'text-base mb-0' : 'text-lg mb-2'}`}>{label}</span>
          {isEditing ? (
             <input 
                 type="number"
@@ -124,26 +129,27 @@ const MainStat: React.FC<{
                 className="text-5xl font-extrabold text-brand-dark bg-transparent text-center w-40 border-b-2 border-brand-accent/30 focus:border-brand-primary outline-none"
             />
          ) : (
-            <span className="text-5xl print:text-4xl font-extrabold text-brand-dark tracking-tight mt-2 print:mt-2">{value.toLocaleString()}</span>
+            <span className={`font-extrabold text-brand-dark tracking-tight ${isPrint ? 'text-4xl mt-2' : 'text-5xl mt-2'}`}>{value.toLocaleString()}</span>
          )}
     </div>
 );
 
-export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, categoryLogos, isEditing, onUpdate, onLogoUpdate }) => {
+export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, categoryLogos, isEditing, isPrint = false, onUpdate, onLogoUpdate }) => {
   return (
-    <div className="mt-8 print:mt-0 bg-white p-6 print:p-0 rounded-2xl print:rounded-none shadow-lg print:shadow-none border border-gray-100 print:border-none break-inside-avoid relative overflow-hidden print:overflow-visible h-full flex flex-col justify-start print:justify-start gap-8 print:gap-10">
+    <div className={`relative overflow-hidden flex flex-col justify-start h-full ${isPrint ? 'mt-0 p-0 rounded-none shadow-none border-none gap-10' : 'mt-8 bg-white p-6 rounded-2xl shadow-lg border border-gray-100 gap-8'}`}>
         
         {/* Decorative corner - Hide on print */}
-        <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-brand-accent/10 to-transparent rounded-br-full no-print"></div>
+        {!isPrint && <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-brand-accent/10 to-transparent rounded-br-full no-print"></div>}
         
         {/* SECTION 1: TOTALS (Side by Side) */}
-        <div className="flex flex-col md:flex-row print:flex-row items-stretch justify-center gap-8 print:gap-8 w-full">
+        <div className={`flex items-stretch justify-center w-full ${isPrint ? 'flex-row gap-8' : 'flex-col md:flex-row gap-8'}`}>
             <div className="flex-1">
                 <MainStat 
                     label="إجمالي عدد المستفيدين من المبادرة" 
                     value={stats.totalBeneficiaries}
                     icon={<Users />}
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('totalBeneficiaries', v)}
                 />
             </div>
@@ -153,6 +159,7 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
                     value={stats.totalRegistered}
                     icon={<Trophy />}
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('totalRegistered', v)}
                 />
             </div>
@@ -160,14 +167,16 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
 
         {/* SECTION 2: CATEGORIES (Side by Side - 4 Columns) */}
         <div className="w-full">
-            <h3 className="hidden print:block text-center text-brand-dark font-bold text-sm mb-2 bg-gray-100 py-1 rounded">الفئات</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-6 print:gap-4">
+            {/* FORCE VISIBILITY if isPrint is true, otherwise use media query for pure CSS print */}
+            <h3 className={`text-center text-brand-dark font-bold text-sm mb-2 bg-gray-100 py-1 rounded ${isPrint ? 'block' : 'hidden print:block'}`}>الفئات</h3>
+            <div className={`grid ${isPrint ? 'grid-cols-4 gap-4' : 'grid-cols-2 md:grid-cols-4 gap-6'}`}>
                 <CategoryBox 
                     label="فئة المبدع" 
                     value={stats.creativeCategory} 
                     imageSrc={categoryLogos.creative}
                     colorClass="bg-brand-primary"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('creativeCategory', v)}
                     onImageUpload={onLogoUpdate('creative')}
                 />
@@ -177,6 +186,7 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
                     imageSrc={categoryLogos.discoverer}
                     colorClass="bg-brand-primary"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('discovererCategory', v)}
                     onImageUpload={onLogoUpdate('discoverer')}
                 />
@@ -186,6 +196,7 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
                     imageSrc={categoryLogos.ambassador} 
                     colorClass="bg-brand-primary"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('ambassadorCategory', v)}
                     onImageUpload={onLogoUpdate('ambassador')}
                 />
@@ -195,6 +206,7 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
                     imageSrc={categoryLogos.artist} 
                     colorClass="bg-brand-primary"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('artistCategory', v)}
                     onImageUpload={onLogoUpdate('artist')}
                 />
@@ -202,15 +214,16 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
         </div>
 
         {/* SECTION 3: SOCIAL STATS (Side by Side - 4 Columns) */}
-        <div className="bg-gray-50/50 print:bg-transparent rounded-xl p-6 print:p-0 border border-gray-100 print:border-none w-full">
-             <h3 className="hidden print:block text-center text-brand-dark font-bold text-sm mb-2 bg-gray-100 py-1 rounded">التفاعل الإعلامي</h3>
-             <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-4 print:gap-4">
+        <div className={`w-full ${isPrint ? 'bg-transparent border-none p-0' : 'bg-gray-50/50 rounded-xl p-6 border border-gray-100'}`}>
+             <h3 className={`text-center text-brand-dark font-bold text-sm mb-2 bg-gray-100 py-1 rounded ${isPrint ? 'block' : 'hidden print:block'}`}>التفاعل الإعلامي</h3>
+             <div className={`grid ${isPrint ? 'grid-cols-4 gap-4' : 'grid-cols-2 md:grid-cols-4 gap-4'}`}>
                  <SocialStatBox 
                     label="اللقاءات التلفزيونية" 
                     value={stats.tvInterviews} 
                     icon={<Mic />} 
                     colorClass="bg-brand-dark"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('tvInterviews', v)}
                 />
                 <SocialStatBox 
@@ -219,6 +232,7 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
                     icon={<FileText />} 
                     colorClass="bg-brand-dark"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('posts', v)}
                 />
                 <SocialStatBox 
@@ -227,14 +241,16 @@ export const StatisticsSection: React.FC<StatisticsSectionProps> = ({ stats, cat
                     icon={<Video />} 
                     colorClass="bg-brand-dark"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('videos', v)}
                 />
                  <SocialStatBox 
                     label="عدد التغريدات" 
                     value={stats.tweets} 
-                    icon={<span className="text-2xl print:text-xl font-bold text-brand-primary">𝕏</span>} 
+                    icon={<span className={`font-bold text-brand-primary ${isPrint ? 'text-xl' : 'text-2xl'}`}>𝕏</span>} 
                     colorClass="bg-brand-dark"
                     isEditing={isEditing}
+                    isPrint={isPrint}
                     onChange={(v) => onUpdate('tweets', v)}
                 />
             </div>
