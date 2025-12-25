@@ -143,7 +143,6 @@
       }
 
       /* Hide Screen UI elements when exporting */
-      /* CRITICAL FIX: Do NOT hide #root, only hide screen-specific containers */
       body.export-mode .animated-bg,
       body.export-mode .glow-layer,
       body.export-mode #network-canvas,
@@ -169,11 +168,13 @@
       @media print {
         @page {
           size: A4 portrait; /* STRICTLY A4 */
-          margin: 0 !important; /* NO MARGINS */
+          margin: 0 !important; /* NO MARGINS (Hides browser header/footer) */
         }
 
+        /* RESET BODY FOR PRINT TO AVOID MOBILE LAYOUTS */
         html, body, #root {
-          width: 100%; 
+          width: 210mm !important; /* Force A4 width to prevent stacking */
+          min-width: 210mm !important;
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
@@ -192,7 +193,7 @@
           -webkit-backdrop-filter: none !important;
         }
 
-        /* Hide screen elements during print (redundant safety) */
+        /* Hide screen elements during print */
         .no-print, .animated-bg, .glow-layer, #network-canvas, .screen-only-container { 
           display: none !important; 
         }
@@ -204,12 +205,13 @@
             position: relative !important;
             left: auto !important;
             top: auto !important;
-            width: 100%;
+            width: 210mm !important; /* Ensure it matches page width */
+            overflow: hidden !important;
         }
 
         .print-page {
-            width: 100%;
-            height: 295mm; /* Reduced slightly from 297mm to prevent bleed */
+            width: 210mm !important;
+            height: 290mm !important; /* Reduced to 290mm to absolutely guarantee no bleed/blank page */
             position: relative;
             page-break-after: always;
             break-after: page;
@@ -217,16 +219,14 @@
             flex-direction: column;
             justify-content: space-between;
             background: white;
-            overflow: hidden; 
+            overflow: hidden !important; /* Critical: Cut off anything that might spill */
             padding: 0;
-            margin: 0;
+            margin: 0 auto;
         }
         
-        /* FIX FOR LAST PAGE FOOTER POSITION */
-        /* We revert height to match standard page (295mm) so flex justify-between pushes footer down */
-        /* We keep page-break-after: auto to prevent an extra blank page after it */
+        /* FIX FOR LAST PAGE FOOTER POSITION & BLANK PAGE */
         .print-page.last-page {
-            height: 295mm !important; 
+            height: 290mm !important; 
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;
@@ -272,12 +272,16 @@
 
     <script>
       (function() {
+        // Simple performance check for mobile
+        const isMobile = window.innerWidth < 768;
+        
         const canvas = document.getElementById('network-canvas');
         const ctx = canvas.getContext('2d');
         
         let width, height;
         let particles = [];
-        const particleCount = 100;
+        // Reduce particle count significantly on mobile to improve loading speed
+        const particleCount = isMobile ? 30 : 100;
         const connectionDistance = 150;
         const moveSpeed = 0.5; 
 
@@ -311,7 +315,6 @@
 
             particles = [];
             for (let i = 0; i < particleCount; i++) {
-                // Ensure pure random distribution across the entire current width/height
                 particles.push(new Particle(Math.random() * width, Math.random() * height));
             }
         }
@@ -325,20 +328,23 @@
             canvas.width = width;
             canvas.height = height;
             
-            // If we have existing particles, scale their positions to match new screen size
-            // This prevents them from clumping in the corner if screen expands
             if (particles.length > 0 && oldWidth > 0 && oldHeight > 0) {
                 particles.forEach(p => {
                     p.x = p.x * (width / oldWidth);
                     p.y = p.y * (height / oldHeight);
                 });
             } else {
-                // First run or invalid old state
                 init();
             }
         }
 
         function animate() {
+          // Optimization: Skip animation render if in print mode
+          if (document.body.classList.contains('export-mode')) {
+              requestAnimationFrame(animate);
+              return;
+          }
+
           ctx.clearRect(0, 0, width, height);
           for (let i = 0; i < particles.length; i++) {
             let p1 = particles[i];
@@ -363,10 +369,8 @@
           requestAnimationFrame(animate);
         }
         
-        // Listen for resize
         window.addEventListener('resize', resize);
         
-        // Initial setup
         init();
         animate();
       })();
