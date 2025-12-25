@@ -121,8 +121,7 @@
 
         html, body {
           width: 210mm;
-          /* Use auto to allow flow, but we control individual page heights */
-          height: auto !important; 
+          height: 100%; /* Changed from auto to 100% to ensure container reference */
           margin: 0 !important;
           padding: 0 !important;
           background-color: white !important;
@@ -139,41 +138,42 @@
         .print-only-container {
             display: block !important;
             width: 100%;
-            height: auto;
         }
 
         /* Generic Print Page */
         .print-page {
             width: 210mm;
-            /* 296mm: Slightly less than A4 (297mm) to account for browser rounding errors */
+            /* Safe Height: 296mm (A4 is 297mm). 1mm buffer prevents overflow. */
             height: 296mm; 
+            max-height: 296mm;
+            
             position: relative;
             background: white;
-            overflow: hidden; /* Cut off content */
+            overflow: hidden !important; /* Force clip content */
             padding: 0;
             margin: 0;
             
-            /* Layout */
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-
-            /* Page Breaking */
-            page-break-after: always;
-            break-after: page;
+            
+            /* Reset default break behavior */
+            page-break-after: auto;
+            break-after: auto;
         }
 
-        /* LAST PAGE FIX: High Specificity to override default break */
-        .print-only-container > .print-page:last-child,
-        .print-only-container > .print-page.last-page {
-            page-break-after: auto !important;
-            break-after: auto !important;
-            margin-bottom: 0 !important;
-            border-bottom: none !important;
+        /* 
+           THE LOGIC INVERSION: 
+           Only apply page break if it is NOT the last page.
+           This removes the instruction entirely for the final page.
+        */
+        .print-page:not(:last-of-type) {
+            page-break-after: always !important;
+            break-after: page !important;
+            border-bottom: 1px solid transparent; /* Force layout separation */
         }
         
         .print-content-safe-area {
-            /* Safe area for content */
             padding: 10mm 10mm 0mm 10mm;
             height: 100%;
             flex-grow: 1;
