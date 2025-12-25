@@ -151,16 +151,21 @@ export default function App() {
       // Sanitize filename to be safe
       const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
       const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      const newTitle = `${safeWeek} - ${safeDate}`;
       
-      // Ensures the week title comes first as requested
-      document.title = `${safeWeek} - ${safeDate}`;
+      // Only update if different to avoid reflows
+      if (document.title !== newTitle) {
+          document.title = newTitle;
+      }
       
-      window.print();
-      
-      // Restore title after print dialog closes
+      // Small delay to ensure title update allows iOS to catch it, but not too long to feel laggy
       setTimeout(() => {
-          document.title = originalTitle;
-      }, 1000);
+          window.print();
+          // Restore title after a reasonable delay for the print dialog to open
+          setTimeout(() => {
+              document.title = originalTitle;
+          }, 2000);
+      }, 100);
   };
 
   // --- Update Helpers ---
@@ -615,8 +620,9 @@ export default function App() {
 
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
-      <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12">
+      // UPDATED: gap-12 to separate the two logo groups more effectively
+      <header className="flex justify-between items-center w-full mb-1 relative z-20 gap-12">
+            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12 flex-grow">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
@@ -822,7 +828,7 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Download size={16} /> حفظ كملف PDF</button>
+                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Download size={16} /> طباعة / حفظ PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>

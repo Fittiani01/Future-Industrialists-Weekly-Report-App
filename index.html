@@ -115,13 +115,18 @@
       /* --- PRINT STYLES (Controlled A4 Layout) --- */
       @media print {
         @page {
-          size: A4;
+          size: A4 portrait;
           margin: 0 !important;
         }
 
-        html, body {
+        html {
+            height: auto !important;
+        }
+
+        body {
           width: 210mm;
-          height: 100%; /* Changed from auto to 100% to ensure container reference */
+          min-height: 0 !important; /* Prevent body from forcing extra height */
+          height: auto !important; 
           margin: 0 !important;
           padding: 0 !important;
           background-color: white !important;
@@ -138,14 +143,20 @@
         .print-only-container {
             display: block !important;
             width: 100%;
+            margin: 0;
+            padding: 0;
         }
 
         /* Generic Print Page */
         .print-page {
             width: 210mm;
-            /* Safe Height: 296mm (A4 is 297mm). 1mm buffer prevents overflow. */
-            height: 296mm; 
-            max-height: 296mm;
+            /* 
+               CRITICAL FIX FOR IOS/IPHONE:
+               A4 is 297mm. 
+               We reduce to 294mm to account for iOS Safari's non-removable print headers/footers scaling.
+            */
+            height: 294mm; 
+            max-height: 294mm;
             
             position: relative;
             background: white;
@@ -160,19 +171,24 @@
             /* Reset default break behavior */
             page-break-after: auto;
             break-after: auto;
+            break-inside: avoid;
         }
 
         /* 
            THE LOGIC INVERSION: 
            Only apply page break if it is NOT the last page.
-           This removes the instruction entirely for the final page.
         */
         .print-page:not(:last-of-type) {
             page-break-after: always !important;
             break-after: page !important;
-            border-bottom: 1px solid transparent; /* Force layout separation */
         }
         
+        /* Ensure last page has absolutely NO margin causing spillover */
+        .print-page:last-of-type {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
         .print-content-safe-area {
             padding: 10mm 10mm 0mm 10mm;
             height: 100%;
