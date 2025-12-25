@@ -147,19 +147,33 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- PDF GENERATION HANDLER ---
+  // --- PDF GENERATION HELPERS ---
+  
+  // Wait for images to load before capturing
+  const waitImages = async (element: HTMLElement) => {
+    const imgs = Array.from(element.querySelectorAll('img'));
+    await Promise.all(imgs.map(img => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve(); // Don't block on error
+      });
+    }));
+  };
+
   const handleDownloadPDF = async () => {
     setIsGeneratingPDF(true);
-    // 1. Activate CSS mode that shows the hidden print container
-    document.body.classList.add('pdf-generating');
+    const element = document.querySelector('.print-only-container') as HTMLElement;
+    if (!element) return;
+
+    // 1. Activate CSS mode (Bring on-screen but keep layout)
+    element.classList.add('is-exporting');
     
-    // Scroll to top to ensure html2canvas captures from 0,0
-    window.scrollTo(0, 0);
+    // 2. Wait for rendering and images
+    await new Promise(r => requestAnimationFrame(() => r(null))); // Allow DOM update
+    await waitImages(element);
+    await new Promise(r => setTimeout(r, 500)); // Extra buffer for layout stability
 
-    // 2. Small delay to ensure images/layout render in the "visible" container
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const element = document.querySelector('.print-only-container');
     const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
     const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
     const filename = `${safeWeek} - ${safeDate}.pdf`;
@@ -168,7 +182,15 @@ export default function App() {
         margin: 0,
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            allowTaint: false,
+            backgroundColor: "#ffffff",
+            logging: false,
+            scrollY: 0,
+            windowWidth: element.scrollWidth // Ensure full width capture
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
     };
@@ -201,7 +223,7 @@ export default function App() {
         alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
     } finally {
         // Cleanup
-        document.body.classList.remove('pdf-generating');
+        element.classList.remove('is-exporting');
         setIsGeneratingPDF(false);
     }
   };

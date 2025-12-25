@@ -115,64 +115,42 @@
       }
 
       /* ========================================= */
-      /* PDF GENERATION STYLES (Client Side)       */
+      /* PDF GENERATION STYLES (Off-Screen Method) */
       /* ========================================= */
       
       /* 
          HIDDEN STATE: 
-         We use visibility: hidden instead of display: none to ensure 
-         html2canvas can calculate dimensions even before we show it.
-         We position it fixed off-screen or with 0 dims to prevent scrollbars.
+         Positioned far off-screen but with REAL dimensions.
+         This ensures html2canvas can render the layout correctly.
       */
       .print-only-container {
           position: fixed;
           top: 0;
-          left: 0;
-          width: 0;
-          height: 0;
-          overflow: hidden;
-          visibility: hidden;
-          z-index: -100;
-          background: white;
-      }
-
-      /* ACTIVE STATE: When generating PDF */
-      body.pdf-generating {
-          overflow: hidden !important;
-          height: 100vh !important;
-          background: #fff !important;
-      }
-
-      body.pdf-generating .screen-only-container,
-      body.pdf-generating .no-print,
-      body.pdf-generating .animated-bg,
-      body.pdf-generating .glow-layer,
-      body.pdf-generating #network-canvas {
-          display: none !important;
-      }
-
-      body.pdf-generating .print-only-container {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 210mm; /* Exact A4 width */
-          height: auto;
+          left: -10000px; /* Far off-screen */
+          width: 210mm;   /* Real A4 Width */
           min-height: 100vh;
-          overflow: visible;
-          visibility: visible;
-          display: block !important;
-          z-index: 9999;
           background: white;
+          visibility: hidden; /* Visually hidden but layout is calculated */
+          z-index: -100;
+          overflow: visible;
+      }
+
+      /* ACTIVE STATE: Bringing it to view for capture */
+      .print-only-container.is-exporting {
+          left: 0;
+          visibility: visible;
+          z-index: 9999;
+          display: block;
       }
       
       /* Ensure colors are exact in PDF */
-      body.pdf-generating * {
+      .print-only-container * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
 
       /* PDF Page Styling */
-      body.pdf-generating .print-page {
+      .print-page {
           width: 210mm;
           /* 
             Slightly less than 297mm to prevent overflow causing a blank page. 
@@ -190,12 +168,12 @@
           page-break-after: always; /* Force break */
       }
 
-      body.pdf-generating .print-page:last-child {
+      .print-page:last-child {
           page-break-after: avoid !important; /* No blank page at end */
           margin-bottom: 0 !important;
       }
 
-      body.pdf-generating .print-content-safe-area {
+      .print-content-safe-area {
           padding: 10mm;
           height: 100%;
           flex-grow: 1;
@@ -239,62 +217,29 @@
         }
 
         .print-only-container {
+            position: relative;
+            left: 0;
+            top: 0;
             display: block !important;
+            visibility: visible;
             width: 100%;
             height: auto;
-            overflow: visible;
-            visibility: visible;
-            position: relative;
             margin: 0;
             padding: 0;
-        }
-
-        .print-page {
-            width: 210mm;
-            min-height: 296mm; 
-            height: auto;
-            position: relative;
-            background: white;
-            overflow: hidden !important;
-            padding: 0;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            page-break-after: always;
-            break-after: page;
-        }
-
-        .print-only-container > .print-page:last-child {
-            page-break-after: auto !important;
-            break-after: auto !important;
-            min-height: auto !important;
-            height: auto !important;
-            margin-bottom: 0 !important;
-        }
-
-        .print-content-safe-area {
-            padding: 10mm;
-            height: 100%;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            position: relative;
-            z-index: 10;
+            z-index: auto;
         }
       }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "mammoth": "https://esm.sh/mammoth@^1.11.0"
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "mammoth": "https://esm.sh/mammoth@^1.11.0",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
   }
 }
 </script>
