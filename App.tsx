@@ -152,9 +152,12 @@ export default function App() {
     setIsGeneratingPDF(true);
     // 1. Activate CSS mode that shows the hidden print container
     document.body.classList.add('pdf-generating');
+    
+    // Scroll to top to ensure html2canvas captures from 0,0
+    window.scrollTo(0, 0);
 
     // 2. Small delay to ensure images/layout render in the "visible" container
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     const element = document.querySelector('.print-only-container');
     const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
@@ -768,7 +771,7 @@ export default function App() {
       )}
 
       {/* ======================= PRINT VIEW ======================= */}
-      <div className="hidden print-only-container">
+      <div className="print-only-container">
           {/* ... (Print logic same as before) ... */}
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
