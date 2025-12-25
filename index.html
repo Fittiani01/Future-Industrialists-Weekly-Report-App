@@ -121,13 +121,14 @@
 
         html, body {
           width: 210mm;
-          height: auto !important;
+          /* Ensure no vertical overflow triggers extra pages */
+          height: auto !important; 
           margin: 0 !important;
           padding: 0 !important;
           background-color: white !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
-          overflow: visible !important;
+          overflow: hidden !important; /* Critical to cut off extra pixels */
         }
 
         /* Optimization: Remove shadows and filters to fix file size and rendering artifacts */
@@ -145,11 +146,12 @@
         .print-only-container {
             display: block !important;
             width: 100%;
+            height: auto;
         }
 
         .print-page {
             width: 210mm;
-            /* Slightly reduced from 297mm to prevent blank page overflow */
+            /* 296mm gives 1mm safety buffer to prevent overflow to next page */
             height: 296mm; 
             position: relative;
             page-break-after: always;
@@ -163,12 +165,20 @@
             margin: 0;
         }
         
-        .print-page:last-child {
-            page-break-after: auto !important;
-            break-after: auto !important;
+        /* Specific targeting for the last page class added in React */
+        .print-page.last-page {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
             margin-bottom: 0 !important;
-            height: 296mm; 
-            min-height: 296mm;
+            height: 296mm !important;
+            overflow: hidden !important;
+        }
+        
+        /* Fallback for last-child if class is missing */
+        .print-page:last-child {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            margin-bottom: 0 !important;
         }
         
         .print-content-safe-area {
