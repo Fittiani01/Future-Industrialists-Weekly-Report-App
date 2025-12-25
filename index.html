@@ -209,7 +209,7 @@
 
         .print-page {
             width: 100%;
-            height: 296.5mm; /* Standard page height */
+            height: 295mm; /* Reduced slightly from 297mm to prevent bleed */
             position: relative;
             page-break-after: always;
             break-after: page;
@@ -225,7 +225,7 @@
         /* FIX FOR BLANK PAGE AT END */
         .print-page.last-page {
             height: auto !important;
-            min-height: 296.5mm; 
+            min-height: 0 !important;
             page-break-after: auto !important;
             break-after: auto !important;
             margin-bottom: 0 !important;

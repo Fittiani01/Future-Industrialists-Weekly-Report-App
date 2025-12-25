@@ -148,8 +148,8 @@ export default function App() {
       // 1. Enter Export Mode (Hides UI, Shows Print Container)
       document.body.classList.add('export-mode');
       
-      // Wait for DOM to update and images to settle
-      await new Promise(r => setTimeout(r, 500));
+      // Wait for DOM to update and images to settle (INCREASED TO 1000ms FOR IPHONE)
+      await new Promise(r => setTimeout(r, 1000));
 
       // 2. Set file name
       const originalTitle = document.title;
