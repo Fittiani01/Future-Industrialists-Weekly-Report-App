@@ -82,7 +82,8 @@ export default function App() {
         }
 
         try {
-            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "desc"));
+            // ORDER BY ASC so Week 1 is first (Right in RTL), Newest is last (Left in RTL)
+            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
             
@@ -93,6 +94,8 @@ export default function App() {
 
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
+                // Default to showing the newest report (last one)
+                setCurrentReportIndex(loadedReports.length - 1);
             } else {
                 setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`}]);
             }
@@ -414,8 +417,10 @@ export default function App() {
           decorations: report.decorations || [],
           createdAt: serverTimestamp() 
       };
-      setReports(prev => [newReport, ...prev]); 
-      setCurrentReportIndex(0);
+      // Append new report to the END (Left side in RTL)
+      setReports(prev => [...prev, newReport]); 
+      // Switch to the new report
+      setCurrentReportIndex(reports.length); 
       setIsDirty(true);
   };
 
@@ -436,7 +441,8 @@ export default function App() {
                   await deleteDoc(doc(db, "weeklyReports", reportId));
                   const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
                   setReports(newReports);
-                  setCurrentReportIndex(0);
+                  // Clamp index to avoid out of bounds when deleting the last element
+                  setCurrentReportIndex(prev => Math.min(prev, newReports.length - 1));
                   setIsDirty(false);
               } catch (e) {
                   console.error("Error deleting doc:", e);
