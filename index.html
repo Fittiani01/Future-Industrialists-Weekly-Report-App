@@ -42,6 +42,7 @@
         background-color: transparent;
         min-height: 100vh;
         overflow-x: hidden;
+        -webkit-text-size-adjust: 100%; /* Critical for iOS PDF generation */
       }
       
       .animated-bg {
@@ -116,11 +117,6 @@
       /* PDF GENERATION STYLES (Canvas Method)     */
       /* ========================================= */
       
-      /* 
-         The container is hidden by default. 
-         When generating PDF (class .pdf-generating on body),
-         we display it but keep it out of normal flow or z-index behind loader
-      */
       .print-only-container {
           position: fixed; 
           top: 0;
@@ -128,24 +124,18 @@
           width: 210mm; /* Strict A4 width */
           background: white;
           z-index: -9999;
-          visibility: hidden; /* Hidden to user, but we will toggle visibility for html2canvas */
+          visibility: hidden; 
       }
 
-      /* 
-         PDF GENERATION MODE:
-         We show the container so html2canvas can "see" it.
-         We put it on top (z-index) but maybe cover it with a loading spinner.
-      */
       body.pdf-generating .print-only-container {
           visibility: visible !important;
           position: absolute !important; 
           top: 0 !important;
           left: 0 !important;
-          z-index: -1 !important; /* Behind the loader overlay */
+          z-index: -1 !important; 
           display: block !important;
       }
 
-      /* Hide screen elements when generating PDF to save resources/conflicts */
       body.pdf-generating .screen-only-container,
       body.pdf-generating .animated-bg,
       body.pdf-generating #network-canvas {
@@ -153,9 +143,11 @@
       }
 
       /* Page Structure for html2canvas */
+      /* UPDATED to 297mm (Full A4) to prevent squashing */
       .print-page {
           width: 210mm !important;
-          height: 292mm !important; /* Exact height for canvas capture */
+          height: 297mm !important; 
+          max-height: 297mm !important;
           position: relative;
           display: flex;
           flex-direction: column;
@@ -164,8 +156,8 @@
           overflow: hidden; 
           padding: 0;
           margin: 0;
-          /* Ensure text rendering is sharp */
           -webkit-font-smoothing: antialiased;
+          transform: translateZ(0); /* iOS rendering fix */
       }
       
       .print-content-safe-area {
@@ -179,7 +171,6 @@
           z-index: 10;
       }
 
-      /* Ensure background colors print correctly in canvas */
       * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -279,7 +270,6 @@
         }
 
         function animate() {
-          // Optimization: Skip animation render if generating PDF
           if (document.body.classList.contains('pdf-generating')) {
               requestAnimationFrame(animate);
               return;

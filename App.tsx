@@ -171,20 +171,28 @@ export default function App() {
               // Capture the page
               const canvas = await html2canvas(pageElement, {
                   scale: 2, // High resolution
-                  useCORS: true, // Allow loading cross-origin images (firebase/placeholders)
+                  useCORS: true, 
                   allowTaint: true,
                   logging: false,
                   backgroundColor: '#ffffff',
-                  width: 794, // ~210mm in pixels at 96DPI
-                  height: 1104, // ~292mm in pixels
+                  // EXACT A4 Dimensions at 96 DPI:
+                  // 210mm = 794px
+                  // 297mm = 1123px
+                  width: 794, 
+                  height: 1123, 
                   windowWidth: 794,
+                  windowHeight: 1123,
+                  x: 0,
+                  y: 0,
+                  scrollX: 0,
+                  scrollY: 0
               });
 
               setPdfProgress(30 + Math.round(((i + 1) / totalPages) * 60));
 
               const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller size
               const imgWidth = 210;
-              const imgHeight = 292; // Match the CSS height
+              const imgHeight = 297; // Full A4 Height (was 292, caused squashing)
 
               pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
 
