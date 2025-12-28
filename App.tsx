@@ -6,6 +6,8 @@ import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
 import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Download } from 'lucide-react';
 import mammoth from 'mammoth';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 // Firebase Imports
 import { db, auth } from './firebase';
@@ -30,6 +32,9 @@ export default function App() {
   // Admin Mode State - Default to FALSE (Public view)
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  // PDF Export State
+  const [isExporting, setIsExporting] = useState(false);
 
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
@@ -76,7 +81,8 @@ export default function App() {
         }
 
         try {
-            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "desc"));
+            // CHANGED: "asc" so Week 1 is index 0. In RTL Flex, index 0 is on the RIGHT.
+            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
             
@@ -87,6 +93,8 @@ export default function App() {
 
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
+                // Set current to the last one (the newest)
+                setCurrentReportIndex(loadedReports.length - 1);
             } else {
                 setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`}]);
             }
@@ -143,24 +151,88 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- Printing Handler (Set File Name) ---
-  const handlePrint = () => {
-      // Set the document title to control the filename
-      // Format: Week Title - Date - Report Name
-      const originalTitle = document.title;
-      // Sanitize filename to be safe
-      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      
-      // Ensures the week title comes first as requested
-      document.title = `${safeWeek} - ${safeDate}`;
-      
-      window.print();
-      
-      // Restore title after print dialog closes
-      setTimeout(() => {
-          document.title = originalTitle;
-      }, 1000);
+  // --- PDF Export Logic ---
+  const exportReportPDF = async () => {
+      const el = document.getElementById("print-root") as HTMLElement;
+      if (!el) return;
+
+      setIsExporting(true); // Triggers 'export-mode' class in render
+
+      // Wait for React to render the class change and for DOM to settle
+      await new Promise(r => requestAnimationFrame(() => r(null)));
+      await new Promise(r => setTimeout(r, 500)); // Longer timeout to ensure images load if hidden
+
+      try {
+          // Capture the element
+          const canvas = await html2canvas(el, {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: "#ffffff",
+              windowWidth: el.scrollWidth,
+              windowHeight: el.scrollHeight,
+              logging: false,
+              // Force remove any extra scroll space
+              height: el.scrollHeight 
+          });
+
+          const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+          // PDF A4 Setup
+          const pdf = new jsPDF("p", "pt", "a4");
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+
+          // Calculate Image Dimensions
+          const imgWidth = pageWidth;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+          // Split Logic
+          let y = 0;
+          let remaining = imgHeight;
+
+          while (remaining > 0) {
+              // The snippet logic for multipage
+              pdf.addImage(imgData, "JPEG", 0, y ? -y : 0, imgWidth, imgHeight);
+              remaining -= pageHeight;
+              y += pageHeight;
+              
+              // FIX: Only add a new page if significant content remains.
+              // If remaining < 20 points (approx 7mm), it's likely just whitespace/margin/artifact.
+              // Break loop to avoid adding a blank page.
+              if (remaining < 20) {
+                  break;
+              }
+
+              pdf.addPage();
+          }
+
+          // Output
+          const blob = pdf.output("blob");
+          const url = URL.createObjectURL(blob);
+
+          const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+          const fileName = `تقرير صناعيو المستقبل - ${safeWeek}.pdf`;
+
+          // iOS: Open in new tab (Preview + Share)
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          if (isIOS) {
+              window.open(url, "_blank");
+          } else {
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = fileName;
+              a.click();
+          }
+
+          // Cleanup
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      } catch (error) {
+          console.error("PDF Export Error:", error);
+          alert("حدث خطأ أثناء تصدير ملف PDF");
+      } finally {
+          setIsExporting(false);
+      }
   };
 
   // --- Update Helpers ---
@@ -180,7 +252,7 @@ export default function App() {
       if (isAdmin) setIsDirty(true);
   };
 
-  // --- Drag & Drop Decoration Handlers ---
+  // ... (Keep existing handlers for Drag & Drop, Uploads, Saving, etc.) ...
   const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
       if (!isEditing) return;
       e.stopPropagation();
@@ -361,8 +433,8 @@ export default function App() {
           decorations: report.decorations || [],
           createdAt: serverTimestamp() 
       };
-      setReports(prev => [newReport, ...prev]); 
-      setCurrentReportIndex(0);
+      setReports(prev => [...prev, newReport]); 
+      setCurrentReportIndex(reports.length); // Select new report (last index)
       setIsDirty(true);
   };
 
@@ -383,7 +455,8 @@ export default function App() {
                   await deleteDoc(doc(db, "weeklyReports", reportId));
                   const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
                   setReports(newReports);
-                  setCurrentReportIndex(0);
+                  // Ensure index is valid
+                  setCurrentReportIndex(prev => Math.min(prev, newReports.length - 1));
                   setIsDirty(false);
               } catch (e) {
                   console.error("Error deleting doc:", e);
@@ -662,9 +735,6 @@ export default function App() {
   )};
 
   const DecorationLayer = ({ isPrint = false }) => (
-      // Z-Index: 
-      // Editing Mode: z-[2000] (Very High)
-      // View/Print Mode: z-[0] (Under content, but in full page absolute context)
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[0]'}`}>
           {report.decorations?.map(d => (
               <div 
@@ -706,9 +776,17 @@ export default function App() {
           </div>
       )}
 
-      {/* ======================= PRINT VIEW ======================= */}
-      <div className="hidden print-only-container">
-          {/* ... (Print logic same as before) ... */}
+      {/* ======================= PDF OVERLAY ======================= */}
+      {isExporting && (
+          <div className="fixed inset-0 z-[10000] bg-black/80 flex flex-col items-center justify-center p-4">
+              <Loader2 className="w-12 h-12 text-brand-primary animate-spin mb-4" />
+              <h2 className="text-white text-xl font-bold">جاري تصدير PDF...</h2>
+          </div>
+      )}
+
+      {/* ======================= PRINT VIEW (Used for HTML2Canvas) ======================= */}
+      <div id="print-root" className={`print-only-container ${isExporting ? 'export-mode' : ''}`}>
+          
           {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
             <div className="print-page">
@@ -733,12 +811,10 @@ export default function App() {
                   <div className="print-content-safe-area">
                       <div className="relative z-10">
                         <ReportHeaderContent />
-                        {/* Changed border opacity and text opacity to solid colors for better print quality */}
                         <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
                                 <div className="flex justify-between items-end px-2">
                                     <div className="flex flex-col">
                                         <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                        {/* Changed from text-brand-primary/80 to text-brand-primary for print clarity */}
                                         <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                     </div>
                                     <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
@@ -757,7 +833,7 @@ export default function App() {
               </div>
           ))}
 
-          {/* 3. Statistics Page - The KEY FIX: Ensure this div is the exact LAST child and has NO margin-bottom or extra spacing */}
+          {/* 3. Statistics Page */}
           <div className="print-page last-page">
                <DecorationLayer isPrint={true} />
                
@@ -798,7 +874,7 @@ export default function App() {
         </div>
       )}
 
-      {/* --- CONTROLS (MOVED OUTSIDE PAPER) --- */}
+      {/* --- CONTROLS --- */}
       <div className="max-w-[210mm] mx-auto mt-4 md:mt-8 relative z-50 no-print px-4 md:px-0">
         <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-white/40 flex flex-col items-end md:flex-row md:justify-between md:items-center gap-4 shadow-xl">
             <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
@@ -808,7 +884,9 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Download size={16} /> حفظ كملف PDF</button>
+                <button onClick={exportReportPDF} disabled={isExporting} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} تحميل PDF
+                </button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>
@@ -823,10 +901,6 @@ export default function App() {
       {/* Main Paper Container */}
       <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto p-6 md:p-12 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
         
-        {/* Only Render Decorations here if NOT editing, otherwise we render later for z-index issues, wait... 
-            Actually, to ensure it's on top of everything including white backgrounds of cards, it MUST be last.
-        */}
-
         {/* --- ADMIN IMPORT AREA --- */}
         {isEditing && isAdmin && (
             <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl no-print space-y-6 relative z-50">
