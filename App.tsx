@@ -4,7 +4,7 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, FileDown } from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
@@ -152,21 +152,77 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- Printing Handler (Set File Name) ---
-  const handlePrint = () => {
+  // --- PDF Generation Handler ---
+  const handleSavePDF = async () => {
       setIsPrinting(true);
-      const originalTitle = document.title;
-      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      document.title = `${safeWeek} - ${safeDate}`;
-      
-      // Allow the UI to update to show the loading overlay before blocking with window.print()
-      setTimeout(() => {
-          window.print();
-          // Reset after print dialog closes (or immediately if it's non-blocking in some browsers)
+      try {
+        // 1. Prepare HTML Content
+        const printContent = document.querySelector('.print-only-container');
+        if (!printContent) throw new Error("Print content not found");
+
+        // Extract Head elements (Tailwind script, Fonts, Styles)
+        const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('\n');
+        // Filter out app logic scripts, keep Tailwind and config
+        const scripts = Array.from(document.querySelectorAll('script'))
+            .filter(s => s.src.includes('tailwindcss') || s.innerText.includes('tailwind.config'))
+            .map(s => s.outerHTML).join('\n');
+        const links = Array.from(document.querySelectorAll('link')).map(l => l.outerHTML).join('\n');
+
+        const html = `
+          <!DOCTYPE html>
+          <html lang="ar" dir="rtl">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>${document.title}</title>
+              ${links}
+              ${scripts}
+              ${styles}
+              <style>
+                body { background: white !important; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .print-only-container { display: block !important; width: 210mm; margin: 0 auto; }
+                .screen-only-container, .no-print, canvas, .animated-bg, .glow-layer { display: none !important; }
+                @page { size: A4; margin: 0; }
+              </style>
+            </head>
+            <body>
+              ${printContent.outerHTML}
+            </body>
+          </html>
+        `;
+
+        // 2. Call API
+        const response = await fetch('/api/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ html })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText || "فشل في إنشاء ملف PDF");
+        }
+
+        // 3. Download Blob
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+        link.download = `Weekly-Report-${safeWeek}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+
+      } catch (e: any) {
+          console.error(e);
+          alert(`حدث خطأ أثناء حفظ الملف: ${e.message}`);
+      } finally {
           setIsPrinting(false);
-          document.title = originalTitle;
-      }, 800);
+      }
   };
 
   // --- Update Helpers ---
@@ -667,8 +723,8 @@ export default function App() {
       {isPrinting && (
           <div className="fixed inset-0 z-[9999] bg-white/95 flex flex-col items-center justify-center">
               <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-4" />
-              <h2 className="text-2xl font-bold text-brand-dark mb-2">جاري تجهيز ملف الطباعة...</h2>
-              <p className="text-gray-500">يرجى الانتظار حتى تظهر نافذة الطباعة</p>
+              <h2 className="text-2xl font-bold text-brand-dark mb-2">جاري إصدار ملف PDF...</h2>
+              <p className="text-gray-500">قد يستغرق هذا بضع ثوانٍ</p>
           </div>
       )}
 
@@ -778,7 +834,7 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Printer size={16} /> طباعة PDF</button>
+                <button onClick={handleSavePDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><FileDown size={16} /> حفظ PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>

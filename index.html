@@ -185,7 +185,9 @@
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "mammoth": "https://esm.sh/mammoth@^1.11.0"
+    "mammoth": "https://esm.sh/mammoth@^1.11.0",
+    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.34.0",
+    "@sparticuz/chromium": "https://esm.sh/@sparticuz/chromium@^143.0.0"
   }
 }
 </script>
@@ -211,8 +213,17 @@
         const connectionDistance = 150;
         const moveSpeed = 0.5; 
 
+        // Resize function to set dimensions correctly
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
         class Particle {
           constructor(x, y) {
+            // Explicitly use passed values or calculate random based on CURRENT width/height
             this.x = x !== undefined ? x : Math.random() * width;
             this.y = y !== undefined ? y : Math.random() * height;
             this.vx = (Math.random() - 0.5) * moveSpeed;
@@ -222,8 +233,13 @@
           update() {
             this.x += this.vx;
             this.y += this.vy;
-            if (this.x < 0 || this.x > width) this.vx *= -1;
-            if (this.y < 0 || this.y > height) this.vy *= -1;
+            
+            // Wrap around screen instead of bouncing to prevent "corner gathering"
+            if (this.x < 0) this.x = width;
+            else if (this.x > width) this.x = 0;
+            
+            if (this.y < 0) this.y = height;
+            else if (this.y > height) this.y = 0;
           }
           draw() {
             ctx.beginPath();
@@ -234,19 +250,12 @@
         }
 
         function init() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
+            resize(); // Ensure dimensions are set BEFORE creating particles
             particles = [];
-            for (let i = 0; i < particleCount; i++) particles.push(new Particle());
-        }
-
-        function resize() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
+            for (let i = 0; i < particleCount; i++) {
+                // Pass explicit random coordinates to constructor
+                particles.push(new Particle(Math.random() * width, Math.random() * height));
+            }
         }
 
         function animate() {
@@ -272,7 +281,10 @@
           }
           requestAnimationFrame(animate);
         }
+        
         window.addEventListener('resize', resize);
+        
+        // Ensure init runs after slight delay if needed, but direct call is usually fine
         init();
         animate();
       })();
