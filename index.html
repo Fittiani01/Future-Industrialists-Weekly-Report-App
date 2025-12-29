@@ -117,20 +117,26 @@
       .export-container {
          position: fixed;
          top: 0;
-         left: -15000px; /* Hide far off-screen */
+         left: 0;
          z-index: -9999;
-         pointer-events: none;
+         /* Force layout to be independent of screen size */
+         width: 210mm;
+         min-width: 210mm;
+         max-width: 210mm;
+         /* Push it off-screen but keep it rendered */
+         transform: translateX(-200%); 
       }
       
       .export-page {
          width: 210mm;
-         height: 296mm;
+         height: 296mm; /* A4 Height */
          background: white;
          position: relative;
          overflow: hidden;
          display: flex;
          flex-direction: column;
          margin-bottom: 50px; 
+         box-sizing: border-box;
       }
 
       .export-safe-area {
@@ -156,6 +162,7 @@
          transform: scale(0.98); 
          transform-origin: top center;
          margin-bottom: 0 !important;
+         width: 100%;
       }
 
       /* Standard Print Media Query (Legacy Fallback) */

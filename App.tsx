@@ -153,13 +153,15 @@ export default function App() {
                   });
               }));
 
-              // Capture
+              // Capture with Forced Desktop Width
               const canvas = await html2canvas(pageElement, {
                   scale: 2, // High quality
                   useCORS: true, // Critical for Firebase images
                   logging: false,
                   allowTaint: true,
-                  backgroundColor: '#ffffff'
+                  backgroundColor: '#ffffff',
+                  windowWidth: 1600, // CRITICAL: Forces desktop layout rendering on mobile devices
+                  windowHeight: 1200
               });
 
               const imgData = canvas.toDataURL('image/jpeg', 0.9);
@@ -527,35 +529,32 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
   };
   const visitChunks = chunkArray(report.visits, 4);
 
-  // Reusable Components for Export with Strict SVG Sizing
+  // Reusable Components for Export with Strict CSS to fix SVG issues and Mobile Inconsistency
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-4 px-8 pt-6 relative z-20">
             {/* Right Side Logos (Ministry, etc) */}
-            <div className="flex items-center gap-4 h-16">
+            <div className="flex items-center gap-4" style={{ height: '64px' }}>
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
-                         {/* Strict container for html2canvas */}
-                        <div className="relative h-12 flex items-center justify-center">
+                        <div className="relative h-full flex items-center justify-center">
+                            {/* STRICT INLINE STYLES ARE MANDATORY FOR HTML2CANVAS SVG RENDERING */}
                             <img 
                                 src={logo} 
                                 alt="" 
-                                // FORCE dimensions in style to stop SVG explosion
-                                style={{ height: '40px', maxWidth: '100px', width: 'auto' }} 
-                                className="object-contain" 
+                                style={{ height: '45px', width: 'auto', maxWidth: '120px', display: 'block' }} 
                             />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div style={{ height: '32px', width: '1px', backgroundColor: '#d1d5db', margin: '0 8px' }}></div>}
                     </React.Fragment>
                  ))}
             </div>
             
             {/* Left Side Logo (Main Initiative Logo) */}
-            <div className="flex flex-col gap-2 relative h-20 items-end justify-center">
+            <div className="flex flex-col gap-2 relative items-end justify-center" style={{ height: '80px' }}>
                  <img 
                     src={report.logos.main} 
                     alt="Future Industrialists" 
-                    style={{ height: '70px', width: 'auto' }} 
-                    className="object-contain" 
+                    style={{ height: '70px', width: 'auto', display: 'block' }} 
                  />
             </div>
       </header>
@@ -568,36 +567,34 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
       <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-3 pb-3 relative z-50 bg-white">
         <div className="text-center mb-3 text-brand-dark font-bold text-lg relative z-10">شركاء النجاح</div>
         <div className="w-full px-8 relative z-10">
-            <div className="flex flex-col items-center gap-2 w-full">
-                {/* Row 1 - Force No Wrap */}
-                <div className="flex justify-center items-center gap-4 w-full flex-nowrap">
+            <div className="flex flex-col items-center gap-4 w-full">
+                {/* Row 1 */}
+                <div className="flex justify-center items-center gap-6 w-full flex-wrap">
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-8">
+                            <div className="relative flex items-center justify-center" style={{ height: '32px' }}>
                                 <img 
                                     src={partner.url} 
-                                    style={{ height: '25px', width: 'auto', maxWidth: '60px' }} 
-                                    className="object-contain" 
+                                    style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block' }} 
                                     alt="" 
                                 />
                             </div>
-                            {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < partnersTop.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
                         </React.Fragment>
                     ))}
                 </div>
-                {/* Row 2 - Force No Wrap */}
-                 <div className="flex justify-center items-center gap-4 w-full flex-nowrap">
+                {/* Row 2 */}
+                 <div className="flex justify-center items-center gap-6 w-full flex-wrap">
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                             <div className="relative flex items-center justify-center h-8">
+                             <div className="relative flex items-center justify-center" style={{ height: '32px' }}>
                                 <img 
                                     src={partner.url} 
-                                    style={{ height: '25px', width: 'auto', maxWidth: '60px' }} 
-                                    className="object-contain" 
+                                    style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block' }} 
                                     alt="" 
                                 />
                             </div>
-                            {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < partnersBottom.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
                         </React.Fragment>
                     ))}
                 </div>
@@ -865,4 +862,21 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                                     <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
                                 </div>
                                 {isEditing && (
-                                    <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20 absolute -
+                                    <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20 absolute -bottom-6 left-1/2 -translate-x-1/2">
+                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={10} /></button>
+                                        <div className="w-px h-3 bg-gray-300"></div>
+                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={10} /></button>
+                                    </div>
+                                )}
+                            </div>
+                            {idx < report.logos.partners.length - 1 && <div className="h-10 w-px bg-gray-200 mx-2"></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
+        </div>
+        <DecorationLayer />
+      </div>
+    </div>
+  );
+}
