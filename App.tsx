@@ -527,21 +527,35 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
   };
   const visitChunks = chunkArray(report.visits, 4);
 
-  // Reusable Components for Export
+  // Reusable Components for Export with Strict SVG Sizing
   const ReportHeaderContent = () => (
-      <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-1 md:gap-4 h-12 md:h-16 print:h-12">
+      <header className="flex justify-between items-center w-full mb-4 px-8 pt-6 relative z-20">
+            {/* Right Side Logos (Ministry, etc) */}
+            <div className="flex items-center gap-4 h-16">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
-                        <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-10 md:max-h-14 print:max-h-10" />
+                        <div className="relative h-full flex items-center justify-center">
+                            {/* Force specific dimensions for SVGs to behave in html2canvas */}
+                            <img 
+                                src={logo} 
+                                alt="" 
+                                style={{ height: '45px', width: 'auto', maxWidth: '120px' }} 
+                                className="object-contain" 
+                            />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-6 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-12 md:h-20 print:h-14 items-end justify-center">
-                 <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
+            
+            {/* Left Side Logo (Main Initiative Logo) */}
+            <div className="flex flex-col gap-2 relative h-20 items-end justify-center">
+                 <img 
+                    src={report.logos.main} 
+                    alt="Future Industrialists" 
+                    style={{ height: '70px', width: 'auto' }} 
+                    className="object-contain" 
+                 />
             </div>
       </header>
   );
@@ -550,28 +564,39 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
     const partnersTop = report.logos.partners.slice(0, 6);
     const partnersBottom = report.logos.partners.slice(6, 11);
     return (
-      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 pb-1 relative z-50">
-        <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-2">شركاء النجاح</div>
-        <div className="w-full px-2 relative z-10">
-            {/* Split Partners for print/export to avoid crowding */}
-            <div className="flex flex-col items-center gap-3 w-full pb-2">
-                <div className="flex justify-between items-center w-full px-2 flex-nowrap">
+      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-3 pb-3 relative z-50 bg-white">
+        <div className="text-center mb-3 text-brand-dark font-bold text-lg relative z-10">شركاء النجاح</div>
+        <div className="w-full px-8 relative z-10">
+            <div className="flex flex-col items-center gap-4 w-full">
+                {/* Row 1 */}
+                <div className="flex justify-center items-center gap-6 w-full flex-wrap">
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7 px-1 flex-1">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                            <div className="relative flex items-center justify-center h-8">
+                                <img 
+                                    src={partner.url} 
+                                    style={{ height: '30px', width: 'auto', maxWidth: '80px' }} 
+                                    className="object-contain" 
+                                    alt="" 
+                                />
                             </div>
-                            {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < partnersTop.length - 1 && <div className="h-5 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
                     ))}
                 </div>
-                 <div className="flex justify-center items-center gap-6 w-full px-2 flex-nowrap">
+                {/* Row 2 */}
+                 <div className="flex justify-center items-center gap-6 w-full flex-wrap">
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7 px-1">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                             <div className="relative flex items-center justify-center h-8">
+                                <img 
+                                    src={partner.url} 
+                                    style={{ height: '30px', width: 'auto', maxWidth: '80px' }} 
+                                    className="object-contain" 
+                                    alt="" 
+                                />
                             </div>
-                            {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < partnersBottom.length - 1 && <div className="h-5 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
                     ))}
                 </div>
@@ -591,7 +616,6 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
               <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-6" />
               <h2 className="text-white text-2xl font-bold mb-3">جاري إنشاء ملف PDF...</h2>
               <p className="text-gray-300 text-lg dir-ltr animate-pulse">{exportProgress}</p>
-              <p className="text-gray-400 text-sm mt-8 max-w-md">يتم المعالجة على جهازك لضمان أعلى جودة. يرجى الانتظار وعدم إغلاق الصفحة.</p>
           </div>
       )}
 
@@ -603,9 +627,9 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                 <div className="export-page">
                     <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
                     <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
-                        <h1 className="text-3xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
-                        <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
-                        <p className="text-xl font-bold font-sans dir-ltr drop-shadow-md opacity-95 text-center">{report.header.dateRange}</p>
+                        <h1 className="text-4xl font-bold font-sans mb-2 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
+                        <div className="w-24 h-1 bg-white/90 my-4 rounded-full shadow-sm"></div>
+                        <p className="text-2xl font-bold font-sans dir-ltr drop-shadow-md opacity-95 text-center">{report.header.dateRange}</p>
                     </div>
                 </div>
             )}
@@ -616,16 +640,16 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                     <DecorationLayer isPrint={true} />
                     <div className="export-safe-area">
                         <ReportHeaderContent />
-                        <div className="mb-2 mt-1 border-b-2 border-indigo-200 pb-2">
-                             <div className="flex justify-between items-end px-2">
+                        <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2 px-8">
+                             <div className="flex justify-between items-end">
                                 <div className="flex flex-col">
                                     <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                    <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                    <span className="text-sm font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                 </div>
-                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-1">{report.header.dateRange}</span>
                             </div>
                         </div>
-                        <div className="export-content-body">
+                        <div className="export-content-body px-8">
                              {chunk.map((visit: Visit) => (
                                <div key={visit.id} className="export-mode-card">
                                   <VisitCard visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
@@ -642,19 +666,19 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                 <DecorationLayer isPrint={true} />
                 <div className="export-safe-area">
                      <ReportHeaderContent />
-                     <div className="mb-2 mt-1 border-b-2 border-indigo-200 pb-2">
-                         <div className="flex justify-between items-end px-2">
+                     <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2 px-8">
+                         <div className="flex justify-between items-end">
                             <div className="flex flex-col">
                                 <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                <span className="text-sm font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                             </div>
-                            <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+                            <span className="text-sm text-gray-500 dir-ltr font-medium mb-1">{report.header.dateRange}</span>
                         </div>
                     </div>
-                    <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
+                    <div className="mb-6 mt-4 border-b-2 border-indigo-200 pb-4 mx-8">
                         <h2 className="text-3xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
                     </div>
-                    <div className="export-content-body">
+                    <div className="export-content-body px-8 justify-center">
                          <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
                     </div>
                     <ReportFooterContent />
