@@ -6,6 +6,8 @@ import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
 import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Trash2, X, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, Hand, Download } from 'lucide-react';
 import mammoth from 'mammoth';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 // Firebase Imports
 import { db, auth } from './firebase';
@@ -28,7 +30,10 @@ export default function App() {
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Export State
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState("");
 
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -118,45 +123,61 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- SERVER SIDE PDF EXPORT ---
+  // --- CLIENT SIDE PDF EXPORT (ROBUST) ---
   const exportReportPDF = async () => {
-      if (isDirty) {
-          alert("يرجى حفظ التغييرات أولاً قبل التحميل لضمان ظهور أحدث البيانات");
-          return;
-      }
-      
+      // 1. Prepare UI
       setIsExporting(true);
-      try {
-          const response = await fetch('/api/pdf', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(report),
-          });
+      setExportProgress("جاري تحضير الصفحات...");
+      
+      // Wait for DOM to render the export-container
+      await new Promise(r => setTimeout(r, 1000));
 
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({ message: response.statusText }));
-            throw new Error(err.message || `Server error: ${response.status}`);
+      try {
+          const pages = document.querySelectorAll('.export-page');
+          if (pages.length === 0) throw new Error("لم يتم العثور على صفحات للتصدير");
+
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          
+          for (let i = 0; i < pages.length; i++) {
+              setExportProgress(`جاري معالجة الصفحة ${i + 1} من ${pages.length}...`);
+              
+              const pageElement = pages[i] as HTMLElement;
+
+              // Ensure all images in this page are loaded
+              const images = Array.from(pageElement.querySelectorAll('img'));
+              await Promise.all(images.map(img => {
+                  if (img.complete) return Promise.resolve();
+                  return new Promise(resolve => {
+                      img.onload = resolve;
+                      img.onerror = resolve; // Don't block on error
+                  });
+              }));
+
+              // Capture
+              const canvas = await html2canvas(pageElement, {
+                  scale: 2, // High quality
+                  useCORS: true, // Critical for Firebase images
+                  logging: false,
+                  allowTaint: true,
+                  backgroundColor: '#ffffff'
+              });
+
+              const imgData = canvas.toDataURL('image/jpeg', 0.9);
+              
+              if (i > 0) pdf.addPage();
+              pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
           }
 
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
+          setExportProgress("جاري حفظ الملف...");
           const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-          a.href = url;
-          a.download = `تقرير صناعيو المستقبل - ${safeWeek}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          
-          setTimeout(() => {
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-          }, 100);
+          pdf.save(`تقرير صناعيو المستقبل - ${safeWeek}.pdf`);
 
       } catch (error: any) {
-          console.error("PDF Export Error:", error);
-          alert(`فشل التصدير: ${error.message}\nتأكد من سرعة الانترنت وحجم الصور.`);
+          console.error("Export Error:", error);
+          alert(`حدث خطأ أثناء التصدير: ${error.message}`);
       } finally {
           setIsExporting(false);
+          setExportProgress("");
       }
   };
 
@@ -171,277 +192,278 @@ export default function App() {
       if (isAdmin) setIsDirty(true);
   };
 
+  // ... (Other handlers unchanged for brevity) ...
   const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
-      if (!isEditing) return;
-      e.stopPropagation();
-      const decoration = report.decorations?.find(d => d.id === id);
-      if (!decoration || !containerRef.current) return;
-      setActiveDecoId(id);
-      isDraggingRef.current = false;
-      let clientX, clientY;
-      if ('touches' in e) {
-          clientX = e.touches[0].clientX;
-          clientY = e.touches[0].clientY;
-      } else {
-          clientX = (e as React.MouseEvent).clientX;
-          clientY = (e as React.MouseEvent).clientY;
-      }
-      const startMouseX = clientX;
-      const startMouseY = clientY;
-      const startDecoX = decoration.x;
-      const startDecoY = decoration.y;
+    if (!isEditing) return;
+    e.stopPropagation();
+    const decoration = report.decorations?.find(d => d.id === id);
+    if (!decoration || !containerRef.current) return;
+    setActiveDecoId(id);
+    isDraggingRef.current = false;
+    let clientX, clientY;
+    if ('touches' in e) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = (e as React.MouseEvent).clientX;
+        clientY = (e as React.MouseEvent).clientY;
+    }
+    const startMouseX = clientX;
+    const startMouseY = clientY;
+    const startDecoX = decoration.x;
+    const startDecoY = decoration.y;
 
-      const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-          if (!containerRef.current) return;
-          isDraggingRef.current = true;
-          let moveClientX, moveClientY;
-          if ('touches' in moveEvent) {
-               moveClientX = moveEvent.touches[0].clientX;
-               moveClientY = moveEvent.touches[0].clientY;
-          } else {
-               moveClientX = (moveEvent as MouseEvent).clientX;
-               moveClientY = (moveEvent as MouseEvent).clientY;
-          }
-          const rect = containerRef.current.getBoundingClientRect();
-          const deltaX_px = moveClientX - startMouseX;
-          const deltaY_px = moveClientY - startMouseY;
-          const deltaX_percent = (deltaX_px / rect.width) * 100;
-          const deltaY_percent = (deltaY_px / rect.height) * 100;
-          const newX = Math.max(0, Math.min(100, startDecoX + deltaX_percent));
-          const newY = Math.max(0, Math.min(100, startDecoY + deltaY_percent));
-          updateCurrentReport(prev => ({
-              ...prev,
-              decorations: prev.decorations?.map(d => d.id === id ? { ...d, x: newX, y: newY } : d)
-          }));
-      };
-      const handleEnd = () => {
-          document.removeEventListener('mousemove', handleMove);
-          document.removeEventListener('mouseup', handleEnd);
-          document.removeEventListener('touchmove', handleMove);
-          document.removeEventListener('touchend', handleEnd);
-      };
-      document.addEventListener('mousemove', handleMove);
-      document.addEventListener('mouseup', handleEnd);
-      document.addEventListener('touchmove', handleMove, { passive: false });
-      document.addEventListener('touchend', handleEnd);
-  };
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+        if (!containerRef.current) return;
+        isDraggingRef.current = true;
+        let moveClientX, moveClientY;
+        if ('touches' in moveEvent) {
+             moveClientX = moveEvent.touches[0].clientX;
+             moveClientY = moveEvent.touches[0].clientY;
+        } else {
+             moveClientX = (moveEvent as MouseEvent).clientX;
+             moveClientY = (moveEvent as MouseEvent).clientY;
+        }
+        const rect = containerRef.current.getBoundingClientRect();
+        const deltaX_px = moveClientX - startMouseX;
+        const deltaY_px = moveClientY - startMouseY;
+        const deltaX_percent = (deltaX_px / rect.width) * 100;
+        const deltaY_percent = (deltaY_px / rect.height) * 100;
+        const newX = Math.max(0, Math.min(100, startDecoX + deltaX_percent));
+        const newY = Math.max(0, Math.min(100, startDecoY + deltaY_percent));
+        updateCurrentReport(prev => ({
+            ...prev,
+            decorations: prev.decorations?.map(d => d.id === id ? { ...d, x: newX, y: newY } : d)
+        }));
+    };
+    const handleEnd = () => {
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleEnd);
+        document.removeEventListener('touchmove', handleMove);
+        document.removeEventListener('touchend', handleEnd);
+    };
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchmove', handleMove, { passive: false });
+    document.addEventListener('touchend', handleEnd);
+};
 
-  const handleDecorationUpload = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file && report.id) {
-          try {
-              const url = await uploadReportImage(file, report.id, 'decorations');
-              const newDeco: Decoration = {
-                  id: `deco-${index}-${Date.now()}`,
-                  url, x: 50, y: 20, scale: 0.8, opacity: 1
-              };
-              updateCurrentReport(prev => {
-                  const newDecos = [...(prev.decorations || [])];
-                  if (index === 0) {
-                      if (newDecos.length > 0) newDecos[0] = newDeco; else newDecos.push(newDeco);
-                  } else {
-                      if (newDecos.length < 1) newDecos.push({} as any);
-                      newDecos[1] = newDeco;
-                  }
-                  return { ...prev, decorations: newDecos.filter(d => d && d.url) };
-              });
-              setActiveDecoId(newDeco.id);
-          } catch(e) { console.error(e); alert("فشل رفع الزخرفة"); }
-      }
-  };
-
-  const updateDecoScale = (id: string, delta: number) => {
-      updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.map(d => d.id === id ? { ...d, scale: Math.max(0.1, d.scale + delta) } : d) }));
-  };
-  const deleteDecoration = (id: string) => {
-       updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.filter(d => d.id !== id) }));
-      setActiveDecoId(null);
-  };
-
-  const saveReportToFirestore = async () => {
-    if (!report || !isAdmin) return;
-    setSaving(true);
-    try {
-        const reportId = report.id || `week-${Date.now()}`;
-        const { visits, ...mainReportData } = report;
-        const reportToSave = { ...mainReportData, visits: [], id: reportId, createdAt: report.createdAt || serverTimestamp() };
-        await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
-        const visitsRef = collection(db, "weeklyReports", reportId, "visits");
-        const existingSnapshot = await getDocs(visitsRef);
-        const existingIds = new Set(existingSnapshot.docs.map(d => d.id));
-        const currentIds = new Set(visits.map(v => v.id));
-        const deletePromises: Promise<void>[] = [];
-        existingIds.forEach(id => { if (!currentIds.has(id)) deletePromises.push(deleteDoc(doc(visitsRef, id))); });
-        await Promise.all(deletePromises);
-        const savePromises = visits.map(visit => setDoc(doc(visitsRef, visit.id), visit));
-        await Promise.all(savePromises);
-        setIsDirty(false);
-        if (!report.id) updateCurrentReport({ id: reportId });
-    } catch (error: any) { console.error("Error saving:", error); alert(`فشل الحفظ: ${error.message}`); } finally { setSaving(false); }
-  };
-
-  const handleCreateNewReport = () => {
-      const nextWeekNum = reports.length + 1;
-      const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
-      const newId = `week-${Date.now()}`;
-      const newReport: WeeklyReport = {
-          ...INITIAL_REPORT,
-          id: newId,
-          header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
-          logos: report.logos, visits: [], decorations: report.decorations || [], createdAt: serverTimestamp() 
-      };
-      setReports(prev => [...prev, newReport]); 
-      setCurrentReportIndex(reports.length); 
-      setIsDirty(true);
-  };
-
-  const handleDeleteCurrentReport = async () => {
-      if (!isAdmin) return;
-      if (reports.length <= 1) return alert("لا يمكن حذف التقرير الأخير.");
-      if (window.confirm("هل أنت متأكد من حذف هذا التقرير نهائياً؟")) {
-          const reportId = report.id;
-          if (reportId) {
-              try {
-                  const visitsRef = collection(db, "weeklyReports", reportId, "visits");
-                  const snapshot = await getDocs(visitsRef);
-                  await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
-                  await deleteDoc(doc(db, "weeklyReports", reportId));
-                  const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
-                  setReports(newReports);
-                  setCurrentReportIndex(prev => Math.min(prev, newReports.length - 1));
-                  setIsDirty(false);
-              } catch (e) { console.error("Error deleting:", e); }
-          }
-      }
-  };
-
-  const handleManualVisitImageUpload = async (files: File[], visitId: string): Promise<string[]> => {
-      if (!report.id) return [];
-      const urls: string[] = [];
-      for (const file of files) {
-          try { urls.push(await uploadReportImage(file, report.id, visitId)); } catch(e) { console.error(e); }
-      }
-      setIsDirty(true); return urls;
-  };
-  const handleVisitLogoUpload = async (file: File, visitId: string): Promise<string> => {
-       if (!report.id) throw new Error("Report ID missing");
-       return await uploadReportImage(file, report.id, visitId);
-  }
-  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleDecorationUpload = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && report.id) {
-        try { const url = await uploadReportImage(file, report.id, 'cover_page'); updateCurrentReport({ coverImage: url }); } catch(e) { console.error(e); }
+        try {
+            const url = await uploadReportImage(file, report.id, 'decorations');
+            const newDeco: Decoration = {
+                id: `deco-${index}-${Date.now()}`,
+                url, x: 50, y: 20, scale: 0.8, opacity: 1
+            };
+            updateCurrentReport(prev => {
+                const newDecos = [...(prev.decorations || [])];
+                if (index === 0) {
+                    if (newDecos.length > 0) newDecos[0] = newDeco; else newDecos.push(newDeco);
+                } else {
+                    if (newDecos.length < 1) newDecos.push({} as any);
+                    newDecos[1] = newDeco;
+                }
+                return { ...prev, decorations: newDecos.filter(d => d && d.url) };
+            });
+            setActiveDecoId(newDeco.id);
+        } catch(e) { console.error(e); alert("فشل رفع الزخرفة"); }
     }
-  };
-  const handleLogoUpdate = (section: 'main' | 'right' | 'partners' | 'categories', indexOrKey: number | string = -1) => async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-          try {
-             const url = await uploadReportImage(file, report.id || `week-${Date.now()}`, 'general_logos');
-             updateCurrentReport(prev => {
-                if (section === 'main') return { ...prev, logos: { ...prev.logos, main: url } };
-                if (section === 'right' && typeof indexOrKey === 'number') {
-                    const newRightLogos = [...prev.logos.rightLogos];
-                    newRightLogos[indexOrKey] = url;
-                    return { ...prev, logos: { ...prev.logos, rightLogos: newRightLogos } };
-                }
-                if (section === 'partners' && typeof indexOrKey === 'number') {
-                    const newPartners = [...prev.logos.partners];
-                    newPartners[indexOrKey] = { ...newPartners[indexOrKey], url: url };
-                    return { ...prev, logos: { ...prev.logos, partners: newPartners } };
-                }
-                if (section === 'categories' && typeof indexOrKey === 'string') {
-                    return { ...prev, logos: { ...prev.logos, categories: { ...prev.logos.categories, [indexOrKey]: url } } };
-                }
-                return prev;
-             });
-          } catch (e) { console.error(e); }
-      }
-  };
-  const changePartnerScale = (index: number, delta: number) => {
-      updateCurrentReport(prev => {
-          const newPartners = [...prev.logos.partners];
-          newPartners[index] = { ...newPartners[index], scale: Math.max(0.5, Math.min(3.0, newPartners[index].scale + delta)) };
-          return { ...prev, logos: { ...prev.logos, partners: newPartners } };
-      });
-  };
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (file.name.endsWith('.docx')) {
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-              try { setRawText((await mammoth.extractRawText({ arrayBuffer: event.target?.result as ArrayBuffer })).value); } catch (err) { console.error(err); }
-          };
-          reader.readAsArrayBuffer(file);
-      } else if (file.name.endsWith('.txt')) {
-          const reader = new FileReader();
-          reader.onload = (event) => setRawText(event.target?.result as string || "");
-          reader.readAsText(file);
-      }
-  };
-  const handleSmartParse = async () => {
-    if (!rawText.trim()) return;
-    setIsParsing(true);
-    setParseError(null); 
+};
+
+const updateDecoScale = (id: string, delta: number) => {
+    updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.map(d => d.id === id ? { ...d, scale: Math.max(0.1, d.scale + delta) } : d) }));
+};
+const deleteDecoration = (id: string) => {
+     updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.filter(d => d.id !== id) }));
+    setActiveDecoId(null);
+};
+
+const saveReportToFirestore = async () => {
+  if (!report || !isAdmin) return;
+  setSaving(true);
+  try {
+      const reportId = report.id || `week-${Date.now()}`;
+      const { visits, ...mainReportData } = report;
+      const reportToSave = { ...mainReportData, visits: [], id: reportId, createdAt: report.createdAt || serverTimestamp() };
+      await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
+      const visitsRef = collection(db, "weeklyReports", reportId, "visits");
+      const existingSnapshot = await getDocs(visitsRef);
+      const existingIds = new Set(existingSnapshot.docs.map(d => d.id));
+      const currentIds = new Set(visits.map(v => v.id));
+      const deletePromises: Promise<void>[] = [];
+      existingIds.forEach(id => { if (!currentIds.has(id)) deletePromises.push(deleteDoc(doc(visitsRef, id))); });
+      await Promise.all(deletePromises);
+      const savePromises = visits.map(visit => setDoc(doc(visitsRef, visit.id), visit));
+      await Promise.all(savePromises);
+      setIsDirty(false);
+      if (!report.id) updateCurrentReport({ id: reportId });
+  } catch (error: any) { console.error("Error saving:", error); alert(`فشل الحفظ: ${error.message}`); } finally { setSaving(false); }
+};
+
+const handleCreateNewReport = () => {
+    const nextWeekNum = reports.length + 1;
+    const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
+    const newId = `week-${Date.now()}`;
+    const newReport: WeeklyReport = {
+        ...INITIAL_REPORT,
+        id: newId,
+        header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
+        logos: report.logos, visits: [], decorations: report.decorations || [], createdAt: serverTimestamp() 
+    };
+    setReports(prev => [...prev, newReport]); 
+    setCurrentReportIndex(reports.length); 
+    setIsDirty(true);
+};
+
+const handleDeleteCurrentReport = async () => {
+    if (!isAdmin) return;
+    if (reports.length <= 1) return alert("لا يمكن حذف التقرير الأخير.");
+    if (window.confirm("هل أنت متأكد من حذف هذا التقرير نهائياً؟")) {
+        const reportId = report.id;
+        if (reportId) {
+            try {
+                const visitsRef = collection(db, "weeklyReports", reportId, "visits");
+                const snapshot = await getDocs(visitsRef);
+                await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
+                await deleteDoc(doc(db, "weeklyReports", reportId));
+                const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
+                setReports(newReports);
+                setCurrentReportIndex(prev => Math.min(prev, newReports.length - 1));
+                setIsDirty(false);
+            } catch (e) { console.error("Error deleting:", e); }
+        }
+    }
+};
+
+const handleManualVisitImageUpload = async (files: File[], visitId: string): Promise<string[]> => {
+    if (!report.id) return [];
+    const urls: string[] = [];
+    for (const file of files) {
+        try { urls.push(await uploadReportImage(file, report.id, visitId)); } catch(e) { console.error(e); }
+    }
+    setIsDirty(true); return urls;
+};
+const handleVisitLogoUpload = async (file: File, visitId: string): Promise<string> => {
+     if (!report.id) throw new Error("Report ID missing");
+     return await uploadReportImage(file, report.id, visitId);
+}
+const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (file && report.id) {
+      try { const url = await uploadReportImage(file, report.id, 'cover_page'); updateCurrentReport({ coverImage: url }); } catch(e) { console.error(e); }
+  }
+};
+const handleLogoUpdate = (section: 'main' | 'right' | 'partners' | 'categories', indexOrKey: number | string = -1) => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        try {
+           const url = await uploadReportImage(file, report.id || `week-${Date.now()}`, 'general_logos');
+           updateCurrentReport(prev => {
+              if (section === 'main') return { ...prev, logos: { ...prev.logos, main: url } };
+              if (section === 'right' && typeof indexOrKey === 'number') {
+                  const newRightLogos = [...prev.logos.rightLogos];
+                  newRightLogos[indexOrKey] = url;
+                  return { ...prev, logos: { ...prev.logos, rightLogos: newRightLogos } };
+              }
+              if (section === 'partners' && typeof indexOrKey === 'number') {
+                  const newPartners = [...prev.logos.partners];
+                  newPartners[indexOrKey] = { ...newPartners[indexOrKey], url: url };
+                  return { ...prev, logos: { ...prev.logos, partners: newPartners } };
+              }
+              if (section === 'categories' && typeof indexOrKey === 'string') {
+                  return { ...prev, logos: { ...prev.logos, categories: { ...prev.logos.categories, [indexOrKey]: url } } };
+              }
+              return prev;
+           });
+        } catch (e) { console.error(e); }
+    }
+};
+const changePartnerScale = (index: number, delta: number) => {
+    updateCurrentReport(prev => {
+        const newPartners = [...prev.logos.partners];
+        newPartners[index] = { ...newPartners[index], scale: Math.max(0.5, Math.min(3.0, newPartners[index].scale + delta)) };
+        return { ...prev, logos: { ...prev.logos, partners: newPartners } };
+    });
+};
+const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.name.endsWith('.docx')) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try { setRawText((await mammoth.extractRawText({ arrayBuffer: event.target?.result as ArrayBuffer })).value); } catch (err) { console.error(err); }
+        };
+        reader.readAsArrayBuffer(file);
+    } else if (file.name.endsWith('.txt')) {
+        const reader = new FileReader();
+        reader.onload = (event) => setRawText(event.target?.result as string || "");
+        reader.readAsText(file);
+    }
+};
+const handleSmartParse = async () => {
+  if (!rawText.trim()) return;
+  setIsParsing(true);
+  setParseError(null); 
+  try {
+    const parsedData = await parseReportFromText(rawText);
+    updateCurrentReport(prev => ({
+      ...prev,
+      header: parsedData.header || prev.header,
+      stats: parsedData.stats ? { ...prev.stats, ...parsedData.stats } : prev.stats,
+      visits: parsedData.visits?.map((v, idx) => ({ ...v, id: Date.now().toString() + idx, images: [] })) || prev.visits
+    }));
+    setRawText(""); 
+  } catch (error: any) { setParseError(error.message || "خطأ أثناء المعالجة"); } finally { setIsParsing(false); }
+};
+const handleBulkImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !report.id) return;
+    const files = Array.from(e.target.files) as File[];
+    setIsAnalyzingImages(true);
+    setImageMatchStatus("جاري التوزيع...");
     try {
-      const parsedData = await parseReportFromText(rawText);
-      updateCurrentReport(prev => ({
-        ...prev,
-        header: parsedData.header || prev.header,
-        stats: parsedData.stats ? { ...prev.stats, ...parsedData.stats } : prev.stats,
-        visits: parsedData.visits?.map((v, idx) => ({ ...v, id: Date.now().toString() + idx, images: [] })) || prev.visits
-      }));
-      setRawText(""); 
-    } catch (error: any) { setParseError(error.message || "خطأ أثناء المعالجة"); } finally { setIsParsing(false); }
-  };
-  const handleBulkImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!e.target.files || !report.id) return;
-      const files = Array.from(e.target.files) as File[];
-      setIsAnalyzingImages(true);
-      setImageMatchStatus("جاري التوزيع...");
-      try {
-        const mapping = await matchImagesToVisits(files.map(f => f.name), report.visits);
-        const newVisits = [...report.visits];
-        const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
-        let matchCount = 0;
-        for (let i = 0; i < files.length; i++) {
-            const visitId = mapping[i.toString()];
-            if (visitId && visitMap.has(visitId)) {
-                const visit = visitMap.get(visitId)!;
-                if (visit.images.length < 4) {
-                    try { visit.images.push(await uploadReportImage(files[i], report.id, visitId)); matchCount++; } catch (err) { console.error(err); }
-                }
-            }
-        }
-        updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
-        setImageMatchStatus(`تم رفع ${matchCount} صورة.`);
-      } catch (error: any) { setImageMatchStatus(`خطأ: ${error.message}`); } finally { setIsAnalyzingImages(false); if(bulkImageInputRef.current) bulkImageInputRef.current.value=""; }
-  };
-  const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!e.target.files || !report.id) return;
-      const files = Array.from(e.target.files) as File[];
-      setIsAnalyzingLogos(true);
-      setLogoMatchStatus("جاري التحليل...");
-      try {
-        const mapping = await matchLogosToFactories(files.map(f => f.name), report.visits);
-        const newVisits = [...report.visits];
-        const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
-        let matchCount = 0;
-        for (let i = 0; i < files.length; i++) {
-            const matchedVisitIds = mapping[i.toString()];
-            if (matchedVisitIds?.length > 0) {
-                try {
-                    const url = await uploadReportImage(files[i], report.id, matchedVisitIds[0]);
-                    matchedVisitIds.forEach(id => { const visit = visitMap.get(id); if (visit) visit.factoryLogo = url; });
-                    matchCount++;
-                } catch(e) { console.error(e); }
-            }
-        }
-        updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
-        setLogoMatchStatus(`تم توزيع ${matchCount} شعار.`);
-      } catch (e: any) { setLogoMatchStatus(`خطأ: ${e.message}`); } finally { setIsAnalyzingLogos(false); if(bulkLogoInputRef.current) bulkLogoInputRef.current.value = ""; }
-  };
+      const mapping = await matchImagesToVisits(files.map(f => f.name), report.visits);
+      const newVisits = [...report.visits];
+      const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
+      let matchCount = 0;
+      for (let i = 0; i < files.length; i++) {
+          const visitId = mapping[i.toString()];
+          if (visitId && visitMap.has(visitId)) {
+              const visit = visitMap.get(visitId)!;
+              if (visit.images.length < 4) {
+                  try { visit.images.push(await uploadReportImage(files[i], report.id, visitId)); matchCount++; } catch (err) { console.error(err); }
+              }
+          }
+      }
+      updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
+      setImageMatchStatus(`تم رفع ${matchCount} صورة.`);
+    } catch (error: any) { setImageMatchStatus(`خطأ: ${error.message}`); } finally { setIsAnalyzingImages(false); if(bulkImageInputRef.current) bulkImageInputRef.current.value=""; }
+};
+const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !report.id) return;
+    const files = Array.from(e.target.files) as File[];
+    setIsAnalyzingLogos(true);
+    setLogoMatchStatus("جاري التحليل...");
+    try {
+      const mapping = await matchLogosToFactories(files.map(f => f.name), report.visits);
+      const newVisits = [...report.visits];
+      const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
+      let matchCount = 0;
+      for (let i = 0; i < files.length; i++) {
+          const matchedVisitIds = mapping[i.toString()];
+          if (matchedVisitIds?.length > 0) {
+              try {
+                  const url = await uploadReportImage(files[i], report.id, matchedVisitIds[0]);
+                  matchedVisitIds.forEach(id => { const visit = visitMap.get(id); if (visit) visit.factoryLogo = url; });
+                  matchCount++;
+              } catch(e) { console.error(e); }
+          }
+      }
+      updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
+      setLogoMatchStatus(`تم توزيع ${matchCount} شعار.`);
+    } catch (e: any) { setLogoMatchStatus(`خطأ: ${e.message}`); } finally { setIsAnalyzingLogos(false); if(bulkLogoInputRef.current) bulkLogoInputRef.current.value = ""; }
+};
 
   const handleUpdateHeader = (key: keyof typeof report.header, value: string) => {
       updateCurrentReport(prev => ({
@@ -498,16 +520,150 @@ export default function App() {
       </div>
   );
 
+  const chunkArray = <T,>(array: T[], size: number): T[][] => {
+      const result: T[][] = [];
+      for (let i = 0; i < array.length; i += size) result.push(array.slice(i, i + size));
+      return result;
+  };
+  const visitChunks = chunkArray(report.visits, 4);
+
+  // Reusable Components for Export
+  const ReportHeaderContent = () => (
+      <header className="flex justify-between items-center w-full mb-1 relative z-20">
+            <div className="flex items-center gap-1 md:gap-4 h-12 md:h-16 print:h-12">
+                 {report.logos.rightLogos.map((logo, idx) => (
+                    <React.Fragment key={idx}>
+                        <div className="relative h-full flex items-center">
+                            <img src={logo} alt="" className="h-full object-contain max-h-10 md:max-h-14 print:max-h-10" />
+                        </div>
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-6 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
+                    </React.Fragment>
+                 ))}
+            </div>
+            <div className="flex flex-col gap-2 relative h-12 md:h-20 print:h-14 items-end justify-center">
+                 <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
+            </div>
+      </header>
+  );
+
+  const ReportFooterContent = () => {
+    const partnersTop = report.logos.partners.slice(0, 6);
+    const partnersBottom = report.logos.partners.slice(6, 11);
+    return (
+      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 pb-1 relative z-50">
+        <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-2">شركاء النجاح</div>
+        <div className="w-full px-2 relative z-10">
+            {/* Split Partners for print/export to avoid crowding */}
+            <div className="flex flex-col items-center gap-3 w-full pb-2">
+                <div className="flex justify-between items-center w-full px-2 flex-nowrap">
+                    {partnersTop.map((partner: PartnerLogo, idx) => (
+                        <React.Fragment key={partner.id}>
+                            <div className="relative flex items-center justify-center h-7 px-1 flex-1">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                            </div>
+                            {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+                 <div className="flex justify-center items-center gap-6 w-full px-2 flex-nowrap">
+                    {partnersBottom.map((partner: PartnerLogo, idx) => (
+                        <React.Fragment key={partner.id}>
+                            <div className="relative flex items-center justify-center h-7 px-1">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                            </div>
+                            {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
+        </div>
+      </div>
+  )};
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-10 h-10 text-brand-primary animate-spin" /></div>;
 
   return (
     <div className="min-h-screen pb-4 relative">
+      
+      {/* EXPORT OVERLAY */}
       {isExporting && (
-          <div className="fixed inset-0 z-[10000] bg-black/80 flex flex-col items-center justify-center p-4">
-              <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-4" />
-              <h2 className="text-white text-xl font-bold mb-2">جاري إنشاء ملف PDF...</h2>
+          <div className="fixed inset-0 z-[10000] bg-black/85 flex flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
+              <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-6" />
+              <h2 className="text-white text-2xl font-bold mb-3">جاري إنشاء ملف PDF...</h2>
+              <p className="text-gray-300 text-lg dir-ltr animate-pulse">{exportProgress}</p>
+              <p className="text-gray-400 text-sm mt-8 max-w-md">يتم المعالجة على جهازك لضمان أعلى جودة. يرجى الانتظار وعدم إغلاق الصفحة.</p>
           </div>
       )}
+
+      {/* EXPORT DOM STRUCTURE (Invisible but rendered) */}
+      {isExporting && (
+         <div className="export-container print:block">
+            {/* Cover */}
+            {report.coverImage && (
+                <div className="export-page">
+                    <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
+                    <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
+                        <h1 className="text-3xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
+                        <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
+                        <p className="text-xl font-bold font-sans dir-ltr drop-shadow-md opacity-95 text-center">{report.header.dateRange}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Visits Pages */}
+            {visitChunks.map((chunk, pageIndex) => (
+                <div key={`page-${pageIndex}`} className="export-page">
+                    <DecorationLayer isPrint={true} />
+                    <div className="export-safe-area">
+                        <ReportHeaderContent />
+                        <div className="mb-2 mt-1 border-b-2 border-indigo-200 pb-2">
+                             <div className="flex justify-between items-end px-2">
+                                <div className="flex flex-col">
+                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                    <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                                </div>
+                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+                            </div>
+                        </div>
+                        <div className="export-content-body">
+                             {chunk.map((visit: Visit) => (
+                               <div key={visit.id} className="export-mode-card">
+                                  <VisitCard visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
+                               </div>
+                             ))}
+                        </div>
+                        <ReportFooterContent />
+                    </div>
+                </div>
+            ))}
+
+            {/* Stats Page */}
+            <div className="export-page">
+                <DecorationLayer isPrint={true} />
+                <div className="export-safe-area">
+                     <ReportHeaderContent />
+                     <div className="mb-2 mt-1 border-b-2 border-indigo-200 pb-2">
+                         <div className="flex justify-between items-end px-2">
+                            <div className="flex flex-col">
+                                <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                <span className="text-xs font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                            </div>
+                            <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+                        </div>
+                    </div>
+                    <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2">
+                        <h2 className="text-3xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
+                    </div>
+                    <div className="export-content-body">
+                         <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
+                    </div>
+                    <ReportFooterContent />
+                </div>
+            </div>
+         </div>
+      )}
+
+      {/* Normal UI (Editing Mode) */}
       {isEditing && activeDecoId && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[3000] bg-white shadow-2xl rounded-full px-6 py-3 border border-gray-200 flex items-center gap-6 animate-fade-in no-print">
               <button onClick={() => updateDecoScale(activeDecoId, 0.1)} className="p-2 hover:bg-gray-100 rounded-full text-brand-primary"><ZoomInIcon size={24}/></button>
@@ -547,6 +703,7 @@ export default function App() {
         </div>
       </div>
       <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto p-6 md:p-12 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
+        {/* ... Admin Import Section ... */}
         {isEditing && isAdmin && (
             <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl no-print space-y-6 relative z-50">
                  <div className="border-b border-indigo-100 pb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -599,6 +756,7 @@ export default function App() {
                 </div>
             </div>
         )}
+        {/* ... Main Report View ... */}
         <div className="border-b-2 border-brand-primary pb-6 mb-8 relative z-20">
             <header className="flex justify-between items-center">
                 <div className="flex items-center gap-2 h-16">
