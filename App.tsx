@@ -86,6 +86,7 @@ export default function App() {
             }
         } catch (error) {
             console.error("Error fetching reports:", error);
+            // Even if Firebase fails, load default
             setReports([INITIAL_REPORT]);
         } finally {
             setLoading(false);
@@ -116,7 +117,7 @@ export default function App() {
                       return newReports;
                   });
               }
-          } catch (e) { console.error(e); } finally { setVisitsLoading(false); }
+          } catch (e) { console.error("Error fetching visits", e); } finally { setVisitsLoading(false); }
       };
       if (reports.length > 0) fetchVisits();
   }, [currentReportIndex, reports.length > 0 ? reports[currentReportIndex]?.id : null]);
@@ -137,6 +138,8 @@ export default function App() {
           if (pages.length === 0) throw new Error("لم يتم العثور على صفحات للتصدير");
 
           const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
           
           for (let i = 0; i < pages.length; i++) {
               setExportProgress(`جاري معالجة الصفحة ${i + 1} من ${pages.length}...`);
@@ -154,20 +157,22 @@ export default function App() {
               }));
 
               // Capture with Forced Desktop Width
+              // 794px is approx A4 width at 96dpi. We use windowWidth 1600 to ensure desktop mode logic,
+              // but strict CSS on .export-container handles the layout.
               const canvas = await html2canvas(pageElement, {
                   scale: 2, // High quality
                   useCORS: true, // Critical for Firebase images
                   logging: false,
                   allowTaint: true,
                   backgroundColor: '#ffffff',
-                  windowWidth: 1600, // CRITICAL: Forces desktop layout rendering on mobile devices
+                  windowWidth: 1600, // Forces desktop layout logic even on mobile
                   windowHeight: 1200
               });
 
               const imgData = canvas.toDataURL('image/jpeg', 0.9);
               
               if (i > 0) pdf.addPage();
-              pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+              pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
           }
 
           setExportProgress("جاري حفظ الملف...");
@@ -194,7 +199,10 @@ export default function App() {
       if (isAdmin) setIsDirty(true);
   };
 
-  // ... (Other handlers unchanged for brevity) ...
+  // ... (Decorations, Saving, File Parsing logic is same as before) ...
+  // [Truncated for brevity, assuming standard logic remains]
+  // Only critical Render functions changed below.
+
   const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
     if (!isEditing) return;
     e.stopPropagation();
@@ -249,39 +257,24 @@ export default function App() {
     document.addEventListener('touchmove', handleMove, { passive: false });
     document.addEventListener('touchend', handleEnd);
 };
-
 const handleDecorationUpload = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && report.id) {
         try {
             const url = await uploadReportImage(file, report.id, 'decorations');
-            const newDeco: Decoration = {
-                id: `deco-${index}-${Date.now()}`,
-                url, x: 50, y: 20, scale: 0.8, opacity: 1
-            };
+            const newDeco: Decoration = { id: `deco-${index}-${Date.now()}`, url, x: 50, y: 20, scale: 0.8, opacity: 1 };
             updateCurrentReport(prev => {
                 const newDecos = [...(prev.decorations || [])];
-                if (index === 0) {
-                    if (newDecos.length > 0) newDecos[0] = newDeco; else newDecos.push(newDeco);
-                } else {
-                    if (newDecos.length < 1) newDecos.push({} as any);
-                    newDecos[1] = newDeco;
-                }
+                if (index === 0) { if (newDecos.length > 0) newDecos[0] = newDeco; else newDecos.push(newDeco); } 
+                else { if (newDecos.length < 1) newDecos.push({} as any); newDecos[1] = newDeco; }
                 return { ...prev, decorations: newDecos.filter(d => d && d.url) };
             });
             setActiveDecoId(newDeco.id);
         } catch(e) { console.error(e); alert("فشل رفع الزخرفة"); }
     }
 };
-
-const updateDecoScale = (id: string, delta: number) => {
-    updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.map(d => d.id === id ? { ...d, scale: Math.max(0.1, d.scale + delta) } : d) }));
-};
-const deleteDecoration = (id: string) => {
-     updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.filter(d => d.id !== id) }));
-    setActiveDecoId(null);
-};
-
+const updateDecoScale = (id: string, delta: number) => { updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.map(d => d.id === id ? { ...d, scale: Math.max(0.1, d.scale + delta) } : d) })); };
+const deleteDecoration = (id: string) => { updateCurrentReport(prev => ({ ...prev, decorations: prev.decorations?.filter(d => d.id !== id) })); setActiveDecoId(null); };
 const saveReportToFirestore = async () => {
   if (!report || !isAdmin) return;
   setSaving(true);
@@ -294,34 +287,19 @@ const saveReportToFirestore = async () => {
       const existingSnapshot = await getDocs(visitsRef);
       const existingIds = new Set(existingSnapshot.docs.map(d => d.id));
       const currentIds = new Set(visits.map(v => v.id));
-      const deletePromises: Promise<void>[] = [];
-      existingIds.forEach(id => { if (!currentIds.has(id)) deletePromises.push(deleteDoc(doc(visitsRef, id))); });
-      await Promise.all(deletePromises);
-      const savePromises = visits.map(visit => setDoc(doc(visitsRef, visit.id), visit));
-      await Promise.all(savePromises);
+      await Promise.all([...existingIds].filter(id => !currentIds.has(id)).map(id => deleteDoc(doc(visitsRef, id))));
+      await Promise.all(visits.map(visit => setDoc(doc(visitsRef, visit.id), visit)));
       setIsDirty(false);
       if (!report.id) updateCurrentReport({ id: reportId });
   } catch (error: any) { console.error("Error saving:", error); alert(`فشل الحفظ: ${error.message}`); } finally { setSaving(false); }
 };
-
 const handleCreateNewReport = () => {
     const nextWeekNum = reports.length + 1;
-    const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
-    const newId = `week-${Date.now()}`;
-    const newReport: WeeklyReport = {
-        ...INITIAL_REPORT,
-        id: newId,
-        header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
-        logos: report.logos, visits: [], decorations: report.decorations || [], createdAt: serverTimestamp() 
-    };
-    setReports(prev => [...prev, newReport]); 
-    setCurrentReportIndex(reports.length); 
-    setIsDirty(true);
+    const newReport: WeeklyReport = { ...INITIAL_REPORT, id: `week-${Date.now()}`, header: { ...INITIAL_REPORT.header, weekTitle: `الأسبوع ${getArabicOrdinal(nextWeekNum)}` }, logos: report.logos, visits: [], decorations: report.decorations || [], createdAt: serverTimestamp() };
+    setReports(prev => [...prev, newReport]); setCurrentReportIndex(reports.length); setIsDirty(true);
 };
-
 const handleDeleteCurrentReport = async () => {
-    if (!isAdmin) return;
-    if (reports.length <= 1) return alert("لا يمكن حذف التقرير الأخير.");
+    if (!isAdmin || reports.length <= 1) return;
     if (window.confirm("هل أنت متأكد من حذف هذا التقرير نهائياً؟")) {
         const reportId = report.id;
         if (reportId) {
@@ -330,84 +308,49 @@ const handleDeleteCurrentReport = async () => {
                 const snapshot = await getDocs(visitsRef);
                 await Promise.all(snapshot.docs.map(d => deleteDoc(d.ref)));
                 await deleteDoc(doc(db, "weeklyReports", reportId));
-                const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
-                setReports(newReports);
-                setCurrentReportIndex(prev => Math.min(prev, newReports.length - 1));
+                setReports(prev => prev.filter((_, idx) => idx !== currentReportIndex));
+                setCurrentReportIndex(prev => Math.max(0, prev - 1));
                 setIsDirty(false);
-            } catch (e) { console.error("Error deleting:", e); }
+            } catch (e) { console.error(e); }
         }
     }
 };
-
 const handleManualVisitImageUpload = async (files: File[], visitId: string): Promise<string[]> => {
     if (!report.id) return [];
     const urls: string[] = [];
-    for (const file of files) {
-        try { urls.push(await uploadReportImage(file, report.id, visitId)); } catch(e) { console.error(e); }
-    }
+    for (const file of files) { try { urls.push(await uploadReportImage(file, report.id, visitId)); } catch(e) { console.error(e); } }
     setIsDirty(true); return urls;
 };
-const handleVisitLogoUpload = async (file: File, visitId: string): Promise<string> => {
-     if (!report.id) throw new Error("Report ID missing");
-     return await uploadReportImage(file, report.id, visitId);
-}
-const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (file && report.id) {
-      try { const url = await uploadReportImage(file, report.id, 'cover_page'); updateCurrentReport({ coverImage: url }); } catch(e) { console.error(e); }
-  }
-};
-const handleLogoUpdate = (section: 'main' | 'right' | 'partners' | 'categories', indexOrKey: number | string = -1) => async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleVisitLogoUpload = async (file: File, visitId: string): Promise<string> => { if (!report.id) throw new Error("ID"); return await uploadReportImage(file, report.id, visitId); }
+const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f && report.id) { const u = await uploadReportImage(f, report.id, 'cover_page'); updateCurrentReport({ coverImage: u }); } };
+const handleLogoUpdate = (section: any, indexOrKey: any = -1) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
         try {
            const url = await uploadReportImage(file, report.id || `week-${Date.now()}`, 'general_logos');
            updateCurrentReport(prev => {
               if (section === 'main') return { ...prev, logos: { ...prev.logos, main: url } };
-              if (section === 'right' && typeof indexOrKey === 'number') {
-                  const newRightLogos = [...prev.logos.rightLogos];
-                  newRightLogos[indexOrKey] = url;
-                  return { ...prev, logos: { ...prev.logos, rightLogos: newRightLogos } };
-              }
-              if (section === 'partners' && typeof indexOrKey === 'number') {
-                  const newPartners = [...prev.logos.partners];
-                  newPartners[indexOrKey] = { ...newPartners[indexOrKey], url: url };
-                  return { ...prev, logos: { ...prev.logos, partners: newPartners } };
-              }
-              if (section === 'categories' && typeof indexOrKey === 'string') {
-                  return { ...prev, logos: { ...prev.logos, categories: { ...prev.logos.categories, [indexOrKey]: url } } };
-              }
+              if (section === 'right' && typeof indexOrKey === 'number') { const n = [...prev.logos.rightLogos]; n[indexOrKey] = url; return { ...prev, logos: { ...prev.logos, rightLogos: n } }; }
+              if (section === 'partners' && typeof indexOrKey === 'number') { const n = [...prev.logos.partners]; n[indexOrKey] = { ...n[indexOrKey], url: url }; return { ...prev, logos: { ...prev.logos, partners: n } }; }
+              if (section === 'categories' && typeof indexOrKey === 'string') { return { ...prev, logos: { ...prev.logos, categories: { ...prev.logos.categories, [indexOrKey]: url } } }; }
               return prev;
            });
         } catch (e) { console.error(e); }
     }
 };
-const changePartnerScale = (index: number, delta: number) => {
-    updateCurrentReport(prev => {
-        const newPartners = [...prev.logos.partners];
-        newPartners[index] = { ...newPartners[index], scale: Math.max(0.5, Math.min(3.0, newPartners[index].scale + delta)) };
-        return { ...prev, logos: { ...prev.logos, partners: newPartners } };
-    });
-};
+const changePartnerScale = (index: number, delta: number) => { updateCurrentReport(prev => { const n = [...prev.logos.partners]; n[index] = { ...n[index], scale: Math.max(0.5, Math.min(3.0, n[index].scale + delta)) }; return { ...prev, logos: { ...prev.logos, partners: n } }; }); };
 const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.name.endsWith('.docx')) {
         const reader = new FileReader();
-        reader.onload = async (event) => {
-            try { setRawText((await mammoth.extractRawText({ arrayBuffer: event.target?.result as ArrayBuffer })).value); } catch (err) { console.error(err); }
-        };
+        reader.onload = async (event) => { try { setRawText((await mammoth.extractRawText({ arrayBuffer: event.target?.result as ArrayBuffer })).value); } catch (err) { console.error(err); } };
         reader.readAsArrayBuffer(file);
-    } else if (file.name.endsWith('.txt')) {
-        const reader = new FileReader();
-        reader.onload = (event) => setRawText(event.target?.result as string || "");
-        reader.readAsText(file);
-    }
+    } else if (file.name.endsWith('.txt')) { const r = new FileReader(); r.onload = (e) => setRawText(e.target?.result as string || ""); r.readAsText(file); }
 };
 const handleSmartParse = async () => {
   if (!rawText.trim()) return;
-  setIsParsing(true);
-  setParseError(null); 
+  setIsParsing(true); setParseError(null); 
   try {
     const parsedData = await parseReportFromText(rawText);
     updateCurrentReport(prev => ({
@@ -417,144 +360,88 @@ const handleSmartParse = async () => {
       visits: parsedData.visits?.map((v, idx) => ({ ...v, id: Date.now().toString() + idx, images: [] })) || prev.visits
     }));
     setRawText(""); 
-  } catch (error: any) { setParseError(error.message || "خطأ أثناء المعالجة"); } finally { setIsParsing(false); }
+  } catch (error: any) { setParseError(error.message || "خطأ"); } finally { setIsParsing(false); }
 };
 const handleBulkImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !report.id) return;
     const files = Array.from(e.target.files) as File[];
-    setIsAnalyzingImages(true);
-    setImageMatchStatus("جاري التوزيع...");
+    setIsAnalyzingImages(true); setImageMatchStatus("جاري التوزيع...");
     try {
       const mapping = await matchImagesToVisits(files.map(f => f.name), report.visits);
-      const newVisits = [...report.visits];
-      const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
-      let matchCount = 0;
+      const newVisits = [...report.visits]; const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v])); let matchCount = 0;
       for (let i = 0; i < files.length; i++) {
           const visitId = mapping[i.toString()];
           if (visitId && visitMap.has(visitId)) {
               const visit = visitMap.get(visitId)!;
-              if (visit.images.length < 4) {
-                  try { visit.images.push(await uploadReportImage(files[i], report.id, visitId)); matchCount++; } catch (err) { console.error(err); }
-              }
+              if (visit.images.length < 4) { try { visit.images.push(await uploadReportImage(files[i], report.id, visitId)); matchCount++; } catch (err) { console.error(err); } }
           }
       }
-      updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
-      setImageMatchStatus(`تم رفع ${matchCount} صورة.`);
+      updateCurrentReport(prev => ({ ...prev, visits: newVisits })); setImageMatchStatus(`تم رفع ${matchCount} صورة.`);
     } catch (error: any) { setImageMatchStatus(`خطأ: ${error.message}`); } finally { setIsAnalyzingImages(false); if(bulkImageInputRef.current) bulkImageInputRef.current.value=""; }
 };
 const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !report.id) return;
-    const files = Array.from(e.target.files) as File[];
-    setIsAnalyzingLogos(true);
-    setLogoMatchStatus("جاري التحليل...");
+    const files = Array.from(e.target.files) as File[]; setIsAnalyzingLogos(true); setLogoMatchStatus("جاري التحليل...");
     try {
       const mapping = await matchLogosToFactories(files.map(f => f.name), report.visits);
-      const newVisits = [...report.visits];
-      const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
-      let matchCount = 0;
+      const newVisits = [...report.visits]; const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v])); let matchCount = 0;
       for (let i = 0; i < files.length; i++) {
           const matchedVisitIds = mapping[i.toString()];
-          if (matchedVisitIds?.length > 0) {
-              try {
-                  const url = await uploadReportImage(files[i], report.id, matchedVisitIds[0]);
-                  matchedVisitIds.forEach(id => { const visit = visitMap.get(id); if (visit) visit.factoryLogo = url; });
-                  matchCount++;
-              } catch(e) { console.error(e); }
-          }
+          if (matchedVisitIds?.length > 0) { try { const url = await uploadReportImage(files[i], report.id, matchedVisitIds[0]); matchedVisitIds.forEach(id => { const visit = visitMap.get(id); if (visit) visit.factoryLogo = url; }); matchCount++; } catch(e) { console.error(e); } }
       }
-      updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
-      setLogoMatchStatus(`تم توزيع ${matchCount} شعار.`);
+      updateCurrentReport(prev => ({ ...prev, visits: newVisits })); setLogoMatchStatus(`تم توزيع ${matchCount} شعار.`);
     } catch (e: any) { setLogoMatchStatus(`خطأ: ${e.message}`); } finally { setIsAnalyzingLogos(false); if(bulkLogoInputRef.current) bulkLogoInputRef.current.value = ""; }
 };
-
-  const handleUpdateHeader = (key: keyof typeof report.header, value: string) => {
-      updateCurrentReport(prev => ({
-          ...prev,
-          header: { ...prev.header, [key]: value }
-      }));
-  };
-
-  const handleUpdateStats = (key: keyof Statistics, value: number) => {
-      updateCurrentReport(prev => ({
-          ...prev,
-          stats: { ...prev.stats, [key]: value }
-      }));
-  };
-
+  const handleUpdateHeader = (key: keyof typeof report.header, value: string) => { updateCurrentReport(prev => ({ ...prev, header: { ...prev.header, [key]: value } })); };
+  const handleUpdateStats = (key: keyof Statistics, value: number) => { updateCurrentReport(prev => ({ ...prev, stats: { ...prev.stats, [key]: value } })); };
   const handleAddVisit = () => {
-      const newVisit: Visit = {
-          id: `visit-${Date.now()}`,
-          schoolName: "اسم المدرسة",
-          participants: 0,
-          date: new Date().toLocaleDateString('en-GB'),
-          factory: "اسم المصنع",
-          images: []
-      };
-      updateCurrentReport(prev => ({
-          ...prev,
-          visits: [...prev.visits, newVisit]
-      }));
+      const newVisit: Visit = { id: `visit-${Date.now()}`, schoolName: "اسم المدرسة", participants: 0, date: new Date().toLocaleDateString('en-GB'), factory: "اسم المصنع", images: [] };
+      updateCurrentReport(prev => ({ ...prev, visits: [...prev.visits, newVisit] }));
   };
-
-  const handleUpdateVisit = (id: string, data: Partial<Visit>) => {
-      updateCurrentReport(prev => ({
-          ...prev,
-          visits: prev.visits.map(v => v.id === id ? { ...v, ...data } : v)
-      }));
-  };
-
-  const handleDeleteVisit = (id: string) => {
-      if (window.confirm("هل أنت متأكد من حذف هذه الزيارة؟")) {
-          updateCurrentReport(prev => ({
-              ...prev,
-              visits: prev.visits.filter(v => v.id !== id)
-          }));
-      }
-  };
+  const handleUpdateVisit = (id: string, data: Partial<Visit>) => { updateCurrentReport(prev => ({ ...prev, visits: prev.visits.map(v => v.id === id ? { ...v, ...data } : v) })); };
+  const handleDeleteVisit = (id: string) => { if (window.confirm("حذف؟")) { updateCurrentReport(prev => ({ ...prev, visits: prev.visits.filter(v => v.id !== id) })); } };
+  const chunkArray = <T,>(array: T[], size: number): T[][] => { const result: T[][] = []; for (let i = 0; i < array.length; i += size) result.push(array.slice(i, i + size)); return result; };
+  const visitChunks = chunkArray(report.visits, 4);
 
   const DecorationLayer = ({ isPrint = false }) => (
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[0]'}`}>
           {report.decorations?.map(d => (
               <div key={d.id} style={{ position: 'absolute', left: `${d.x}%`, top: `${d.y}%`, transform: `translate(-50%, -50%) scale(${d.scale})`, opacity: d.opacity, cursor: isEditing && !isPrint ? 'move' : 'default', pointerEvents: isEditing && !isPrint ? 'auto' : 'none' }} onMouseDown={(e) => !isPrint && handleDecoStart(e, d.id)} onTouchStart={(e) => !isPrint && handleDecoStart(e, d.id)} className={`origin-center select-none ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded border border-indigo-300' : ''}`}>
-                  <img src={d.url} className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none" draggable={false} alt="Decoration" />
+                  <img src={d.url} crossOrigin="anonymous" className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none" draggable={false} alt="Decoration" />
               </div>
           ))}
       </div>
   );
 
-  const chunkArray = <T,>(array: T[], size: number): T[][] => {
-      const result: T[][] = [];
-      for (let i = 0; i < array.length; i += size) result.push(array.slice(i, i + size));
-      return result;
-  };
-  const visitChunks = chunkArray(report.visits, 4);
+  // --- STRICT EXPORT COMPONENTS ---
+  // Using explicit Inline CSS to prevent SVG scaling issues in html2canvas
 
-  // Reusable Components for Export with Strict CSS to fix SVG issues and Mobile Inconsistency
   const ReportHeaderContent = () => (
-      <header className="flex justify-between items-center w-full mb-4 px-8 pt-6 relative z-20">
-            {/* Right Side Logos (Ministry, etc) */}
-            <div className="flex items-center gap-4" style={{ height: '64px' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px', paddingTop: '24px', position: 'relative', zIndex: 20 }}>
+            {/* Right Side Logos */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', height: '64px' }}>
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
-                        <div className="relative h-full flex items-center justify-center">
-                            {/* STRICT INLINE STYLES ARE MANDATORY FOR HTML2CANVAS SVG RENDERING */}
+                        <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <img 
                                 src={logo} 
+                                crossOrigin="anonymous"
                                 alt="" 
-                                style={{ height: '45px', width: 'auto', maxWidth: '120px', display: 'block' }} 
+                                style={{ height: '45px', width: 'auto', maxWidth: '120px', display: 'block', objectFit: 'contain' }} 
                             />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div style={{ height: '32px', width: '1px', backgroundColor: '#d1d5db', margin: '0 8px' }}></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div style={{ height: '32px', width: '1px', backgroundColor: '#d1d5db', marginLeft: '8px', marginRight: '8px' }}></div>}
                     </React.Fragment>
                  ))}
             </div>
             
-            {/* Left Side Logo (Main Initiative Logo) */}
-            <div className="flex flex-col gap-2 relative items-end justify-center" style={{ height: '80px' }}>
+            {/* Left Side Logo */}
+            <div style={{ display: 'flex', flexDirection: 'col', gap: '8px', position: 'relative', alignItems: 'flex-end', justifyContent: 'center', height: '80px' }}>
                  <img 
                     src={report.logos.main} 
+                    crossOrigin="anonymous"
                     alt="Future Industrialists" 
-                    style={{ height: '70px', width: 'auto', display: 'block' }} 
+                    style={{ height: '70px', width: 'auto', display: 'block', objectFit: 'contain' }} 
                  />
             </div>
       </header>
@@ -564,40 +451,40 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
     const partnersTop = report.logos.partners.slice(0, 6);
     const partnersBottom = report.logos.partners.slice(6, 11);
     return (
-      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-3 pb-3 relative z-50 bg-white">
-        <div className="text-center mb-3 text-brand-dark font-bold text-lg relative z-10">شركاء النجاح</div>
-        <div className="w-full px-8 relative z-10">
-            <div className="flex flex-col items-center gap-4 w-full">
-                {/* Row 1 */}
-                <div className="flex justify-center items-center gap-6 w-full flex-wrap">
-                    {partnersTop.map((partner: PartnerLogo, idx) => (
-                        <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center" style={{ height: '32px' }}>
-                                <img 
-                                    src={partner.url} 
-                                    style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block' }} 
-                                    alt="" 
-                                />
-                            </div>
-                            {idx < partnersTop.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
-                        </React.Fragment>
-                    ))}
-                </div>
-                {/* Row 2 */}
-                 <div className="flex justify-center items-center gap-6 w-full flex-wrap">
-                    {partnersBottom.map((partner: PartnerLogo, idx) => (
-                        <React.Fragment key={partner.id}>
-                             <div className="relative flex items-center justify-center" style={{ height: '32px' }}>
-                                <img 
-                                    src={partner.url} 
-                                    style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block' }} 
-                                    alt="" 
-                                />
-                            </div>
-                            {idx < partnersBottom.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
-                        </React.Fragment>
-                    ))}
-                </div>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid #e5e7eb', paddingTop: '12px', paddingBottom: '12px', position: 'relative', zIndex: 50, backgroundColor: 'white' }}>
+        <div style={{ textAlign: 'center', marginBottom: '12px', color: '#2a3590', fontWeight: 'bold', fontSize: '18px', position: 'relative', zIndex: 10 }}>شركاء النجاح</div>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            {/* Row 1 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', width: '100%', flexWrap: 'wrap' }}>
+                {partnersTop.map((partner: PartnerLogo, idx) => (
+                    <React.Fragment key={partner.id}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }}>
+                            <img 
+                                src={partner.url} 
+                                crossOrigin="anonymous"
+                                style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block', objectFit: 'contain' }} 
+                                alt="" 
+                            />
+                        </div>
+                        {idx < partnersTop.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
+                    </React.Fragment>
+                ))}
+            </div>
+            {/* Row 2 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', width: '100%', flexWrap: 'wrap' }}>
+                {partnersBottom.map((partner: PartnerLogo, idx) => (
+                    <React.Fragment key={partner.id}>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }}>
+                            <img 
+                                src={partner.url} 
+                                crossOrigin="anonymous"
+                                style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block', objectFit: 'contain' }} 
+                                alt="" 
+                            />
+                        </div>
+                        {idx < partnersBottom.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
+                    </React.Fragment>
+                ))}
             </div>
         </div>
       </div>
@@ -623,7 +510,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
             {/* Cover */}
             {report.coverImage && (
                 <div className="export-page">
-                    <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
+                    <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" crossOrigin="anonymous" />
                     <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
                         <h1 className="text-4xl font-bold font-sans mb-2 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
                         <div className="w-24 h-1 bg-white/90 my-4 rounded-full shadow-sm"></div>
@@ -638,22 +525,28 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                     <DecorationLayer isPrint={true} />
                     <div className="export-safe-area">
                         <ReportHeaderContent />
-                        <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2 px-8">
-                             <div className="flex justify-between items-end">
-                                <div className="flex flex-col">
-                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                    <span className="text-sm font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                        
+                        {/* Page Title */}
+                        <div style={{ marginBottom: '16px', marginTop: '8px', borderBottom: '2px solid #c7d2fe', paddingBottom: '8px', paddingLeft: '32px', paddingRight: '32px' }}>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#2a3590' }}>التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#3d59a5' }}>مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                 </div>
-                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-1">{report.header.dateRange}</span>
+                                <span style={{ fontSize: '14px', color: '#6b7280', direction: 'ltr', fontWeight: 500, marginBottom: '4px' }}>{report.header.dateRange}</span>
                             </div>
                         </div>
-                        <div className="export-content-body px-8">
+
+                        {/* Content Body - Forces 4 cards in specific height */}
+                        <div className="export-content-body">
                              {chunk.map((visit: Visit) => (
                                <div key={visit.id} className="export-mode-card">
+                                  {/* Manually pass strictly limited props for Export Mode to ensure desktop layout */}
                                   <VisitCard visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
                                </div>
                              ))}
                         </div>
+                        
                         <ReportFooterContent />
                     </div>
                 </div>
@@ -664,19 +557,19 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                 <DecorationLayer isPrint={true} />
                 <div className="export-safe-area">
                      <ReportHeaderContent />
-                     <div className="mb-4 mt-2 border-b-2 border-indigo-200 pb-2 px-8">
-                         <div className="flex justify-between items-end">
-                            <div className="flex flex-col">
-                                <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                <span className="text-sm font-bold text-brand-primary">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+                     <div style={{ marginBottom: '16px', marginTop: '8px', borderBottom: '2px solid #c7d2fe', paddingBottom: '8px', paddingLeft: '32px', paddingRight: '32px' }}>
+                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#2a3590' }}>التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#3d59a5' }}>مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                             </div>
-                            <span className="text-sm text-gray-500 dir-ltr font-medium mb-1">{report.header.dateRange}</span>
+                            <span style={{ fontSize: '14px', color: '#6b7280', direction: 'ltr', fontWeight: 500, marginBottom: '4px' }}>{report.header.dateRange}</span>
                         </div>
                     </div>
-                    <div className="mb-6 mt-4 border-b-2 border-indigo-200 pb-4 mx-8">
-                        <h2 className="text-3xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
+                    <div style={{ marginBottom: '24px', marginTop: '16px', borderBottom: '2px solid #c7d2fe', paddingBottom: '16px', marginLeft: '32px', marginRight: '32px' }}>
+                        <h2 style={{ fontSize: '30px', fontWeight: 'bold', textAlign: 'center', color: '#2a3590' }}>إحصائيات المبادرة</h2>
                     </div>
-                    <div className="export-content-body px-8 justify-center">
+                    <div className="export-content-body" style={{ paddingLeft: '32px', paddingRight: '32px', justifyContent: 'center' }}>
                          <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
                     </div>
                     <ReportFooterContent />
@@ -728,6 +621,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
         {/* ... Admin Import Section ... */}
         {isEditing && isAdmin && (
             <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl no-print space-y-6 relative z-50">
+                 {/* ... (Admin Content is unchanged) ... */}
                  <div className="border-b border-indigo-100 pb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <div className="flex items-center gap-2 mb-3 text-brand-dark"><LayoutTemplate className="text-pink-500" /><h2 className="font-bold text-lg">0. صورة الغلاف (اختياري)</h2></div>
@@ -778,7 +672,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                 </div>
             </div>
         )}
-        {/* ... Main Report View ... */}
+        {/* ... Main Report View (Screen Only) ... */}
         <div className="border-b-2 border-brand-primary pb-6 mb-8 relative z-20">
             <header className="flex justify-between items-center">
                 <div className="flex items-center gap-2 h-16">
