@@ -564,20 +564,20 @@ export default function App() {
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            {/* UPDATED: h-3 md:h-16 for smaller mobile logos */}
-            <div className="flex items-center gap-1 md:gap-4 h-3 md:h-16 print:h-12">
+            {/* UPDATED: h-10 md:h-20 for better visibility on mobile */}
+            <div className="flex items-center gap-1 md:gap-4 h-10 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            {/* UPDATED: max-h-2.5 for mobile */}
-                            <img src={logo} alt="" className="h-full object-contain max-h-[10px] md:max-h-14 print:max-h-10" />
+                            {/* UPDATED: max-h-[30px] for mobile */}
+                            <img src={logo} alt="" className="h-full object-contain max-h-[30px] md:max-h-14 print:max-h-10" />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-3 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            {/* UPDATED: h-5 md:h-20 for smaller mobile logo */}
-            <div className="flex flex-col gap-2 relative h-5 md:h-20 print:h-14 items-end justify-center">
+            {/* UPDATED: h-12 md:h-24 for main logo on mobile */}
+            <div className="flex flex-col gap-2 relative h-12 md:h-24 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -645,7 +645,12 @@ export default function App() {
       </div>
   );
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-10 h-10 text-brand-primary animate-spin" /></div>;
+  if (loading) return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
+          <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+          <p className="text-gray-500 font-medium animate-pulse">جاري تحميل البيانات، يرجى الانتظار...</p>
+      </div>
+  );
 
   return (
     <div className="min-h-screen pb-4 relative">
