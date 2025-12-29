@@ -121,9 +121,10 @@ export default function App() {
   // --- SERVER SIDE PDF EXPORT ---
   const exportReportPDF = async () => {
       if (isDirty) {
-          alert("يرجى حفظ التغييرات أولاً قبل التحميل");
+          alert("يرجى حفظ التغييرات أولاً قبل التحميل لضمان ظهور أحدث البيانات");
           return;
       }
+      
       setIsExporting(true);
       try {
           const response = await fetch('/api/pdf', {
@@ -132,7 +133,10 @@ export default function App() {
               body: JSON.stringify(report),
           });
 
-          if (!response.ok) throw new Error('فشل إنشاء ملف PDF من السيرفر');
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'فشل إنشاء ملف PDF من السيرفر');
+          }
 
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
@@ -142,12 +146,16 @@ export default function App() {
           a.download = `تقرير صناعيو المستقبل - ${safeWeek}.pdf`;
           document.body.appendChild(a);
           a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
+          
+          // Cleanup
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          }, 100);
 
-      } catch (error) {
+      } catch (error: any) {
           console.error("PDF Export Error:", error);
-          alert("حدث خطأ أثناء الاتصال بالسيرفر لإنشاء PDF.");
+          alert(`حدث خطأ أثناء الاتصال بالسيرفر: ${error.message}`);
       } finally {
           setIsExporting(false);
       }
@@ -498,8 +506,8 @@ export default function App() {
       {isExporting && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex flex-col items-center justify-center p-4">
               <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-4" />
-              <h2 className="text-white text-xl font-bold mb-2">جاري إنشاء التقرير...</h2>
-              <p className="text-white/70 text-sm">يتم معالجة الصفحات والصور بجودة عالية في السيرفر.</p>
+              <h2 className="text-white text-xl font-bold mb-2">جاري إنشاء ملف PDF...</h2>
+              <p className="text-white/70 text-sm">يتم معالجة الصور والنصوص في السيرفر لضمان أعلى جودة.</p>
           </div>
       )}
       {isEditing && activeDecoId && (
