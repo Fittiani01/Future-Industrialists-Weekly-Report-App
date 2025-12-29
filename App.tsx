@@ -507,7 +507,6 @@ export default function App() {
           <div className="fixed inset-0 z-[10000] bg-black/80 flex flex-col items-center justify-center p-4">
               <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-4" />
               <h2 className="text-white text-xl font-bold mb-2">جاري إنشاء ملف PDF...</h2>
-              <p className="text-white/70 text-sm">يتم معالجة الصور والنصوص في السيرفر لضمان أعلى جودة.</p>
           </div>
       )}
       {isEditing && activeDecoId && (

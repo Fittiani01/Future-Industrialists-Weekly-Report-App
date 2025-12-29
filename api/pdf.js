@@ -2,7 +2,7 @@ import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 
 export const config = {
-  maxDuration: 60, // Extend timeout for image fetching
+  maxDuration: 60, 
 };
 
 const getBrowser = async () => {
@@ -48,7 +48,7 @@ const generateHTML = (report) => {
 
     .page {
         width: 210mm;
-        height: 296.5mm; /* Tiny bit short of 297mm to prevent overflow blank page */
+        height: 296.5mm; 
         position: relative;
         overflow: hidden;
         page-break-after: always;
@@ -105,7 +105,7 @@ const generateHTML = (report) => {
         background: white;
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: none; /* Shadow removed for cleaner print */
+        box-shadow: none; 
         border: 1px solid #eee;
     }
     .card-header {
@@ -318,16 +318,26 @@ export default async function handler(req, res) {
 
         const html = generateHTML(report);
         
-        // Wait for network idle (images loaded)
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        // Use 'domcontentloaded' which is faster than 'networkidle0'
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
         
-        // Wait specifically for fonts
-        await page.evaluateHandle('document.fonts.ready');
+        // Custom wait for all images to actually load
+        await page.evaluate(async () => {
+            const selectors = Array.from(document.querySelectorAll('img'));
+            await Promise.all(selectors.map(img => {
+                if (img.complete) return;
+                return new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                });
+            }));
+            await document.fonts.ready;
+        });
 
         const pdf = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: 0, right: 0, bottom: 0, left: 0 } // Full bleed, CSS handles margins
+            margin: { top: 0, right: 0, bottom: 0, left: 0 } // Full bleed
         });
 
         await browser.close();
