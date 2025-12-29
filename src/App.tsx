@@ -76,7 +76,9 @@ export default function App() {
         }
 
         try {
-            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "desc"));
+            // UPDATED: 'asc' so Oldest (Week 1) is first.
+            // In RTL layout, the first item is on the RIGHT.
+            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
             
@@ -87,6 +89,8 @@ export default function App() {
 
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
+                // UPDATED: Set index to the LAST element (Newest report)
+                setCurrentReportIndex(loadedReports.length - 1);
             } else {
                 setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`}]);
             }
@@ -361,8 +365,10 @@ export default function App() {
           decorations: report.decorations || [],
           createdAt: serverTimestamp() 
       };
-      setReports(prev => [newReport, ...prev]); 
-      setCurrentReportIndex(0);
+      // UPDATED: Add to the END (Left side in RTL)
+      setReports(prev => [...prev, newReport]); 
+      // Focus on the new report (Last Index)
+      setCurrentReportIndex(reports.length);
       setIsDirty(true);
   };
 
@@ -383,7 +389,8 @@ export default function App() {
                   await deleteDoc(doc(db, "weeklyReports", reportId));
                   const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
                   setReports(newReports);
-                  setCurrentReportIndex(0);
+                  // UPDATED: Focus on last element (newest)
+                  setCurrentReportIndex(Math.max(0, newReports.length - 1));
                   setIsDirty(false);
               } catch (e) {
                   console.error("Error deleting doc:", e);
@@ -602,17 +609,20 @@ export default function App() {
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12">
+            {/* UPDATED: h-4 for mobile, md:h-16 */}
+            <div className="flex items-center gap-1 md:gap-4 h-4 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" />
+                             {/* UPDATED: max-h-3 for mobile, md:max-h-14 */}
+                            <img src={logo} alt="" className="h-full object-contain max-h-3 md:max-h-14 print:max-h-10" />
                         </div>
                         {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
+             {/* UPDATED: h-6 for mobile, md:h-20 */}
+            <div className="flex flex-col gap-2 relative h-6 md:h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -891,18 +901,18 @@ export default function App() {
         {/* --- REPORT HEADER --- */}
         <div className="border-b-2 border-brand-primary pb-6 mb-8 relative z-20">
             <header className="flex justify-between items-center">
-                <div className="flex items-center gap-2 h-16">
-                    {report.logos.rightLogos.map((logo, idx) => (
+                <div className="flex items-center gap-1 md:gap-4 h-4 md:h-16 print:h-12">
+                     {report.logos.rightLogos.map((logo, idx) => (
                         <React.Fragment key={idx}>
                             <div className="relative group h-full flex items-center">
-                                <img src={logo} alt="" className={`h-full object-contain max-h-14 ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={() => isEditing && rightLogoRefs.current[idx]?.click()} />
+                                <img src={logo} alt="" className={`h-full object-contain max-h-3 md:max-h-14 print:max-h-10 ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={() => isEditing && rightLogoRefs.current[idx]?.click()} />
                                 <input type="file" ref={el => { rightLogoRefs.current[idx] = el; }} onChange={handleLogoUpdate('right', idx)} className="hidden" accept="image/*,.svg" />
                             </div>
-                            {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
+                            {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                         </React.Fragment>
-                    ))}
+                     ))}
                 </div>
-                <div className="flex flex-col gap-2 relative group h-20 items-end justify-center">
+                <div className="flex flex-col gap-2 relative group h-6 md:h-20 print:h-14 items-end justify-center">
                     <img src={report.logos.main} alt="Future Industrialists" className={`h-full object-contain ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={() => isEditing && mainLogoRef.current?.click()} />
                     <input type="file" ref={mainLogoRef} onChange={handleLogoUpdate('main')} className="hidden" accept="image/*,.svg" />
                 </div>

@@ -1,7 +1,7 @@
 export async function compressImage(
   file: File,
-  maxWidth = 1600,
-  quality = 0.75
+  maxWidth = 1280, // Reduced from 1600 to save size
+  quality = 0.65   // Reduced from 0.75 to save size
 ): Promise<File> {
   // 1. Skip SVGs entirely to preserve vector scaling and transparency.
   if (file.type === 'image/svg+xml') {
@@ -41,6 +41,8 @@ export async function compressImage(
     // If original supported transparency, output PNG. Otherwise JPEG.
     const outType = supportsTransparency ? "image/png" : "image/jpeg";
     
+    // For PNG, quality parameter is ignored by many browsers, but we set it anyway.
+    // For JPEG, this will significantly reduce size.
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error("Compression failed"))),
