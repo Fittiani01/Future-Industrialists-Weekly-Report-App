@@ -644,7 +644,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
             </div>
         </div>
       </div>
-      <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto pt-6 px-6 pb-6 md:pt-12 md:px-12 md:pb-8 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
+      <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto p-6 md:p-12 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
         {/* ... Admin Import Section ... */}
         {isEditing && isAdmin && (
             <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl no-print space-y-6 relative z-50">
@@ -761,7 +761,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
             )}
             <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={isEditing} onUpdate={handleUpdateStats} onLogoUpdate={(key) => handleLogoUpdate('categories', key)} />
         </div>
-        <div className="mt-4 pt-4 border-t border-gray-200 relative pb-0 z-20">
+        <div className="mt-8 pt-4 border-t border-gray-200 relative pb-4 z-20">
              <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
              <div className="w-full px-4 relative z-10">
                 <div className="md:hidden w-full flex flex-wrap justify-center items-center gap-y-6 px-2">
