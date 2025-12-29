@@ -26,6 +26,7 @@ export default function App() {
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   
   // Admin Mode State - Default to FALSE (Public view)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -46,7 +47,10 @@ export default function App() {
   const [isAnalyzingLogos, setIsAnalyzingLogos] = useState(false);
   const [imageMatchStatus, setImageMatchStatus] = useState<string>("");
   const [logoMatchStatus, setLogoMatchStatus] = useState<string>("");
+  
+  // Image Viewer State
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isViewerImageLoading, setIsViewerImageLoading] = useState(false);
 
   // Refs
   const wordInputRef = useRef<HTMLInputElement>(null);
@@ -150,14 +154,19 @@ export default function App() {
 
   // --- Printing Handler (Set File Name) ---
   const handlePrint = () => {
+      setIsPrinting(true);
       const originalTitle = document.title;
       const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
       const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
       document.title = `${safeWeek} - ${safeDate}`;
-      window.print();
+      
+      // Allow the UI to update to show the loading overlay before blocking with window.print()
       setTimeout(() => {
+          window.print();
+          // Reset after print dialog closes (or immediately if it's non-blocking in some browsers)
+          setIsPrinting(false);
           document.title = originalTitle;
-      }, 1000);
+      }, 800);
   };
 
   // --- Update Helpers ---
@@ -654,6 +663,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-4 relative">
+      {/* Print Loading Overlay */}
+      {isPrinting && (
+          <div className="fixed inset-0 z-[9999] bg-white/95 flex flex-col items-center justify-center">
+              <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-4" />
+              <h2 className="text-2xl font-bold text-brand-dark mb-2">جاري تجهيز ملف الطباعة...</h2>
+              <p className="text-gray-500">يرجى الانتظار حتى تظهر نافذة الطباعة</p>
+          </div>
+      )}
+
       {isEditing && activeDecoId && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[3000] bg-white shadow-2xl rounded-full px-6 py-3 border border-gray-200 flex items-center gap-6 animate-fade-in no-print">
               <span className="text-xs font-bold text-gray-500 hidden md:block">تحكم بالزخرفة:</span>
@@ -730,10 +748,23 @@ export default function App() {
 
       {/* ======================= SCREEN VIEW ======================= */}
       {selectedImage && (
-        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 animate-fade-in no-print" onClick={() => setSelectedImage(null)}>
-            <div className="relative max-w-5xl max-h-[90vh] animate-zoom-in">
-                 <button onClick={() => setSelectedImage(null)} className="absolute -top-12 right-0 text-white hover:text-gray-300"><X size={32} /></button>
-                 <img src={selectedImage} alt="View" className="max-h-[85vh] max-w-full object-contain rounded-lg" />
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-fade-in no-print" onClick={() => setSelectedImage(null)}>
+            <div className="relative max-w-5xl max-h-[90vh] animate-zoom-in w-full h-full flex items-center justify-center">
+                 <button onClick={() => setSelectedImage(null)} className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black/50 rounded-full p-2 z-50"><X size={32} /></button>
+                 
+                 {isViewerImageLoading && (
+                     <div className="absolute inset-0 flex items-center justify-center">
+                         <Loader2 className="w-12 h-12 text-white animate-spin" />
+                     </div>
+                 )}
+                 
+                 <img 
+                    src={selectedImage} 
+                    alt="View" 
+                    className={`max-h-[85vh] max-w-full object-contain rounded-lg transition-opacity duration-300 ${isViewerImageLoading ? 'opacity-0' : 'opacity-100'}`}
+                    onLoad={() => setIsViewerImageLoading(false)}
+                    onLoadStart={() => setIsViewerImageLoading(true)}
+                 />
             </div>
         </div>
       )}
@@ -835,7 +866,10 @@ export default function App() {
                         isEditing={isEditing} 
                         onUpdate={handleUpdateVisit}
                         onDelete={handleDeleteVisit}
-                        onImageClick={(url) => setSelectedImage(url)}
+                        onImageClick={(url) => {
+                             setSelectedImage(url);
+                             setIsViewerImageLoading(true); // Reset loading state for new image
+                        }}
                         onUploadImages={(files) => handleManualVisitImageUpload(files, visit.id)}
                         onUploadLogo={(file) => handleVisitLogoUpload(file, visit.id)}
                     />

@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Visit } from '../types';
-import { Building2, Calendar, Users, Upload, X, ImagePlus, ZoomIn, Factory } from 'lucide-react';
+import { Building2, Calendar, Users, Upload, X, ImagePlus, ZoomIn, Factory, Loader2 } from 'lucide-react';
 
 interface VisitCardProps {
   visit: Visit;
@@ -11,6 +11,55 @@ interface VisitCardProps {
   onUploadImages?: (files: File[]) => Promise<string[]>;
   onUploadLogo?: (file: File) => Promise<string>;
 }
+
+// Sub-component for individual image handling (loading state)
+const VisitImageItem = ({ 
+    src, 
+    idx, 
+    isEditing, 
+    onDelete, 
+    onClick 
+}: { 
+    src: string, 
+    idx: number, 
+    isEditing: boolean, 
+    onDelete: () => void, 
+    onClick: () => void 
+}) => {
+    const [isLoading, setIsLoading] = useState(true);
+
+    return (
+        <div 
+            className={`relative aspect-video bg-gray-200 rounded-lg print:rounded-md overflow-hidden border border-gray-300 print:border-none flex items-center justify-center group shadow-sm print:shadow-none ${!isEditing ? 'cursor-zoom-in' : ''}`}
+            onClick={onClick}
+        >
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                </div>
+            )}
+            <img 
+                src={src} 
+                alt={`Visit ${idx + 1}`} 
+                className={`w-full h-full object-cover transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                onLoad={() => setIsLoading(false)} 
+            />
+            {isEditing && (
+                <button 
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                >
+                <X size={12} />
+                </button>
+            )}
+            {!isEditing && !isLoading && (
+                <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                    <ZoomIn className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" size={20} />
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate, onDelete, onImageClick, onUploadImages, onUploadLogo }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -217,49 +266,38 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
       <div className="p-2 md:p-3 print:px-1 print:pt-1 bg-gray-50/50 print:bg-transparent">
         <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-2 print:gap-1.5">
             {[0, 1, 2, 3].map((idx) => (
-                <div 
-                    key={idx} 
-                    className={`relative aspect-video bg-gray-200 rounded-lg print:rounded-md overflow-hidden border border-gray-300 print:border-none flex items-center justify-center group shadow-sm print:shadow-none ${!isEditing && visit.images[idx] ? 'cursor-zoom-in' : ''}`}
-                    onClick={() => !isEditing && visit.images[idx] && onImageClick(visit.images[idx])}
-                >
+                <React.Fragment key={idx}>
                     {visit.images[idx] ? (
-                        <>
-                           <img src={visit.images[idx]} alt={`Visit ${idx + 1}`} className="w-full h-full object-cover" />
-                           {isEditing && (
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); const newImages = [...visit.images]; newImages.splice(idx, 1); onUpdate(visit.id, { images: newImages }); }}
-                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                             >
-                                <X size={12} />
-                             </button>
-                           )}
-                           {!isEditing && (
-                                <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
-                                    <ZoomIn className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" size={20} />
-                                </div>
-                           )}
-                        </>
+                        <VisitImageItem 
+                            src={visit.images[idx]} 
+                            idx={idx} 
+                            isEditing={isEditing} 
+                            onDelete={() => { const newImages = [...visit.images]; newImages.splice(idx, 1); onUpdate(visit.id, { images: newImages }); }}
+                            onClick={() => !isEditing && onImageClick(visit.images[idx])}
+                        />
                     ) : (
-                        <div className="flex flex-col items-center justify-center text-gray-400">
-                            {isEditing ? (
-                                <>
-                                    <input 
-                                        type="file" 
-                                        multiple 
-                                        accept="image/*"
-                                        className="absolute inset-0 opacity-0 cursor-pointer"
-                                        onChange={handleImageUpload}
-                                        title="رفع صور"
-                                    />
-                                    <Upload size={20} className="mb-1" />
-                                    <span className="text-[10px]">رفع صور</span>
-                                </>
-                            ) : (
-                                <ImagePlus size={20} className="opacity-50" />
-                            )}
+                        <div className="relative aspect-video bg-gray-200 rounded-lg print:rounded-md overflow-hidden border border-gray-300 print:border-none flex items-center justify-center group shadow-sm print:shadow-none">
+                            <div className="flex flex-col items-center justify-center text-gray-400">
+                                {isEditing ? (
+                                    <>
+                                        <input 
+                                            type="file" 
+                                            multiple 
+                                            accept="image/*"
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                            onChange={handleImageUpload}
+                                            title="رفع صور"
+                                        />
+                                        <Upload size={20} className="mb-1" />
+                                        <span className="text-[10px]">رفع صور</span>
+                                    </>
+                                ) : (
+                                    <ImagePlus size={20} className="opacity-50" />
+                                )}
+                            </div>
                         </div>
                     )}
-                </div>
+                </React.Fragment>
             ))}
         </div>
       </div>
