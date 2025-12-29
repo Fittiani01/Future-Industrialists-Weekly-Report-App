@@ -134,8 +134,8 @@ export default function App() {
           });
 
           if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.message || 'فشل إنشاء ملف PDF من السيرفر');
+            const err = await response.json().catch(() => ({ message: response.statusText }));
+            throw new Error(err.message || `Server error: ${response.status}`);
           }
 
           const blob = await response.blob();
@@ -147,7 +147,6 @@ export default function App() {
           document.body.appendChild(a);
           a.click();
           
-          // Cleanup
           setTimeout(() => {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
@@ -155,7 +154,7 @@ export default function App() {
 
       } catch (error: any) {
           console.error("PDF Export Error:", error);
-          alert(`حدث خطأ أثناء الاتصال بالسيرفر: ${error.message}`);
+          alert(`فشل التصدير: ${error.message}\nتأكد من سرعة الانترنت وحجم الصور.`);
       } finally {
           setIsExporting(false);
       }
