@@ -131,15 +131,13 @@ export default function App() {
       setExportProgress("جاري تحضير الصفحات...");
       
       // Wait for DOM to render the export-container
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1500)); // Increased delay for images
 
       try {
           const pages = document.querySelectorAll('.export-page');
           if (pages.length === 0) throw new Error("لم يتم العثور على صفحات للتصدير");
 
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const pdf = new jsPDF('p', 'px', [794, 1123]); // Strict A4 pixels
           
           for (let i = 0; i < pages.length; i++) {
               setExportProgress(`جاري معالجة الصفحة ${i + 1} من ${pages.length}...`);
@@ -157,22 +155,22 @@ export default function App() {
               }));
 
               // Capture with Forced Desktop Width
-              // 794px is approx A4 width at 96dpi. We use windowWidth 1600 to ensure desktop mode logic,
-              // but strict CSS on .export-container handles the layout.
+              // Strict width matches CSS
               const canvas = await html2canvas(pageElement, {
-                  scale: 2, // High quality
-                  useCORS: true, // Critical for Firebase images
+                  scale: 1.5, // Standard quality
+                  useCORS: true,
                   logging: false,
                   allowTaint: true,
                   backgroundColor: '#ffffff',
-                  windowWidth: 1600, // Forces desktop layout logic even on mobile
-                  windowHeight: 1200
+                  width: 794,
+                  height: 1123,
+                  windowWidth: 1600, // Forces desktop layout logic 
               });
 
-              const imgData = canvas.toDataURL('image/jpeg', 0.9);
+              const imgData = canvas.toDataURL('image/jpeg', 0.95);
               
               if (i > 0) pdf.addPage();
-              pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+              pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
           }
 
           setExportProgress("جاري حفظ الملف...");
@@ -200,9 +198,6 @@ export default function App() {
   };
 
   // ... (Decorations, Saving, File Parsing logic is same as before) ...
-  // [Truncated for brevity, assuming standard logic remains]
-  // Only critical Render functions changed below.
-
   const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
     if (!isEditing) return;
     e.stopPropagation();
@@ -413,82 +408,65 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
       </div>
   );
 
-  // --- STRICT EXPORT COMPONENTS ---
+  // --- STRICT EXPORT HEADER / FOOTER / LAYOUT ---
   // Using explicit Inline CSS to prevent SVG scaling issues in html2canvas
 
-  const ReportHeaderContent = () => (
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px', paddingTop: '24px', position: 'relative', zIndex: 20 }}>
-            {/* Right Side Logos */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', height: '64px' }}>
-                 {report.logos.rightLogos.map((logo, idx) => (
+  const ExportHeader = () => (
+      <div className="export-header-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
+            {/* Right Logos */}
+            <div style={{ display: 'flex', gap: '10px', height: '60px', alignItems: 'center' }}>
+                {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
-                        <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <img 
-                                src={logo} 
-                                crossOrigin="anonymous"
-                                alt="" 
-                                style={{ height: '45px', width: 'auto', maxWidth: '120px', display: 'block', objectFit: 'contain' }} 
-                            />
-                        </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div style={{ height: '32px', width: '1px', backgroundColor: '#d1d5db', marginLeft: '8px', marginRight: '8px' }}></div>}
-                    </React.Fragment>
-                 ))}
-            </div>
-            
-            {/* Left Side Logo */}
-            <div style={{ display: 'flex', flexDirection: 'col', gap: '8px', position: 'relative', alignItems: 'flex-end', justifyContent: 'center', height: '80px' }}>
-                 <img 
-                    src={report.logos.main} 
-                    crossOrigin="anonymous"
-                    alt="Future Industrialists" 
-                    style={{ height: '70px', width: 'auto', display: 'block', objectFit: 'contain' }} 
-                 />
-            </div>
-      </header>
-  );
-
-  const ReportFooterContent = () => {
-    const partnersTop = report.logos.partners.slice(0, 6);
-    const partnersBottom = report.logos.partners.slice(6, 11);
-    return (
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid #e5e7eb', paddingTop: '12px', paddingBottom: '12px', position: 'relative', zIndex: 50, backgroundColor: 'white' }}>
-        <div style={{ textAlign: 'center', marginBottom: '12px', color: '#2a3590', fontWeight: 'bold', fontSize: '18px', position: 'relative', zIndex: 10 }}>شركاء النجاح</div>
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-            {/* Row 1 */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', width: '100%', flexWrap: 'wrap' }}>
-                {partnersTop.map((partner: PartnerLogo, idx) => (
-                    <React.Fragment key={partner.id}>
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }}>
-                            <img 
-                                src={partner.url} 
-                                crossOrigin="anonymous"
-                                style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block', objectFit: 'contain' }} 
-                                alt="" 
-                            />
-                        </div>
-                        {idx < partnersTop.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
+                         <img src={logo} crossOrigin="anonymous" style={{ height: '50px', width: 'auto', maxWidth: '100px', objectFit: 'contain' }} />
+                         {idx < 3 && <div style={{ height: '30px', width: '1px', background: '#ccc' }}></div>}
                     </React.Fragment>
                 ))}
             </div>
-            {/* Row 2 */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', width: '100%', flexWrap: 'wrap' }}>
-                {partnersBottom.map((partner: PartnerLogo, idx) => (
-                    <React.Fragment key={partner.id}>
-                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px' }}>
-                            <img 
-                                src={partner.url} 
-                                crossOrigin="anonymous"
-                                style={{ height: '30px', width: 'auto', maxWidth: '80px', display: 'block', objectFit: 'contain' }} 
-                                alt="" 
-                            />
-                        </div>
-                        {idx < partnersBottom.length - 1 && <div style={{ height: '20px', width: '1px', backgroundColor: '#d1d5db' }}></div>}
-                    </React.Fragment>
-                ))}
-            </div>
+            {/* Main Logo */}
+            <img src={report.logos.main} crossOrigin="anonymous" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
         </div>
       </div>
-  )};
+  );
+
+  const ExportFooter = () => {
+    const top = report.logos.partners.slice(0, 6);
+    const bottom = report.logos.partners.slice(6, 11);
+    return (
+        <div className="export-footer-section">
+            <div style={{ color: '#2a3590', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>شركاء النجاح</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
+                    {top.map((p, i) => (
+                        <React.Fragment key={i}>
+                            <img src={p.url} crossOrigin="anonymous" style={{ height: '25px', width: 'auto', maxWidth: '60px', objectFit: 'contain' }} />
+                            {i < top.length - 1 && <div style={{ height: '15px', width: '1px', background: '#ccc' }}></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+                 <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
+                    {bottom.map((p, i) => (
+                        <React.Fragment key={i}>
+                            <img src={p.url} crossOrigin="anonymous" style={{ height: '25px', width: 'auto', maxWidth: '60px', objectFit: 'contain' }} />
+                            {i < bottom.length - 1 && <div style={{ height: '15px', width: '1px', background: '#ccc' }}></div>}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+  };
+
+  const ExportPageTitle = () => (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #a5b4fc', paddingBottom: '8px', marginBottom: '10px' }}>
+          <div>
+              <h1 style={{ fontSize: '18px', fontWeight: 'bold', color: '#2a3590', margin: 0 }}>التقرير الأسبوعي ({report.header.weekTitle})</h1>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#3d59a5' }}>مبادرة صناعيو المستقبل – النسخة الرابعة</span>
+          </div>
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', direction: 'ltr' }}>{report.header.dateRange}</span>
+      </div>
+  );
+
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-10 h-10 text-brand-primary animate-spin" /></div>;
 
@@ -504,9 +482,9 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
           </div>
       )}
 
-      {/* EXPORT DOM STRUCTURE (Invisible but rendered) */}
+      {/* EXPORT DOM STRUCTURE (Strict Fixed Layout) */}
       {isExporting && (
-         <div className="export-container print:block">
+         <div className="export-container">
             {/* Cover */}
             {report.coverImage && (
                 <div className="export-page">
@@ -524,30 +502,20 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                 <div key={`page-${pageIndex}`} className="export-page">
                     <DecorationLayer isPrint={true} />
                     <div className="export-safe-area">
-                        <ReportHeaderContent />
-                        
-                        {/* Page Title */}
-                        <div style={{ marginBottom: '16px', marginTop: '8px', borderBottom: '2px solid #c7d2fe', paddingBottom: '8px', paddingLeft: '32px', paddingRight: '32px' }}>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#2a3590' }}>التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#3d59a5' }}>مبادرة صناعيو المستقبل – النسخة الرابعة</span>
-                                </div>
-                                <span style={{ fontSize: '14px', color: '#6b7280', direction: 'ltr', fontWeight: 500, marginBottom: '4px' }}>{report.header.dateRange}</span>
-                            </div>
-                        </div>
+                        <ExportHeader />
+                        <ExportPageTitle />
 
                         {/* Content Body - Forces 4 cards in specific height */}
                         <div className="export-content-body">
                              {chunk.map((visit: Visit) => (
                                <div key={visit.id} className="export-mode-card">
-                                  {/* Manually pass strictly limited props for Export Mode to ensure desktop layout */}
+                                  {/* Wrapping VisitCard to ensure it renders correctly in export mode */}
                                   <VisitCard visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
                                </div>
                              ))}
                         </div>
                         
-                        <ReportFooterContent />
+                        <ExportFooter />
                     </div>
                 </div>
             ))}
@@ -556,23 +524,17 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
             <div className="export-page">
                 <DecorationLayer isPrint={true} />
                 <div className="export-safe-area">
-                     <ReportHeaderContent />
-                     <div style={{ marginBottom: '16px', marginTop: '8px', borderBottom: '2px solid #c7d2fe', paddingBottom: '8px', paddingLeft: '32px', paddingRight: '32px' }}>
-                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#2a3590' }}>التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#3d59a5' }}>مبادرة صناعيو المستقبل – النسخة الرابعة</span>
-                            </div>
-                            <span style={{ fontSize: '14px', color: '#6b7280', direction: 'ltr', fontWeight: 500, marginBottom: '4px' }}>{report.header.dateRange}</span>
-                        </div>
+                     <ExportHeader />
+                     <ExportPageTitle />
+                    
+                    <div style={{ textAlign: 'center', marginBottom: '15px', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
+                        <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#2a3590' }}>إحصائيات المبادرة</h2>
                     </div>
-                    <div style={{ marginBottom: '24px', marginTop: '16px', borderBottom: '2px solid #c7d2fe', paddingBottom: '16px', marginLeft: '32px', marginRight: '32px' }}>
-                        <h2 style={{ fontSize: '30px', fontWeight: 'bold', textAlign: 'center', color: '#2a3590' }}>إحصائيات المبادرة</h2>
-                    </div>
-                    <div className="export-content-body" style={{ paddingLeft: '32px', paddingRight: '32px', justifyContent: 'center' }}>
+
+                    <div className="export-content-body">
                          <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
                     </div>
-                    <ReportFooterContent />
+                    <ExportFooter />
                 </div>
             </div>
          </div>

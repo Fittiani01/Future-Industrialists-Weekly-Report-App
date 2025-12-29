@@ -115,10 +115,9 @@
       /* --- UNIFIED EXPORT STRATEGY CSS --- */
       
       /* 
-         Standard A4 is 210mm x 297mm.
-         At 96 DPI (standard screen), 1mm approx 3.78px.
-         Width: ~794px
-         Height: ~1123px
+         STRICT PIXEL-PERFECT A4 LAYOUT
+         Width: 794px (A4 @ 96DPI)
+         Height: 1123px
       */
 
       .export-container {
@@ -126,36 +125,58 @@
          top: 0;
          left: 0;
          z-index: -9999;
-         /* Strictly fix the width to simulate desktop A4 size */
          width: 794px !important;
          min-width: 794px !important;
          max-width: 794px !important;
          margin: 0;
          padding: 0;
-         /* Push off-screen horizontally so user doesn't see it, but it exists in DOM */
-         transform: translateX(-200%); 
+         /* Move it far away but keep it rendered */
+         left: -2000px;
+         background: white;
       }
       
       .export-page {
          width: 794px !important;
-         height: 1123px !important; /* Strict A4 Height */
+         height: 1123px !important;
          background: white;
          position: relative;
          overflow: hidden;
          display: flex;
          flex-direction: column;
-         margin-bottom: 0;
+         margin: 0;
+         padding: 0;
          box-sizing: border-box;
       }
 
+      /* Safe Area: 10px margins + strict internal layout */
       .export-safe-area {
          width: 100%;
          height: 100%;
-         /* Padding: Top 20px, Sides 30px */
-         padding: 20px 30px 0 30px;
+         padding: 15px 25px; 
          display: flex;
          flex-direction: column;
-         justify-content: space-between;
+         justify-content: flex-start;
+         box-sizing: border-box;
+      }
+
+      .export-header-section {
+          height: 90px;
+          width: 100%;
+          border-bottom: 2px solid #e5e7eb;
+          margin-bottom: 10px;
+          flex-shrink: 0;
+      }
+
+      .export-footer-section {
+          height: 110px;
+          width: 100%;
+          border-top: 1px solid #e5e7eb;
+          margin-top: auto;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
       }
 
       .export-content-body {
@@ -163,14 +184,20 @@
          display: flex;
          flex-direction: column;
          justify-content: flex-start;
-         gap: 15px; /* Consistent gap between visits */
-         padding-top: 10px;
-         padding-bottom: 5px;
+         gap: 15px; 
+         padding-top: 5px;
       }
 
+      /* Force visits to fit */
       .export-mode-card {
          width: 100%;
-         /* Removed generic transform scaling to rely on correct layout first */
+         height: 215px; /* Rigid height for 4 cards per page */
+         overflow: hidden;
+         border: 1px solid #e5e7eb;
+         border-radius: 8px;
+         background: white;
+         box-shadow: none !important;
+         margin-bottom: 0 !important;
       }
 
       /* Standard Print Media Query (Legacy Fallback) */
@@ -192,8 +219,8 @@
     "mammoth": "https://esm.sh/mammoth@^1.11.0",
     "html2canvas": "https://esm.sh/html2canvas@1.4.1",
     "jspdf": "https://esm.sh/jspdf@2.5.1",
-    "@sparticuz/chromium": "https://esm.sh/@sparticuz/chromium@^143.0.0",
-    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.34.0"
+    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.34.0",
+    "@sparticuz/chromium": "https://esm.sh/@sparticuz/chromium@^143.0.0"
   }
 }
 </script>
