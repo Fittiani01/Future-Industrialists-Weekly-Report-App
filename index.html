@@ -115,11 +115,10 @@
       /* --- UNIFIED EXPORT STRATEGY CSS --- */
       
       /* 
-         STRICT PIXEL-PERFECT A4 LAYOUT
-         Width: 794px (A4 @ 96DPI)
-         Height: 1123px
+         This container is pushed off-screen but exists in the DOM.
+         It forces a strict width of 794px (A4 @ 96 DPI) so html2canvas
+         sees a "Desktop" layout even on mobile.
       */
-
       .export-container {
          position: fixed;
          top: 0;
@@ -128,16 +127,13 @@
          width: 794px !important;
          min-width: 794px !important;
          max-width: 794px !important;
-         margin: 0;
-         padding: 0;
-         /* Move it far away but keep it rendered */
-         left: -2000px;
+         transform: translateX(-200vw); /* Hide it */
          background: white;
       }
       
       .export-page {
          width: 794px !important;
-         height: 1123px !important;
+         height: 1123px !important; /* Strict A4 Height */
          background: white;
          position: relative;
          overflow: hidden;
@@ -148,17 +144,18 @@
          box-sizing: border-box;
       }
 
-      /* Safe Area: 10px margins + strict internal layout */
+      /* Padding inside the A4 page */
       .export-safe-area {
          width: 100%;
          height: 100%;
-         padding: 15px 25px; 
+         padding: 20px 30px; 
          display: flex;
          flex-direction: column;
          justify-content: flex-start;
          box-sizing: border-box;
       }
 
+      /* Explicit sections for Header/Content/Footer to ensure alignment */
       .export-header-section {
           height: 90px;
           width: 100%;
@@ -168,7 +165,7 @@
       }
 
       .export-footer-section {
-          height: 110px;
+          height: 100px;
           width: 100%;
           border-top: 1px solid #e5e7eb;
           margin-top: auto;
@@ -177,6 +174,7 @@
           flex-direction: column;
           align-items: center;
           justify-content: center;
+          background: white;
       }
 
       .export-content-body {
@@ -184,23 +182,53 @@
          display: flex;
          flex-direction: column;
          justify-content: flex-start;
-         gap: 15px; 
+         gap: 12px; 
          padding-top: 5px;
       }
 
-      /* Force visits to fit */
+      /* 
+         Rigid Card Height Calculation:
+         Page Height (1123) - Header (90) - Footer (100) - Padding (40) - Gaps (36) 
+         Remaining ≈ 857px. 
+         857 / 4 visits ≈ 214px per card.
+         We set it to 215px to be safe and fill space.
+      */
       .export-mode-card {
          width: 100%;
-         height: 215px; /* Rigid height for 4 cards per page */
+         height: 215px !important;
+         max-height: 215px !important;
          overflow: hidden;
          border: 1px solid #e5e7eb;
          border-radius: 8px;
          background: white;
          box-shadow: none !important;
          margin-bottom: 0 !important;
+         page-break-inside: avoid;
       }
 
-      /* Standard Print Media Query (Legacy Fallback) */
+      .export-card-header {
+         height: 45px;
+         padding: 0 10px;
+         display: flex;
+         align-items: center;
+         color: white;
+      }
+
+      .export-image-grid {
+         height: 168px; /* Remaining height inside card */
+         display: flex;
+         flex-wrap: wrap;
+         padding: 2px;
+         gap: 2px;
+      }
+      
+      .export-visit-img {
+         width: calc(50% - 1px);
+         height: calc(50% - 1px);
+         object-fit: cover;
+      }
+
+      /* Print fallback */
       @media print {
         @page { size: A4; margin: 0; }
         html, body { width: 210mm; height: auto; background: white; }

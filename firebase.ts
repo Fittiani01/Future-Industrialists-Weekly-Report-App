@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 
@@ -14,10 +14,12 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with offline persistence enabled
+// Initialize Firestore with robust persistence settings to handle offline/unstable connections
+// Fixed error: cacheSizeBytes must be configured inside the localCache object when using persistentLocalCache
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
+    tabManager: persistentMultipleTabManager(),
+    cacheSizeBytes: CACHE_SIZE_UNLIMITED
   })
 });
 

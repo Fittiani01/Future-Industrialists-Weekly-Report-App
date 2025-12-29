@@ -20,6 +20,51 @@ const getArabicOrdinal = (n: number) => {
     return ordinals[n] || n.toString();
 };
 
+// Custom Rigid Export Card to fix layout issues
+const ExportVisitCard: React.FC<{ visit: Visit }> = ({ visit }) => {
+    const isGirls = visit.schoolName.includes("بنات");
+    const headerColor = isGirls ? "#867bba" : "#2b3592";
+    return (
+        <div className="export-mode-card">
+            <div className="export-card-header" style={{ backgroundColor: headerColor }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                     {/* Factory Logo Box */}
+                     <div style={{ width: '38px', height: '38px', background: 'white', borderRadius: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+                        {visit.factoryLogo ? (
+                            <img src={visit.factoryLogo} crossOrigin="anonymous" style={{ maxWidth: '34px', maxHeight: '34px', objectFit: 'contain' }} />
+                        ) : <Factory size={20} color="#ccc" />}
+                     </div>
+                     
+                     {/* Text Info */}
+                     <div style={{ flexGrow: 1, color: 'white' }}>
+                         <div style={{ fontSize: '13px', fontWeight: 'bold', lineHeight: 1.2 }}>{visit.schoolName}</div>
+                         <div style={{ fontSize: '11px', opacity: 0.9 }}>🏭 {visit.factory}</div>
+                     </div>
+                     
+                     {/* Stats */}
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', borderRight: '1px solid rgba(255,255,255,0.3)', paddingRight: '8px' }}>
+                         <div style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 'bold', direction: 'ltr' }}>{visit.date} 📅</div>
+                         <div style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 'bold' }}>{visit.participants} مشارك 👥</div>
+                     </div>
+                </div>
+            </div>
+            
+            {/* Images */}
+            <div className="export-image-grid">
+                {[0, 1, 2, 3].map(idx => (
+                    <img 
+                      key={idx} 
+                      src={visit.images[idx] || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"} 
+                      crossOrigin="anonymous" 
+                      className="export-visit-img"
+                      style={{ backgroundColor: '#f3f4f6' }}
+                    />
+                ))}
+            </div>
+        </div>
+    )
+};
+
 export default function App() {
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [currentReportIndex, setCurrentReportIndex] = useState(0);
@@ -86,7 +131,6 @@ export default function App() {
             }
         } catch (error) {
             console.error("Error fetching reports:", error);
-            // Even if Firebase fails, load default
             setReports([INITIAL_REPORT]);
         } finally {
             setLoading(false);
@@ -124,51 +168,52 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- CLIENT SIDE PDF EXPORT (ROBUST) ---
+  // --- STRICT PDF EXPORT (PIXEL PERFECT & UNIFIED) ---
   const exportReportPDF = async () => {
-      // 1. Prepare UI
       setIsExporting(true);
       setExportProgress("جاري تحضير الصفحات...");
       
-      // Wait for DOM to render the export-container
-      await new Promise(r => setTimeout(r, 1500)); // Increased delay for images
+      // Wait for React to render the export structure in the hidden container
+      await new Promise(r => setTimeout(r, 2000)); 
 
       try {
           const pages = document.querySelectorAll('.export-page');
           if (pages.length === 0) throw new Error("لم يتم العثور على صفحات للتصدير");
 
-          const pdf = new jsPDF('p', 'px', [794, 1123]); // Strict A4 pixels
+          // Initialize PDF with strict A4 dimensions in pixels
+          // 794px x 1123px is the standard A4 size at 96 DPI
+          const pdf = new jsPDF('p', 'px', [794, 1123]); 
           
           for (let i = 0; i < pages.length; i++) {
               setExportProgress(`جاري معالجة الصفحة ${i + 1} من ${pages.length}...`);
-              
               const pageElement = pages[i] as HTMLElement;
 
-              // Ensure all images in this page are loaded
+              // Ensure images load
               const images = Array.from(pageElement.querySelectorAll('img'));
               await Promise.all(images.map(img => {
                   if (img.complete) return Promise.resolve();
                   return new Promise(resolve => {
                       img.onload = resolve;
-                      img.onerror = resolve; // Don't block on error
+                      img.onerror = resolve; 
                   });
               }));
 
-              // Capture with Forced Desktop Width
-              // Strict width matches CSS
               const canvas = await html2canvas(pageElement, {
-                  scale: 1.5, // Standard quality
+                  scale: 1.5,
                   useCORS: true,
                   logging: false,
                   allowTaint: true,
                   backgroundColor: '#ffffff',
-                  width: 794,
-                  height: 1123,
-                  windowWidth: 1600, // Forces desktop layout logic 
+                  width: 794, // FORCE width to A4
+                  height: 1123, // FORCE height to A4
+                  windowWidth: 1600, // TRICK html2canvas to simulate desktop viewport
+                  onclone: (clonedDoc) => {
+                      // Safety: ensure body inside canvas context is large
+                      clonedDoc.body.style.width = '1600px'; 
+                  }
               });
 
               const imgData = canvas.toDataURL('image/jpeg', 0.95);
-              
               if (i > 0) pdf.addPage();
               pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
           }
@@ -197,7 +242,7 @@ export default function App() {
       if (isAdmin) setIsDirty(true);
   };
 
-  // ... (Decorations, Saving, File Parsing logic is same as before) ...
+  // ... (Standard logic handlers: Decorations, parsing, etc.) ...
   const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
     if (!isEditing) return;
     e.stopPropagation();
@@ -408,23 +453,26 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
       </div>
   );
 
-  // --- STRICT EXPORT HEADER / FOOTER / LAYOUT ---
-  // Using explicit Inline CSS to prevent SVG scaling issues in html2canvas
+  // --- STRICT EXPORT COMPONENTS (USING PURE INLINE CSS) ---
+  // These components render inside the 'export-container' and do NOT use external CSS classes.
+  // This ensures they are identical on every device (Mobile/Desktop/Tablet).
 
   const ExportHeader = () => (
       <div className="export-header-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%', padding: '0 10px' }}>
             {/* Right Logos */}
             <div style={{ display: 'flex', gap: '10px', height: '60px', alignItems: 'center' }}>
                 {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
-                         <img src={logo} crossOrigin="anonymous" style={{ height: '50px', width: 'auto', maxWidth: '100px', objectFit: 'contain' }} />
+                         <img src={logo} crossOrigin="anonymous" style={{ height: '50px', width: 'auto', maxWidth: '100px', objectFit: 'contain', display: 'block' }} />
                          {idx < 3 && <div style={{ height: '30px', width: '1px', background: '#ccc' }}></div>}
                     </React.Fragment>
                 ))}
             </div>
             {/* Main Logo */}
-            <img src={report.logos.main} crossOrigin="anonymous" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
+            <div style={{ display: 'flex', alignItems: 'center', height: '80px' }}>
+               <img src={report.logos.main} crossOrigin="anonymous" style={{ height: '70px', width: 'auto', objectFit: 'contain', display: 'block' }} />
+            </div>
         </div>
       </div>
   );
@@ -439,7 +487,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                 <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
                     {top.map((p, i) => (
                         <React.Fragment key={i}>
-                            <img src={p.url} crossOrigin="anonymous" style={{ height: '25px', width: 'auto', maxWidth: '60px', objectFit: 'contain' }} />
+                            <img src={p.url} crossOrigin="anonymous" style={{ height: '25px', width: 'auto', maxWidth: '60px', objectFit: 'contain', display: 'block' }} />
                             {i < top.length - 1 && <div style={{ height: '15px', width: '1px', background: '#ccc' }}></div>}
                         </React.Fragment>
                     ))}
@@ -447,7 +495,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                  <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
                     {bottom.map((p, i) => (
                         <React.Fragment key={i}>
-                            <img src={p.url} crossOrigin="anonymous" style={{ height: '25px', width: 'auto', maxWidth: '60px', objectFit: 'contain' }} />
+                            <img src={p.url} crossOrigin="anonymous" style={{ height: '25px', width: 'auto', maxWidth: '60px', objectFit: 'contain', display: 'block' }} />
                             {i < bottom.length - 1 && <div style={{ height: '15px', width: '1px', background: '#ccc' }}></div>}
                         </React.Fragment>
                     ))}
@@ -466,7 +514,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
           <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', direction: 'ltr' }}>{report.header.dateRange}</span>
       </div>
   );
-
+  
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-10 h-10 text-brand-primary animate-spin" /></div>;
 
@@ -508,10 +556,7 @@ const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement
                         {/* Content Body - Forces 4 cards in specific height */}
                         <div className="export-content-body">
                              {chunk.map((visit: Visit) => (
-                               <div key={visit.id} className="export-mode-card">
-                                  {/* Wrapping VisitCard to ensure it renders correctly in export mode */}
-                                  <VisitCard visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
-                               </div>
+                               <ExportVisitCard key={visit.id} visit={visit} />
                              ))}
                         </div>
                         
