@@ -76,7 +76,10 @@ export default function App() {
         }
 
         try {
-            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "desc"));
+            // UPDATED: 'asc' means Oldest First. 
+            // In RTL, index 0 is RIGHT, index N is LEFT.
+            // This ensures Week 1 is on the right.
+            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
             
@@ -87,6 +90,8 @@ export default function App() {
 
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
+                // Open the LATEST report by default (the one at the end of the array)
+                setCurrentReportIndex(loadedReports.length - 1);
             } else {
                 setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`}]);
             }
@@ -145,19 +150,11 @@ export default function App() {
 
   // --- Printing Handler (Set File Name) ---
   const handlePrint = () => {
-      // Set the document title to control the filename
-      // Format: Week Title - Date - Report Name
       const originalTitle = document.title;
-      // Sanitize filename to be safe
       const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
       const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      
-      // Ensures the week title comes first as requested
       document.title = `${safeWeek} - ${safeDate}`;
-      
       window.print();
-      
-      // Restore title after print dialog closes
       setTimeout(() => {
           document.title = originalTitle;
       }, 1000);
@@ -219,10 +216,8 @@ export default function App() {
           }
 
           const rect = containerRef.current.getBoundingClientRect();
-          
           const deltaX_px = moveClientX - startMouseX;
           const deltaY_px = moveClientY - startMouseY;
-
           const deltaX_percent = (deltaX_px / rect.width) * 100;
           const deltaY_percent = (deltaY_px / rect.height) * 100;
 
@@ -257,7 +252,6 @@ export default function App() {
               const url = await uploadReportImage(file, report.id, 'decorations');
               const defaultX = 50; 
               const defaultY = 20; 
-
               const newDeco: Decoration = {
                   id: `deco-${index}-${Date.now()}`,
                   url,
@@ -266,7 +260,6 @@ export default function App() {
                   scale: 0.8,
                   opacity: 1
               };
-              
               updateCurrentReport(prev => {
                   const newDecos = [...(prev.decorations || [])];
                   if (index === 0) {
@@ -279,10 +272,7 @@ export default function App() {
                   return { ...prev, decorations: newDecos.filter(d => d && d.url) };
               });
               setActiveDecoId(newDeco.id);
-          } catch(e) {
-              console.error(e);
-              alert("فشل رفع الزخرفة");
-          }
+          } catch(e) { console.error(e); }
       }
   };
 
@@ -315,37 +305,23 @@ export default function App() {
             id: reportId,
             createdAt: report.createdAt || serverTimestamp() 
         };
-
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
         const visitsRef = collection(db, "weeklyReports", reportId, "visits");
-        
         const existingSnapshot = await getDocs(visitsRef);
         const existingIds = new Set(existingSnapshot.docs.map(d => d.id));
         const currentIds = new Set(visits.map(v => v.id));
-
         const deletePromises: Promise<void>[] = [];
         existingIds.forEach(id => {
-            if (!currentIds.has(id)) {
-                deletePromises.push(deleteDoc(doc(visitsRef, id)));
-            }
+            if (!currentIds.has(id)) deletePromises.push(deleteDoc(doc(visitsRef, id)));
         });
         await Promise.all(deletePromises);
-
-        const savePromises = visits.map(visit => {
-            return setDoc(doc(visitsRef, visit.id), visit);
-        });
+        const savePromises = visits.map(visit => setDoc(doc(visitsRef, visit.id), visit));
         await Promise.all(savePromises);
-        
         setIsDirty(false);
-        if (!report.id) {
-            updateCurrentReport({ id: reportId });
-        }
+        if (!report.id) updateCurrentReport({ id: reportId });
     } catch (error: any) {
-        console.error("Error saving report:", error);
         alert(`فشل الحفظ: ${error.message || "تأكد من الاتصال بالإنترنت"}`);
-    } finally {
-        setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const handleCreateNewReport = () => {
@@ -361,8 +337,9 @@ export default function App() {
           decorations: report.decorations || [],
           createdAt: serverTimestamp() 
       };
-      setReports(prev => [newReport, ...prev]); 
-      setCurrentReportIndex(0);
+      // UPDATED: Append to the end of array so newest appears on the LEFT in RTL
+      setReports(prev => [...prev, newReport]); 
+      setCurrentReportIndex(reports.length); // Focus the newly added report
       setIsDirty(true);
   };
 
@@ -383,11 +360,10 @@ export default function App() {
                   await deleteDoc(doc(db, "weeklyReports", reportId));
                   const newReports = reports.filter((_, idx) => idx !== currentReportIndex);
                   setReports(newReports);
-                  setCurrentReportIndex(0);
+                  // Focus the last report (newest)
+                  setCurrentReportIndex(Math.max(0, newReports.length - 1));
                   setIsDirty(false);
-              } catch (e) {
-                  console.error("Error deleting doc:", e);
-              }
+              } catch (e) { console.error(e); }
           }
       }
   };
@@ -430,9 +406,7 @@ export default function App() {
           try {
               const url = await uploadReportImage(file, report.id, visitId);
               urls.push(url);
-          } catch(e: any) { 
-              console.error(e); 
-          }
+          } catch(e: any) { console.error(e); }
       }
       setIsDirty(true);
       return urls;
@@ -532,13 +506,11 @@ export default function App() {
       if (!e.target.files || !report.id) return;
       const files = Array.from(e.target.files) as File[];
       setIsAnalyzingImages(true);
-      setImageMatchStatus("جاري التوزيع الذكي...");
       try {
         const filenames = files.map(f => f.name);
         const mapping = await matchImagesToVisits(filenames, report.visits);
         const newVisits = [...report.visits];
         const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
-        let matchCount = 0;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const visitId = mapping[i.toString()];
@@ -548,28 +520,23 @@ export default function App() {
                     try {
                         const url = await uploadReportImage(file, report.id, visitId);
                         visit.images.push(url);
-                        matchCount++;
                     } catch (err) { console.error(err); }
                 }
             }
         }
         updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
-        setImageMatchStatus(`تم رفع ${matchCount} صورة.`);
-      } catch (error: any) { setImageMatchStatus(`خطأ: ${error.message}`); } 
-      finally { setIsAnalyzingImages(false); if(bulkImageInputRef.current) bulkImageInputRef.current.value=""; }
+      } finally { setIsAnalyzingImages(false); if(bulkImageInputRef.current) bulkImageInputRef.current.value=""; }
   };
 
   const handleBulkFactoryLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!e.target.files || !report.id) return;
       const files = Array.from(e.target.files) as File[];
       setIsAnalyzingLogos(true);
-      setLogoMatchStatus("جاري التحليل...");
       try {
         const filenames = files.map(f => f.name);
         const mapping = await matchLogosToFactories(filenames, report.visits);
         const newVisits = [...report.visits];
         const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
-        let matchCount = 0;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const matchedVisitIds = mapping[i.toString()];
@@ -580,21 +547,16 @@ export default function App() {
                         const visit = visitMap.get(id);
                         if (visit) visit.factoryLogo = url;
                     });
-                    matchCount++;
                 } catch(e) { console.error(e); }
             }
         }
         updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
-        setLogoMatchStatus(`تم توزيع ${matchCount} شعار.`);
-      } catch (e: any) { setLogoMatchStatus(`خطأ: ${e.message}`); } 
-      finally { setIsAnalyzingLogos(false); if(bulkLogoInputRef.current) bulkLogoInputRef.current.value = ""; }
+      } finally { setIsAnalyzingLogos(false); if(bulkLogoInputRef.current) bulkLogoInputRef.current.value = ""; }
   };
 
   const chunkArray = <T,>(array: T[], size: number): T[][] => {
       const result: T[][] = [];
-      for (let i = 0; i < array.length; i += size) {
-          result.push(array.slice(i, i + size));
-      }
+      for (let i = 0; i < array.length; i += size) result.push(array.slice(i, i + size));
       return result;
   };
   const visitChunks = chunkArray(report.visits, 4);
@@ -602,69 +564,63 @@ export default function App() {
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12">
+            {/* UPDATED: h-3 md:h-16 for smaller mobile logos */}
+            <div className="flex items-center gap-1 md:gap-4 h-3 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" />
+                            {/* UPDATED: max-h-2.5 for mobile */}
+                            <img src={logo} alt="" className="h-full object-contain max-h-[10px] md:max-h-14 print:max-h-10" />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-3 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
+            {/* UPDATED: h-5 md:h-20 for smaller mobile logo */}
+            <div className="flex flex-col gap-2 relative h-5 md:h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
   );
 
-  const ReportFooterContent = () => {
-    const partnersTop = report.logos.partners.slice(0, 6);
-    const partnersBottom = report.logos.partners.slice(6, 11);
-    return (
+  const ReportFooterContent = () => (
       <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 relative z-50">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
-            {/* Screen View */}
             <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto print:hidden">
-                {report.logos.partners.map((partner: PartnerLogo, idx) => (
+                {report.logos.partners.map((partner: PartnerLogo) => (
                     <div key={partner.id} className="relative flex flex-col items-center justify-center">
                         <img src={partner.url} style={{ height: `${35 * partner.scale}px`, width: 'auto', maxWidth: '100px' }} className="object-contain" alt="" />
                     </div>
                 ))}
             </div>
-
-            {/* Print View (Separated with Lines) */}
             <div className="hidden print:flex flex-col items-center gap-3 w-full pb-2">
                 <div className="flex justify-between items-center w-full px-2 flex-nowrap">
-                    {partnersTop.map((partner: PartnerLogo, idx) => (
+                    {report.logos.partners.slice(0, 6).map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex items-center justify-center h-7 px-1 flex-1">
                                 <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
                             </div>
-                            {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < 5 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
                     ))}
                 </div>
                  <div className="flex justify-center items-center gap-6 w-full px-2 flex-nowrap">
-                    {partnersBottom.map((partner: PartnerLogo, idx) => (
+                    {report.logos.partners.slice(6, 11).map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex items-center justify-center h-7 px-1">
                                 <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
                             </div>
-                            {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < 4 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
                     ))}
                 </div>
             </div>
         </div>
       </div>
-  )};
+  );
 
   const DecorationLayer = ({ isPrint = false }) => (
-      // Z-Index: 
-      // Editing Mode: z-[2000] (Very High)
-      // View/Print Mode: z-[0] (Under content, but in full page absolute context)
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[0]'}`}>
           {report.decorations?.map(d => (
               <div 
@@ -693,8 +649,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-4 relative">
-      
-      {/* ======================= FIXED EDIT CONTROLS (Active Decoration) ======================= */}
       {isEditing && activeDecoId && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[3000] bg-white shadow-2xl rounded-full px-6 py-3 border border-gray-200 flex items-center gap-6 animate-fade-in no-print">
               <span className="text-xs font-bold text-gray-500 hidden md:block">تحكم بالزخرفة:</span>
@@ -708,14 +662,9 @@ export default function App() {
 
       {/* ======================= PRINT VIEW ======================= */}
       <div className="hidden print-only-container">
-          {/* ... (Print logic same as before) ... */}
-          {/* 1. Cover Page (PRINT) */}
           {report.coverImage && (
             <div className="print-page">
-                {/* Full Bleed Image */}
                 <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
-                
-                {/* Overlay Text */}
                 <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
                     <h1 className="text-2xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
                     <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
@@ -723,13 +672,9 @@ export default function App() {
                 </div>
             </div>
           )}
-
-          {/* 2. Content Pages */}
           {visitChunks.map((chunk, pageIndex) => (
               <div key={pageIndex} className="print-page">
                   <DecorationLayer isPrint={true} />
-                  
-                  {/* Content Container (Safe Area) */}
                   <div className="print-content-safe-area">
                       <div className="relative z-10">
                         <ReportHeaderContent />
@@ -743,23 +688,17 @@ export default function App() {
                                 </div>
                         </div>
                       </div>
-
                       <div className="flex-grow flex flex-col justify-start gap-2 print:gap-1 pt-4 relative z-10">
                           {chunk.map((visit: Visit) => (
                                <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
                           ))}
                       </div>
-
                       <ReportFooterContent />
                   </div>
               </div>
           ))}
-
-          {/* 3. Statistics Page */}
           <div className="print-page">
                <DecorationLayer isPrint={true} />
-               
-               {/* Content Container (Safe Area) */}
                <div className="print-content-safe-area">
                    <div className="relative z-10">
                        <ReportHeaderContent />
@@ -776,11 +715,9 @@ export default function App() {
                             <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
                        </div>
                    </div>
-                   
                    <div className="flex-grow flex flex-col justify-start py-4 print:py-0 relative z-10">
                         <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
                    </div>
-                   
                    <ReportFooterContent />
                </div>
           </div>
@@ -791,12 +728,11 @@ export default function App() {
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 animate-fade-in no-print" onClick={() => setSelectedImage(null)}>
             <div className="relative max-w-5xl max-h-[90vh] animate-zoom-in">
                  <button onClick={() => setSelectedImage(null)} className="absolute -top-12 right-0 text-white hover:text-gray-300"><X size={32} /></button>
-                 <img src={selectedImage} alt="View" className="max-h-[85vh] max-w-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+                 <img src={selectedImage} alt="View" className="max-h-[85vh] max-w-full object-contain rounded-lg" />
             </div>
         </div>
       )}
 
-      {/* --- CONTROLS (MOVED OUTSIDE PAPER) --- */}
       <div className="max-w-[210mm] mx-auto mt-4 md:mt-8 relative z-50 no-print px-4 md:px-0">
         <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-white/40 flex flex-col items-end md:flex-row md:justify-between md:items-center gap-4 shadow-xl">
             <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
@@ -818,17 +754,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Paper Container */}
       <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto p-6 md:p-12 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
         
-        {/* Only Render Decorations here if NOT editing, otherwise we render later for z-index issues, wait... 
-            Actually, to ensure it's on top of everything including white backgrounds of cards, it MUST be last.
-        */}
-
-        {/* --- ADMIN IMPORT AREA --- */}
         {isEditing && isAdmin && (
             <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl no-print space-y-6 relative z-50">
-                {/* 1. Cover & Decoration */}
                  <div className="border-b border-indigo-100 pb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <div className="flex items-center gap-2 mb-3 text-brand-dark"><LayoutTemplate className="text-pink-500" /><h2 className="font-bold text-lg">0. صورة الغلاف (اختياري)</h2></div>
@@ -841,75 +770,32 @@ export default function App() {
                     <div>
                         <div className="flex items-center gap-2 mb-3 text-brand-dark"><Move className="text-purple-500" /><h2 className="font-bold text-lg">0.1 زخارف حرة (Free SVG)</h2></div>
                         <div className="grid grid-cols-2 gap-3">
-                            {/* Decoration 1 Button */}
-                            <div className="flex flex-col gap-1">
-                                <input type="file" ref={decorationInputRef1} accept="image/*,.svg" onChange={handleDecorationUpload(0)} className="hidden" />
-                                <button onClick={() => decorationInputRef1.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50">
-                                    <Plus size={16} /> زخرفة 1
-                                </button>
-                                {report.decorations?.[0] && <span className="text-[10px] text-green-600 text-center">موجودة</span>}
-                            </div>
-                            
-                            {/* Decoration 2 Button */}
-                            <div className="flex flex-col gap-1">
-                                <input type="file" ref={decorationInputRef2} accept="image/*,.svg" onChange={handleDecorationUpload(1)} className="hidden" />
-                                <button onClick={() => decorationInputRef2.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50">
-                                    <Plus size={16} /> زخرفة 2
-                                </button>
-                                {report.decorations?.[1] && <span className="text-[10px] text-green-600 text-center">موجودة</span>}
-                            </div>
+                            <input type="file" ref={decorationInputRef1} accept="image/*,.svg" onChange={handleDecorationUpload(0)} className="hidden" />
+                            <button onClick={() => decorationInputRef1.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50"><Plus size={16} /> زخرفة 1</button>
+                            <input type="file" ref={decorationInputRef2} accept="image/*,.svg" onChange={handleDecorationUpload(1)} className="hidden" />
+                            <button onClick={() => decorationInputRef2.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50"><Plus size={16} /> زخرفة 2</button>
                         </div>
-                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1"><Hand size={12}/> <span>اضغط واسحب الزخرفة على الشاشة</span></div>
                     </div>
                 </div>
-
-                {/* 2. Text Parser */}
                 <div className="border-b border-indigo-100 pb-6">
                     <div className="flex items-center gap-2 mb-3 text-brand-dark"><Sparkles className="text-yellow-500" /><h2 className="font-bold text-lg">1. استيراد البيانات</h2></div>
-                    <div className="flex gap-4 mb-4 items-start">
-                        <div className="flex-1">
-                            <input type="file" ref={wordInputRef} accept=".docx, .txt" onChange={handleFileSelect} className="hidden" />
-                            <button onClick={() => wordInputRef.current?.click()} className="bg-white border border-gray-300 px-4 py-2 rounded-lg flex items-center gap-2 text-sm"><FileText size={16} /> رفع ملف (Word/Txt)</button>
-                        </div>
-                    </div>
                     <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="نص التقرير..." className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm mb-2" dir="rtl" />
-                    <button onClick={handleSmartParse} disabled={isParsing || !rawText.trim()} className="bg-brand-primary text-white px-6 py-2 rounded-lg flex items-center gap-2 w-full md:w-auto justify-center transition-opacity hover:opacity-90">{isParsing ? <Loader2 className="animate-spin" /> : "تعبئة الجدول تلقائياً"}</button>
-                    {parseError && <div className="text-red-600 bg-red-50 border border-red-200 p-2 rounded text-sm flex items-center gap-2 mt-2"><AlertCircle size={16} /><span>{parseError}</span></div>}
+                    <button onClick={handleSmartParse} disabled={isParsing || !rawText.trim()} className="bg-brand-primary text-white px-6 py-2 rounded-lg flex items-center gap-2">{isParsing ? <Loader2 className="animate-spin" /> : "تعبئة الجدول تلقائياً"}</button>
                 </div>
-                
-                {/* 3. Bulk Images */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <button onClick={() => bulkImageInputRef.current?.click()} disabled={isAnalyzingImages} className="w-full border-2 border-dashed border-teal-300 bg-teal-50 text-teal-700 py-4 rounded-lg flex flex-col items-center justify-center"><input type="file" multiple accept="image/*" ref={bulkImageInputRef} onChange={handleBulkImageUpload} className="hidden" />{isAnalyzingImages ? <Loader2 className="animate-spin" /> : <UploadCloud size={24} />}<span className="font-bold text-sm">توزيع صور الزيارات</span></button>
                     <button onClick={() => bulkLogoInputRef.current?.click()} disabled={isAnalyzingLogos} className="w-full border-2 border-dashed border-purple-300 bg-purple-50 text-purple-700 py-4 rounded-lg flex flex-col items-center justify-center"><input type="file" multiple accept="image/*" ref={bulkLogoInputRef} onChange={handleBulkFactoryLogoUpload} className="hidden" />{isAnalyzingLogos ? <Loader2 className="animate-spin" /> : <Factory size={24} />}<span className="font-bold text-sm">توزيع شعارات المصانع</span></button>
                 </div>
                  <div className="border-t border-indigo-100 pt-4 flex justify-end">
-                    <button onClick={() => handleDeleteCurrentReport()} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 border border-red-200 px-3 py-2 rounded bg-red-50"><Trash2 size={14} /> حذف هذا التقرير</button>
+                    <button onClick={() => handleDeleteCurrentReport()} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1"><Trash2 size={14} /> حذف هذا التقرير</button>
                 </div>
             </div>
         )}
 
-        {/* --- REPORT HEADER --- */}
         <div className="border-b-2 border-brand-primary pb-6 mb-8 relative z-20">
-            <header className="flex justify-between items-center">
-                <div className="flex items-center gap-2 h-16">
-                    {report.logos.rightLogos.map((logo, idx) => (
-                        <React.Fragment key={idx}>
-                            <div className="relative group h-full flex items-center">
-                                <img src={logo} alt="" className={`h-full object-contain max-h-14 ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={() => isEditing && rightLogoRefs.current[idx]?.click()} />
-                                <input type="file" ref={el => { rightLogoRefs.current[idx] = el; }} onChange={handleLogoUpdate('right', idx)} className="hidden" accept="image/*,.svg" />
-                            </div>
-                            {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
-                        </React.Fragment>
-                    ))}
-                </div>
-                <div className="flex flex-col gap-2 relative group h-20 items-end justify-center">
-                    <img src={report.logos.main} alt="Future Industrialists" className={`h-full object-contain ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={() => isEditing && mainLogoRef.current?.click()} />
-                    <input type="file" ref={mainLogoRef} onChange={handleLogoUpdate('main')} className="hidden" accept="image/*,.svg" />
-                </div>
-            </header>
+            <ReportHeaderContent />
         </div>
 
-        {/* Title */}
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
             <div className="text-right order-2 md:order-1">
                 <h1 className="text-2xl md:text-3xl font-bold mb-1">التقرير الأسبوعي</h1>
@@ -924,27 +810,15 @@ export default function App() {
                 ) : (
                     <div className="flex flex-row md:flex-col justify-between md:justify-start items-center md:items-start gap-4 md:gap-0">
                         <h2 className="text-sm md:text-lg font-bold whitespace-nowrap">{report.header.weekTitle}</h2>
-                        
-                        {/* Mobile Date Split */}
                         <div className="block md:hidden text-[10px] opacity-90 font-medium leading-snug text-left dir-ltr">
-                           {report.header.dateRange.includes(' الى ') ? (
-                                <div className="flex flex-col items-end">
-                                    <span>{report.header.dateRange.split(' الى ')[0]}</span>
-                                    <span>الى {report.header.dateRange.split(' الى ')[1]}</span>
-                                </div>
-                           ) : (
-                                <span>{report.header.dateRange}</span>
-                           )}
+                           {report.header.dateRange}
                         </div>
-
-                        {/* Desktop Date */}
                         <p className="hidden md:block text-sm md:text-base dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
                     </div>
                 )}
             </div>
         </div>
 
-        {/* Body */}
         <div className="flex-grow relative z-20">
             {visitsLoading ? (
                  <div className="flex items-center justify-center h-40"><Loader2 className="w-8 h-8 text-brand-primary animate-spin" /></div>
@@ -968,43 +842,18 @@ export default function App() {
                     <Plus size={24} /> إضافة زيارة يدوياً
                 </button>
             )}
-
             <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={isEditing} onUpdate={handleUpdateStats} onLogoUpdate={(key) => handleLogoUpdate('categories', key)} />
         </div>
 
-        {/* Footer */}
         <div className="mt-8 pt-4 border-t border-gray-200 relative pb-4 z-20">
              <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
              <div className="w-full px-4 relative z-10">
-                
-                {/* --- MOBILE: Modern Flex Layout with Simple Dividers --- */}
-                <div className="md:hidden w-full flex flex-wrap justify-center items-center gap-y-6 px-2">
-                    {report.logos.partners.map((partner: PartnerLogo, idx) => (
-                        <div key={partner.id} className="relative flex items-center justify-center px-3 border-r border-gray-200 last:border-none">
-                             <div className={`relative flex items-center justify-center ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
-                                <img 
-                                    src={partner.url} 
-                                    className="object-contain h-8 w-auto max-w-[80px]"
-                                    alt="" 
-                                />
-                                <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* --- DESKTOP: Flex Layout (Original) --- */}
-                <div className="hidden md:flex md:flex-wrap md:justify-center md:items-center md:gap-x-4 md:gap-y-8">
+                <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-8">
                     {report.logos.partners.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex flex-col items-center gap-2 group/partner">
                                 <div className={`relative w-full flex items-center justify-center ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
-                                    <img 
-                                        src={partner.url} 
-                                        style={{ height: `${48 * partner.scale}px` }} 
-                                        className="object-contain transition-all duration-200 w-auto" 
-                                        alt="" 
-                                    />
+                                    <img src={partner.url} style={{ height: `${48 * partner.scale}px` }} className="object-contain transition-all duration-200 w-auto" alt="" />
                                     <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
                                 </div>
                                 {isEditing && (
@@ -1021,10 +870,7 @@ export default function App() {
                 </div>
             </div>
         </div>
-
-        {/* Render Decorations LAST to ensure they are on top of everything (z-index alone sometimes fails with nested relative contexts) */}
         <DecorationLayer />
-
       </div>
     </div>
   );

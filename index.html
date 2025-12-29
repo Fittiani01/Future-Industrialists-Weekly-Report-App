@@ -116,7 +116,7 @@
       @media print {
         @page {
           size: A4;
-          margin: 0 !important; /* CRITICAL: Removes browser headers/footers on Mac/iPhone */
+          margin: 0mm !important; /* CRITICAL: Force remove browser headers/footers */
         }
 
         html, body {
@@ -124,54 +124,48 @@
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
-          background-color: white !important;
+          background: white !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
           overflow: visible !important;
         }
 
-        /* Hide Screen UI elements */
         .no-print, .animated-bg, .glow-layer, #network-canvas, .screen-only-container { 
           display: none !important; 
         }
 
-        /* Show Print UI elements */
         .print-only-container {
             display: block !important;
-            width: 100%;
+            width: 210mm;
+            margin: 0 auto;
         }
 
-        /* Explicit Page Break Wrapper */
         .print-page {
             width: 210mm;
-            /* Using 296mm creates a tiny buffer ensuring no blank page triggers */
-            height: 296.5mm; 
+            height: 297mm; /* Full A4 height */
             position: relative;
             page-break-after: always;
             break-after: page;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: flex-start;
             background: white;
             overflow: hidden;
             padding: 0;
             margin: 0;
         }
         
-        /* Force remove page break after the last page to prevent blank sheet */
         .print-page:last-child {
             page-break-after: auto !important;
             break-after: auto !important;
-            margin-bottom: 0 !important;
         }
         
-        /* Inner container to ensure content has safe margin but background is full */
         .print-content-safe-area {
-            padding: 10mm 10mm 5mm 10mm; /* Top/Right/Bottom/Left Padding */
+            padding: 12mm 12mm 8mm 12mm; /* Consistent margins for content */
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
+            justify-content: space-between;
             position: relative;
             z-index: 10;
         }
@@ -206,7 +200,6 @@
       (function() {
         const canvas = document.getElementById('network-canvas');
         const ctx = canvas.getContext('2d');
-        
         let width, height;
         let particles = [];
         const particleCount = 100;
@@ -240,34 +233,15 @@
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
-
             particles = [];
-            for (let i = 0; i < particleCount; i++) {
-                // Ensure pure random distribution across the entire current width/height
-                particles.push(new Particle(Math.random() * width, Math.random() * height));
-            }
+            for (let i = 0; i < particleCount; i++) particles.push(new Particle());
         }
 
         function resize() {
-            const oldWidth = width;
-            const oldHeight = height;
-            
             width = window.innerWidth;
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
-            
-            // If we have existing particles, scale their positions to match new screen size
-            // This prevents them from clumping in the corner if screen expands
-            if (particles.length > 0 && oldWidth > 0 && oldHeight > 0) {
-                particles.forEach(p => {
-                    p.x = p.x * (width / oldWidth);
-                    p.y = p.y * (height / oldHeight);
-                });
-            } else {
-                // First run or invalid old state
-                init();
-            }
         }
 
         function animate() {
@@ -285,7 +259,6 @@
                 ctx.beginPath();
                 let opacity = 1 - (distance / connectionDistance);
                 ctx.strokeStyle = `rgba(180, 200, 255, ${opacity * 0.4})`; 
-                ctx.lineWidth = 1;
                 ctx.moveTo(p1.x, p1.y);
                 ctx.lineTo(p2.x, p2.y);
                 ctx.stroke();
@@ -294,11 +267,7 @@
           }
           requestAnimationFrame(animate);
         }
-        
-        // Listen for resize
         window.addEventListener('resize', resize);
-        
-        // Initial setup
         init();
         animate();
       })();
