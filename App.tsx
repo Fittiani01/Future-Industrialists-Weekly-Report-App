@@ -4,7 +4,7 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move } from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
@@ -33,9 +33,8 @@ export default function App() {
 
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  // Track dragging state to distinguish between click and drag
-  const isDraggingRef = useRef(false);
 
   // Parsing & AI State
   const [rawText, setRawText] = useState("");
@@ -53,8 +52,7 @@ export default function App() {
   const bulkImageInputRef = useRef<HTMLInputElement>(null);
   const bulkLogoInputRef = useRef<HTMLInputElement>(null);
   const coverImageRef = useRef<HTMLInputElement>(null);
-  const decorationInputRef1 = useRef<HTMLInputElement>(null);
-  const decorationInputRef2 = useRef<HTMLInputElement>(null);
+  const decorationInputRef = useRef<HTMLInputElement>(null);
   const mainLogoRef = useRef<HTMLInputElement>(null);
   const rightLogoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const partnerRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -143,26 +141,6 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- Printing Handler (Set File Name) ---
-  const handlePrint = () => {
-      // Set the document title to control the filename
-      // Format: Week Title - Date - Report Name
-      const originalTitle = document.title;
-      // Sanitize filename to be safe
-      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      
-      // Ensures the week title comes first as requested
-      document.title = `${safeWeek} - ${safeDate}`;
-      
-      window.print();
-      
-      // Restore title after print dialog closes
-      setTimeout(() => {
-          document.title = originalTitle;
-      }, 1000);
-  };
-
   // --- Update Helpers ---
   const updateCurrentReport = (newData: Partial<WeeklyReport> | ((prev: WeeklyReport) => WeeklyReport)) => {
       setReports(prevReports => {
@@ -181,104 +159,67 @@ export default function App() {
   };
 
   // --- Drag & Drop Decoration Handlers ---
-  const handleDecoStart = (e: React.MouseEvent | React.TouchEvent, id: string) => {
+  const handleDecoMouseDown = (e: React.MouseEvent, id: string) => {
       if (!isEditing) return;
       e.stopPropagation();
-
+      e.preventDefault();
       const decoration = report.decorations?.find(d => d.id === id);
       if (!decoration || !containerRef.current) return;
 
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const initialLeft = (decoration.x / 100) * containerRect.width;
+      const initialTop = (decoration.y / 100) * containerRect.height;
+
       setActiveDecoId(id);
-      isDraggingRef.current = false;
-      
-      let clientX, clientY;
-      if ('touches' in e) {
-          clientX = e.touches[0].clientX;
-          clientY = e.touches[0].clientY;
-      } else {
-          clientX = (e as React.MouseEvent).clientX;
-          clientY = (e as React.MouseEvent).clientY;
-      }
+      setDragOffset({ x: startX - initialLeft, y: startY - initialTop });
 
-      const startMouseX = clientX;
-      const startMouseY = clientY;
-      const startDecoX = decoration.x;
-      const startDecoY = decoration.y;
-
-      const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const handleMouseMove = (moveEvent: MouseEvent) => {
           if (!containerRef.current) return;
-          isDraggingRef.current = true;
-          
-          let moveClientX, moveClientY;
-          if ('touches' in moveEvent) {
-               moveClientX = moveEvent.touches[0].clientX;
-               moveClientY = moveEvent.touches[0].clientY;
-          } else {
-               moveClientX = (moveEvent as MouseEvent).clientX;
-               moveClientY = (moveEvent as MouseEvent).clientY;
-          }
-
           const rect = containerRef.current.getBoundingClientRect();
+          const currentX = moveEvent.clientX - rect.left - (startX - initialLeft);
+          const currentY = moveEvent.clientY - rect.top - (startY - initialTop);
           
-          const deltaX_px = moveClientX - startMouseX;
-          const deltaY_px = moveClientY - startMouseY;
-
-          const deltaX_percent = (deltaX_px / rect.width) * 100;
-          const deltaY_percent = (deltaY_px / rect.height) * 100;
-
-          const newX = Math.max(0, Math.min(100, startDecoX + deltaX_percent));
-          const newY = Math.max(0, Math.min(100, startDecoY + deltaY_percent));
+          // Convert back to percentage
+          const percentX = (currentX / rect.width) * 100;
+          const percentY = (currentY / rect.height) * 100;
 
           updateCurrentReport(prev => ({
               ...prev,
               decorations: prev.decorations?.map(d => 
-                  d.id === id ? { ...d, x: newX, y: newY } : d
+                  d.id === id ? { ...d, x: percentX, y: percentY } : d
               )
           }));
       };
 
-      const handleEnd = () => {
-          document.removeEventListener('mousemove', handleMove);
-          document.removeEventListener('mouseup', handleEnd);
-          document.removeEventListener('touchmove', handleMove);
-          document.removeEventListener('touchend', handleEnd);
+      const handleMouseUp = () => {
+          setActiveDecoId(null);
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
       };
 
-      document.addEventListener('mousemove', handleMove);
-      document.addEventListener('mouseup', handleEnd);
-      document.addEventListener('touchmove', handleMove, { passive: false });
-      document.addEventListener('touchend', handleEnd);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleDecorationUpload = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDecorationUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file && report.id) {
           try {
               const url = await uploadReportImage(file, report.id, 'decorations');
-              const defaultX = 50; 
-              const defaultY = 20; 
-
               const newDeco: Decoration = {
-                  id: `deco-${index}-${Date.now()}`,
+                  id: `deco-${Date.now()}`,
                   url,
-                  x: defaultX, 
-                  y: defaultY,
-                  scale: 0.8,
+                  x: 10, // Default positions
+                  y: 10,
+                  scale: 1,
                   opacity: 1
               };
-              
-              updateCurrentReport(prev => {
-                  const newDecos = [...(prev.decorations || [])];
-                  if (index === 0) {
-                      if (newDecos.length > 0) newDecos[0] = newDeco;
-                      else newDecos.push(newDeco);
-                  } else {
-                      if (newDecos.length < 1) newDecos.push({} as any);
-                      newDecos[1] = newDeco;
-                  }
-                  return { ...prev, decorations: newDecos.filter(d => d && d.url) };
-              });
-              setActiveDecoId(newDeco.id);
+              updateCurrentReport(prev => ({
+                  ...prev,
+                  decorations: [...(prev.decorations || []), newDeco].slice(0, 2) // Max 2
+              }));
           } catch(e) {
               console.error(e);
               alert("فشل رفع الزخرفة");
@@ -300,9 +241,9 @@ export default function App() {
           ...prev,
           decorations: prev.decorations?.filter(d => d.id !== id)
       }));
-      setActiveDecoId(null);
   };
 
+  // --- Handlers (Existing) ---
   const saveReportToFirestore = async () => {
     if (!report || !isAdmin) return;
     setSaving(true);
@@ -348,6 +289,7 @@ export default function App() {
     }
   };
 
+  // ... (Other handlers: Create, Delete, Update Visit, etc. kept same)
   const handleCreateNewReport = () => {
       const nextWeekNum = reports.length + 1;
       const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
@@ -358,7 +300,7 @@ export default function App() {
           header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
           logos: report.logos, 
           visits: [], 
-          decorations: report.decorations || [],
+          decorations: report.decorations || [], // Copy decorations
           createdAt: serverTimestamp() 
       };
       setReports(prev => [newReport, ...prev]); 
@@ -423,6 +365,7 @@ export default function App() {
       updateCurrentReport(prev => ({ ...prev, header: { ...prev.header, [key]: value } }));
   }
 
+  // --- Upload Handlers ---
   const handleManualVisitImageUpload = async (files: File[], visitId: string): Promise<string[]> => {
       if (!report.id) return [];
       const urls: string[] = [];
@@ -490,6 +433,7 @@ export default function App() {
       });
   };
 
+  // --- AI Handlers ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -602,17 +546,17 @@ export default function App() {
   // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-1 md:gap-4 h-5 md:h-16 print:h-12">
+            <div className="flex items-center gap-2 h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-4 md:max-h-14 print:max-h-10" />
+                            <img src={logo} alt="" className="h-full object-contain max-h-14 print:max-h-10" />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-8 w-px bg-gray-300 mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-9 md:h-20 print:h-14 items-end justify-center">
+            <div className="flex flex-col gap-2 relative h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -622,10 +566,9 @@ export default function App() {
     const partnersTop = report.logos.partners.slice(0, 6);
     const partnersBottom = report.logos.partners.slice(6, 11);
     return (
-      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 relative z-50">
+      <div className="w-full flex flex-col items-center mt-auto border-t border-gray-200 pt-1 relative z-20">
         <div className="text-center mb-1 text-brand-dark font-bold text-lg relative z-10 print:text-sm print:mb-0">شركاء النجاح</div>
         <div className="w-full px-2 relative z-10">
-            {/* Screen View */}
             <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 max-w-[95%] mx-auto print:hidden">
                 {report.logos.partners.map((partner: PartnerLogo, idx) => (
                     <div key={partner.id} className="relative flex flex-col items-center justify-center">
@@ -633,26 +576,24 @@ export default function App() {
                     </div>
                 ))}
             </div>
-
-            {/* Print View (Separated with Lines) */}
             <div className="hidden print:flex flex-col items-center gap-3 w-full pb-2">
-                <div className="flex justify-between items-center w-full px-2 flex-nowrap">
+                <div className="flex justify-center items-center gap-x-6 w-full px-4">
                     {partnersTop.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7 px-1 flex-1">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                            <div className="relative flex items-center justify-center h-7">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[100px]" alt="" />
                             </div>
-                            {idx < partnersTop.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < partnersTop.length - 1 && <div className="h-5 w-px bg-gray-300"></div>}
                         </React.Fragment>
                     ))}
                 </div>
-                 <div className="flex justify-center items-center gap-6 w-full px-2 flex-nowrap">
+                 <div className="flex justify-center items-center gap-x-6 w-full px-4">
                     {partnersBottom.map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
-                            <div className="relative flex items-center justify-center h-7 px-1">
-                                <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
+                            <div className="relative flex items-center justify-center h-7">
+                                <img src={partner.url} className="h-full w-auto object-contain max-w-[100px]" alt="" />
                             </div>
-                            {idx < partnersBottom.length - 1 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < partnersBottom.length - 1 && <div className="h-5 w-px bg-gray-300"></div>}
                         </React.Fragment>
                     ))}
                 </div>
@@ -662,10 +603,8 @@ export default function App() {
   )};
 
   const DecorationLayer = ({ isPrint = false }) => (
-      // Z-Index: 
-      // Editing Mode: z-[2000] (Very High)
-      // View/Print Mode: z-[0] (Under content, but in full page absolute context)
-      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isEditing && !isPrint ? 'z-[2000]' : 'z-[0]'}`}>
+      // Corrected Z-Index to ensure it appears above white background but below content
+      <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isPrint ? 'print-layer z-[2]' : 'z-[5]'}`}>
           {report.decorations?.map(d => (
               <div 
                 key={d.id}
@@ -673,17 +612,24 @@ export default function App() {
                     position: 'absolute',
                     left: `${d.x}%`,
                     top: `${d.y}%`,
-                    transform: `translate(-50%, -50%) scale(${d.scale})`,
+                    transform: `scale(${d.scale})`,
                     opacity: d.opacity,
                     cursor: isEditing && !isPrint ? 'move' : 'default',
                     pointerEvents: isEditing && !isPrint ? 'auto' : 'none',
-                    touchAction: 'none' 
                 }}
-                onMouseDown={(e) => !isPrint && handleDecoStart(e, d.id)}
-                onTouchStart={(e) => !isPrint && handleDecoStart(e, d.id)}
-                className={`origin-center select-none ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded border border-indigo-300' : ''}`}
+                onMouseDown={(e) => !isPrint && handleDecoMouseDown(e, d.id)}
+                className={`origin-top-left ${activeDecoId === d.id && !isPrint ? 'ring-2 ring-indigo-500 rounded' : ''}`}
               >
-                  <img src={d.url} className="max-w-[300px] h-auto min-w-[50px] min-h-[50px] object-contain select-none pointer-events-none" draggable={false} alt="Decoration" />
+                  <img src={d.url} className="max-w-[300px] h-auto object-contain select-none pointer-events-none" draggable={false} alt="" />
+                  
+                  {/* Controls for Editing */}
+                  {isEditing && !isPrint && (
+                      <div className="absolute -top-10 left-0 flex items-center gap-1 bg-white shadow-md rounded p-1 pointer-events-auto">
+                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, 0.1); }} className="p-1 hover:bg-gray-100 rounded text-green-600"><Plus size={14}/></button>
+                          <button onClick={(e) => { e.stopPropagation(); updateDecoScale(d.id, -0.1); }} className="p-1 hover:bg-gray-100 rounded text-red-600"><Minus size={14}/></button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteDecoration(d.id); }} className="p-1 hover:bg-gray-100 rounded text-red-600 ml-2"><Trash2 size={14}/></button>
+                      </div>
+                  )}
               </div>
           ))}
       </div>
@@ -694,95 +640,73 @@ export default function App() {
   return (
     <div className="min-h-screen pb-4 relative">
       
-      {/* ======================= FIXED EDIT CONTROLS (Active Decoration) ======================= */}
-      {isEditing && activeDecoId && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[3000] bg-white shadow-2xl rounded-full px-6 py-3 border border-gray-200 flex items-center gap-6 animate-fade-in no-print">
-              <span className="text-xs font-bold text-gray-500 hidden md:block">تحكم بالزخرفة:</span>
-              <button onClick={() => updateDecoScale(activeDecoId, 0.1)} className="p-2 hover:bg-gray-100 rounded-full text-brand-primary transition-colors bg-gray-50" title="تكبير"><ZoomInIcon size={24}/></button>
-              <button onClick={() => updateDecoScale(activeDecoId, -0.1)} className="p-2 hover:bg-gray-100 rounded-full text-brand-primary transition-colors bg-gray-50" title="تصغير"><ZoomOutIcon size={24}/></button>
-              <div className="w-px h-8 bg-gray-300"></div>
-              <button onClick={() => deleteDecoration(activeDecoId)} className="p-2 hover:bg-red-50 rounded-full text-red-500 transition-colors bg-red-50" title="حذف"><Trash2 size={24}/></button>
-              <button onClick={() => setActiveDecoId(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors" title="إغلاق"><X size={20}/></button>
-          </div>
-      )}
-
       {/* ======================= PRINT VIEW ======================= */}
       <div className="hidden print-only-container">
-          {/* ... (Print logic same as before) ... */}
-          {/* 1. Cover Page (PRINT) */}
+          
+          {/* 1. Cover Page */}
           {report.coverImage && (
-            <div className="print-page">
-                {/* Full Bleed Image */}
-                <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
-                
-                {/* Overlay Text */}
-                <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
-                    <h1 className="text-2xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
-                    <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
-                    <p className="text-lg font-bold font-sans dir-ltr drop-shadow-md opacity-95 text-center">{report.header.dateRange}</p>
+            // Ensure z-0 allows img to be seen, content is z-10
+            <div className="print-page w-full h-full p-0 overflow-hidden relative" style={{ height: '297mm', width: '210mm' }}>
+                <img src={report.coverImage} className="w-full h-full object-cover absolute inset-0 z-0" alt="Cover" style={{ objectFit: 'cover' }} />
+                <div className="absolute bottom-[13%] left-0 w-full flex flex-col items-center justify-center z-10 text-white">
+                    <h1 className="text-6xl font-extrabold mb-4 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-wide text-center" style={{textShadow: '2px 2px 4px black'}}>{report.header.weekTitle}</h1>
+                    <p className="text-2xl font-bold dir-ltr drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-95 text-center" style={{textShadow: '1px 1px 3px black'}}>{report.header.dateRange}</p>
                 </div>
             </div>
           )}
 
           {/* 2. Content Pages */}
           {visitChunks.map((chunk, pageIndex) => (
-              <div key={pageIndex} className="print-page">
+              <div key={pageIndex} className="print-page flex flex-col justify-between relative">
                   <DecorationLayer isPrint={true} />
                   
-                  {/* Content Container (Safe Area) */}
-                  <div className="print-content-safe-area">
-                      <div className="relative z-10">
-                        <ReportHeaderContent />
-                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                                <div className="flex justify-between items-end px-2">
-                                    <div className="flex flex-col">
-                                        <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
-                                    </div>
-                                    <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+                  <div className="relative z-10">
+                    <ReportHeaderContent />
+                    <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                            <div className="flex justify-between items-end px-2">
+                                <div className="flex flex-col">
+                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                    <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                 </div>
-                        </div>
-                      </div>
-
-                      <div className="flex-grow flex flex-col justify-start gap-2 print:gap-1 pt-4 relative z-10">
-                          {chunk.map((visit: Visit) => (
-                               <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
-                          ))}
-                      </div>
-
-                      <ReportFooterContent />
+                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+                            </div>
+                    </div>
                   </div>
+
+                  <div className="flex-grow flex flex-col justify-start gap-4 pt-4 relative z-10">
+                      {chunk.map((visit: Visit) => (
+                           <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
+                      ))}
+                  </div>
+
+                  <ReportFooterContent />
               </div>
           ))}
 
           {/* 3. Statistics Page */}
-          <div className="print-page">
+          <div className="print-page flex flex-col justify-between relative">
                <DecorationLayer isPrint={true} />
-               
-               {/* Content Container (Safe Area) */}
-               <div className="print-content-safe-area">
-                   <div className="relative z-10">
-                       <ReportHeaderContent />
-                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                                <div className="flex justify-between items-end px-2">
-                                    <div className="flex flex-col">
-                                        <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
-                                    </div>
-                                    <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+               <div className="relative z-10">
+                   <ReportHeaderContent />
+                    <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
+                            <div className="flex justify-between items-end px-2">
+                                <div className="flex flex-col">
+                                    <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
+                                    <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
                                 </div>
-                        </div>
-                       <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
-                            <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
-                       </div>
+                                <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
+                            </div>
+                    </div>
+                   <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
+                        <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
                    </div>
-                   
-                   <div className="flex-grow flex flex-col justify-start py-4 print:py-0 relative z-10">
-                        <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
-                   </div>
-                   
-                   <ReportFooterContent />
                </div>
+               
+               <div className="flex-grow flex flex-col justify-start py-4 print:py-0 relative z-10">
+                    <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
+               </div>
+               
+               <ReportFooterContent />
           </div>
       </div>
 
@@ -796,34 +720,31 @@ export default function App() {
         </div>
       )}
 
-      {/* --- CONTROLS (MOVED OUTSIDE PAPER) --- */}
-      <div className="max-w-[210mm] mx-auto mt-4 md:mt-8 relative z-50 no-print px-4 md:px-0">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-white/40 flex flex-col items-end md:flex-row md:justify-between md:items-center gap-4 shadow-xl">
+      {/* Main Container */}
+      <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-auto mt-8 bg-white shadow-2xl min-h-[297mm] h-auto p-8 md:p-12 relative flex flex-col z-10 rounded-[2.5rem] overflow-hidden border-8 border-gray-100">
+        
+        {/* Render Free Decorations on Screen */}
+        <DecorationLayer />
+
+        {/* --- CONTROLS --- */}
+        <div className="no-print mb-8 bg-gray-50 rounded-xl p-3 border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 shadow-inner relative z-50">
             <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
                 {reports.map((r: WeeklyReport, idx) => (
-                    <button key={r.id} onClick={() => setCurrentReportIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white/50 text-gray-700 hover:bg-white border border-transparent hover:border-gray-200'}`}>{r.header.weekTitle}</button>
+                    <button key={r.id} onClick={() => setCurrentReportIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}>{r.header.weekTitle}</button>
                 ))}
-                {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
+                {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-200"><Plus size={18} /></button>}
             </div>
-            <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><Printer size={16} /> طباعة PDF</button>
+            <div className="flex items-center gap-3 flex-shrink-0">
+                <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700 text-xs font-bold shadow-sm transition-colors"><Printer size={14} /> طباعة PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}</button>
+                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-200 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}</button>
                         <button onClick={saveReportToFirestore} disabled={!isDirty || saving} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-gray-200 text-gray-400'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "تم الحفظ"}</button>
                     </>
                 )}
             </div>
         </div>
-      </div>
-
-      {/* Main Paper Container */}
-      <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto p-6 md:p-12 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
-        
-        {/* Only Render Decorations here if NOT editing, otherwise we render later for z-index issues, wait... 
-            Actually, to ensure it's on top of everything including white backgrounds of cards, it MUST be last.
-        */}
 
         {/* --- ADMIN IMPORT AREA --- */}
         {isEditing && isAdmin && (
@@ -840,26 +761,13 @@ export default function App() {
                     </div>
                     <div>
                         <div className="flex items-center gap-2 mb-3 text-brand-dark"><Move className="text-purple-500" /><h2 className="font-bold text-lg">0.1 زخارف حرة (Free SVG)</h2></div>
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* Decoration 1 Button */}
-                            <div className="flex flex-col gap-1">
-                                <input type="file" ref={decorationInputRef1} accept="image/*,.svg" onChange={handleDecorationUpload(0)} className="hidden" />
-                                <button onClick={() => decorationInputRef1.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50">
-                                    <Plus size={16} /> زخرفة 1
-                                </button>
-                                {report.decorations?.[0] && <span className="text-[10px] text-green-600 text-center">موجودة</span>}
-                            </div>
-                            
-                            {/* Decoration 2 Button */}
-                            <div className="flex flex-col gap-1">
-                                <input type="file" ref={decorationInputRef2} accept="image/*,.svg" onChange={handleDecorationUpload(1)} className="hidden" />
-                                <button onClick={() => decorationInputRef2.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50">
-                                    <Plus size={16} /> زخرفة 2
-                                </button>
-                                {report.decorations?.[1] && <span className="text-[10px] text-green-600 text-center">موجودة</span>}
-                            </div>
+                        <div className="flex gap-4 items-center">
+                            <input type="file" ref={decorationInputRef} accept="image/*,.svg" onChange={handleDecorationUpload} className="hidden" />
+                            <button onClick={() => decorationInputRef.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-purple-50" disabled={(report.decorations?.length || 0) >= 2}>
+                                <Plus size={16} /> إضافة زخرفة ({report.decorations?.length || 0}/2)
+                            </button>
+                            <span className="text-xs text-gray-500">ارفع ملف SVG أو صورة، ثم حركها بالفأرة</span>
                         </div>
-                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1"><Hand size={12}/> <span>اضغط واسحب الزخرفة على الشاشة</span></div>
                     </div>
                 </div>
 
@@ -910,36 +818,22 @@ export default function App() {
         </div>
 
         {/* Title */}
-        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
-            <div className="text-right order-2 md:order-1">
+        <div className="flex justify-between items-end bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
+            <div className="text-right">
                 <h1 className="text-2xl md:text-3xl font-bold mb-1">التقرير الأسبوعي</h1>
                 <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
             </div>
-            <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm order-1 md:order-2 w-full md:w-auto">
+            <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm">
                 {isEditing ? (
-                    <div className="flex flex-col gap-1 w-full">
-                        <input type="text" value={report.header.weekTitle} onChange={(e) => handleUpdateHeader('weekTitle', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white font-bold w-full" />
-                        <input type="text" value={report.header.dateRange} onChange={(e) => handleUpdateHeader('dateRange', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white text-sm w-full" />
+                    <div className="flex flex-col gap-1">
+                        <input type="text" value={report.header.weekTitle} onChange={(e) => handleUpdateHeader('weekTitle', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white font-bold" />
+                        <input type="text" value={report.header.dateRange} onChange={(e) => handleUpdateHeader('dateRange', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white text-sm" />
                     </div>
                 ) : (
-                    <div className="flex flex-row md:flex-col justify-between md:justify-start items-center md:items-start gap-4 md:gap-0">
-                        <h2 className="text-sm md:text-lg font-bold whitespace-nowrap">{report.header.weekTitle}</h2>
-                        
-                        {/* Mobile Date Split */}
-                        <div className="block md:hidden text-[10px] opacity-90 font-medium leading-snug text-left dir-ltr">
-                           {report.header.dateRange.includes(' الى ') ? (
-                                <div className="flex flex-col items-end">
-                                    <span>{report.header.dateRange.split(' الى ')[0]}</span>
-                                    <span>الى {report.header.dateRange.split(' الى ')[1]}</span>
-                                </div>
-                           ) : (
-                                <span>{report.header.dateRange}</span>
-                           )}
-                        </div>
-
-                        {/* Desktop Date */}
-                        <p className="hidden md:block text-sm md:text-base dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
-                    </div>
+                    <>
+                        <h2 className="text-lg font-bold">{report.header.weekTitle}</h2>
+                        <p className="text-sm md:text-base dir-ltr opacity-90 font-medium">{report.header.dateRange}</p>
+                    </>
                 )}
             </div>
         </div>
@@ -975,55 +869,28 @@ export default function App() {
         {/* Footer */}
         <div className="mt-8 pt-4 border-t border-gray-200 relative pb-4 z-20">
              <div className="text-center mb-6 text-brand-dark font-bold text-2xl relative z-10">شركاء النجاح</div>
-             <div className="w-full px-4 relative z-10">
-                
-                {/* --- MOBILE: Modern Flex Layout with Simple Dividers --- */}
-                <div className="md:hidden w-full flex flex-wrap justify-center items-center gap-y-6 px-2">
-                    {report.logos.partners.map((partner: PartnerLogo, idx) => (
-                        <div key={partner.id} className="relative flex items-center justify-center px-3 border-r border-gray-200 last:border-none">
-                             <div className={`relative flex items-center justify-center ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
-                                <img 
-                                    src={partner.url} 
-                                    className="object-contain h-8 w-auto max-w-[80px]"
-                                    alt="" 
-                                />
+             <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-8 px-4 relative z-10">
+                {report.logos.partners.map((partner: PartnerLogo, idx) => (
+                    <React.Fragment key={partner.id}>
+                        <div className="relative flex flex-col items-center gap-2 group/partner">
+                            <div className={`relative ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
+                                <img src={partner.url} style={{ height: `${48 * partner.scale}px`, width: 'auto' }} className="object-contain transition-all duration-200" alt="" />
                                 <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
                             </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* --- DESKTOP: Flex Layout (Original) --- */}
-                <div className="hidden md:flex md:flex-wrap md:justify-center md:items-center md:gap-x-4 md:gap-y-8">
-                    {report.logos.partners.map((partner: PartnerLogo, idx) => (
-                        <React.Fragment key={partner.id}>
-                            <div className="relative flex flex-col items-center gap-2 group/partner">
-                                <div className={`relative w-full flex items-center justify-center ${isEditing ? 'cursor-pointer p-1 rounded hover:bg-gray-100' : ''}`} onClick={() => isEditing && partnerRefs.current[idx]?.click()}>
-                                    <img 
-                                        src={partner.url} 
-                                        style={{ height: `${48 * partner.scale}px` }} 
-                                        className="object-contain transition-all duration-200 w-auto" 
-                                        alt="" 
-                                    />
-                                    <input type="file" ref={el => { partnerRefs.current[idx] = el; }} onChange={handleLogoUpdate('partners', idx)} className="hidden" accept="image/*,.svg" />
+                            {isEditing && (
+                                <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20">
+                                    <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={12} /></button>
+                                    <div className="w-px h-3 bg-gray-300"></div>
+                                    <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={12} /></button>
                                 </div>
-                                {isEditing && (
-                                    <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20 absolute -bottom-6 left-1/2 -translate-x-1/2">
-                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={10} /></button>
-                                        <div className="w-px h-3 bg-gray-300"></div>
-                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={10} /></button>
-                                    </div>
-                                )}
-                            </div>
-                            {idx < report.logos.partners.length - 1 && <div className="h-10 w-px bg-gray-200 mx-2"></div>}
-                        </React.Fragment>
-                    ))}
-                </div>
+                            )}
+                        </div>
+                        {idx < report.logos.partners.length - 1 && <div className="h-10 w-px bg-gray-200 mx-2 hidden md:block"></div>}
+                    </React.Fragment>
+                ))}
             </div>
+            {/* Removed ConstellationCorner as requested */}
         </div>
-
-        {/* Render Decorations LAST to ensure they are on top of everything (z-index alone sometimes fails with nested relative contexts) */}
-        <DecorationLayer />
 
       </div>
     </div>
