@@ -60,11 +60,11 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [
-          { role: 'user', parts: [{ text: systemPrompt }] },
-          { role: 'user', parts: [{ text: text }] }
-      ],
-      config: { responseMimeType: "application/json" }
+      contents: text,
+      config: { 
+          responseMimeType: "application/json",
+          systemInstruction: systemPrompt 
+      }
     });
 
     const responseText = response.text;
@@ -108,7 +108,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            contents: prompt,
             config: { responseMimeType: "application/json" }
         });
 
@@ -148,7 +148,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            contents: prompt,
             config: { responseMimeType: "application/json" }
         });
 

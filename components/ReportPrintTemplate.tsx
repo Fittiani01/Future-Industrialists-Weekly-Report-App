@@ -1,6 +1,6 @@
 import React from 'react';
 import { WeeklyReport, Visit, PartnerLogo } from '../types';
-import { Factory, Users, Calendar, Video, Mic, FileText } from 'lucide-react';
+import { Factory, Users, Calendar, Video, Mic, FileText, Building2 } from 'lucide-react';
 
 interface ReportPrintTemplateProps {
   report: WeeklyReport;
@@ -93,66 +93,58 @@ const VisitItem: React.FC<{ visit: Visit }> = ({ visit }) => {
     const headerBg = isGirls ? "#6c429e" : BRAND_COLOR;
 
     return (
-        <div className="w-full mb-3 border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm break-inside-avoid box-border">
-            {/* 1. Header Strip - Fixed Height 17mm */}
+        <div className="w-full mb-3 border border-gray-200 rounded-lg bg-white shadow-sm break-inside-avoid box-border overflow-hidden">
+            {/* 1. Header Strip - Fixed Height 17mm - Updated Layout */}
             <div 
-                className="w-full h-[17mm] flex items-center justify-between px-3 box-border"
-                style={{ backgroundColor: headerBg, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                className="w-full h-[17mm] flex items-center justify-between px-3 box-border relative"
+                style={{ backgroundColor: headerBg, printColorAdjust: 'exact' as any, WebkitPrintColorAdjust: 'exact' as any }}
             >
-                {/* Right: School & Factory Text - CENTERED */}
-                <div className="flex flex-col justify-center items-center text-center h-full overflow-hidden flex-grow px-2">
-                    {/* School Name */}
-                    <div className="flex items-center justify-center h-[50%] w-full">
-                         <h3 className="text-white font-bold text-[13px] font-sans whitespace-nowrap overflow-hidden text-ellipsis leading-none pb-2 -mt-0.5" style={{ fontFamily: 'Tajawal, sans-serif' }}>
+                {/* Right Side: Text Info with Icons */}
+                <div className="flex flex-col justify-center h-full text-right overflow-hidden flex-grow pr-2 gap-1.5">
+                     
+                     {/* School Line */}
+                     <div className="flex items-center gap-2 min-w-0">
+                        <div className="bg-white/20 p-1 rounded flex-shrink-0 flex items-center justify-center">
+                            <Building2 className="w-3 h-3 text-white" />
+                        </div>
+                        {/* Lifted text with pb-1 and relaxed leading to prevent cutting */}
+                        <div className="text-white font-bold text-[12px] leading-relaxed truncate pb-1 pt-0.5" style={{ fontFamily: 'Tajawal, sans-serif' }}>
                             {visit.schoolName}
-                        </h3>
-                    </div>
-                    
-                    {/* Factory Name */}
-                    <div className="flex items-center justify-center gap-1 text-indigo-100 text-[11px] h-[50%] -mt-2 w-full">
-                        {/* Lift Icon to match text baseline - Increased margin to match text lift */}
-                        <Factory size={12} className="flex-shrink-0 mb-[9px]" />
-                        {/* Lift Text using padding-bottom */}
-                        <span className="truncate font-sans leading-none pb-[10px]" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.factory}</span>
-                    </div>
+                        </div>
+                     </div>
+
+                     {/* Factory Line */}
+                     <div className="flex items-center gap-2 min-w-0">
+                        <div className="bg-white/10 p-1 rounded flex-shrink-0 flex items-center justify-center">
+                            <Factory className="w-3 h-3 text-indigo-100" />
+                        </div>
+                         {/* Lifted text with pb-1 and relaxed leading */}
+                        <div className="text-indigo-100 text-[10px] font-bold leading-relaxed truncate opacity-100 pb-1 pt-0.5" style={{ fontFamily: 'Tajawal, sans-serif' }}>
+                            {visit.factory}
+                        </div>
+                     </div>
+
                 </div>
 
-                {/* Left: Stats & Logo */}
+                {/* Left Side: Stats & Logo */}
                 <div className="flex items-center gap-2 flex-shrink-0 h-full py-0">
-                    
-                    {/* Stats Group - Center Vertically in parent */}
                     <div className="flex items-end gap-2 h-full pb-[2mm]">
-                        {/* Date Pill - Height fixed, text lifted */}
-                        <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[80px]">
-                            {/* pb-[6px] is roughly 6px padding bottom to lift the Tajawal numbers */}
-                            <span className="text-white text-[11px] font-bold dir-ltr leading-none pb-[6px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.date}</span>
+                        {/* Date Pill */}
+                        <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[70px]">
+                            <span className="text-white text-[10px] font-bold dir-ltr pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.date}</span>
                             <Calendar size={12} className="text-white/90 mb-[1px]" />
                         </div>
                         {/* Participants Pill */}
-                        <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[50px]">
-                            <span className="text-white text-[11px] font-bold leading-none pb-[6px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.participants}</span>
+                        <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[45px]">
+                            <span className="text-white text-[10px] font-bold pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.participants}</span>
                             <Users size={12} className="text-white/90 mb-[1px]" />
                         </div>
                     </div>
-
-                    {/* Factory Logo */}
+                    
+                    {/* Factory Logo Box */}
                     {visit.factoryLogo && (
-                        <div 
-                            className="bg-white rounded overflow-hidden shadow-sm flex items-center justify-center ml-1 self-center"
-                            style={{
-                                width: '13mm',
-                                height: '13mm',
-                                minWidth: '13mm',
-                                minHeight: '13mm',
-                                backgroundColor: 'white',
-                                border: '1px solid white'
-                            }}
-                        >
-                             <img 
-                                src={visit.factoryLogo}
-                                className="w-full h-full object-contain"
-                                alt=""
-                            />
+                        <div className="bg-white rounded overflow-hidden shadow-sm flex items-center justify-center w-[13mm] h-[13mm] border border-white box-border">
+                             <img src={visit.factoryLogo} className="w-full h-full object-contain" alt="" />
                         </div>
                     )}
                 </div>
@@ -188,8 +180,8 @@ const MainStatBox: React.FC<{ label: string; value: number; primary?: boolean }>
         style={{ 
             backgroundColor: primary ? BRAND_COLOR : '#ffffff',
             color: primary ? 'white' : BRAND_COLOR,
-            printColorAdjust: 'exact',
-            WebkitPrintColorAdjust: 'exact'
+            printColorAdjust: 'exact' as any,
+            WebkitPrintColorAdjust: 'exact' as any
         }}
     >
         <span className="text-[32px] font-black leading-none mb-1 mt-1 pb-2" style={{ fontFamily: 'Tajawal, sans-serif' }}>{value.toLocaleString()}</span>
@@ -225,15 +217,6 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
   const visitsChunks = chunkArray<Visit>(report.visits, 4); 
   const hasPageBg = !!report.pageBackgroundImage;
 
-  // Background Image Style helper
-  const bgStyle = hasPageBg ? {
-      backgroundImage: `url('${report.pageBackgroundImage}')`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      printColorAdjust: 'exact',
-      WebkitPrintColorAdjust: 'exact'
-  } : {};
-
   return (
     <div 
         className="flex flex-col items-center bg-gray-50 gap-10 font-sans text-right" 
@@ -258,8 +241,18 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
             <div 
                 key={i} 
                 className="strict-page relative flex flex-col bg-white box-border" 
-                style={{ width: '210mm', height: '297mm', ...bgStyle }}
+                style={{ width: '210mm', height: '297mm' }}
             >
+                {/* Background Image Layer (Absolute) - Solves Resolution Issues */}
+                {hasPageBg && (
+                    <img 
+                        src={report.pageBackgroundImage} 
+                        className="absolute inset-0 w-full h-full object-cover -z-10" 
+                        alt="" 
+                        style={{ pointerEvents: 'none' }}
+                    />
+                )}
+
                 {/* Header Section */}
                 {hasPageBg ? <div className="h-[30mm] w-full" /> : <PrintHeader report={report} />}
 
@@ -290,8 +283,18 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
         {/* 3. STATISTICS PAGE */}
         <div 
             className="strict-page relative flex flex-col bg-white box-border" 
-            style={{ width: '210mm', height: '297mm', ...bgStyle }}
+            style={{ width: '210mm', height: '297mm' }}
         >
+             {/* Background Image Layer */}
+             {hasPageBg && (
+                <img 
+                    src={report.pageBackgroundImage} 
+                    className="absolute inset-0 w-full h-full object-cover -z-10" 
+                    alt="" 
+                    style={{ pointerEvents: 'none' }}
+                />
+             )}
+
              {hasPageBg ? <div className="h-[30mm] w-full" /> : <PrintHeader report={report} />}
 
              {/* Moved down using mt-16 and pb-8 */}

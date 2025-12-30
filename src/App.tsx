@@ -423,7 +423,7 @@ export default function App() {
         try {
             const url = await uploadReportImage(file, report.id, 'cover_page');
             updateCurrentReport({ coverImage: url });
-        } catch(e) { console.error(e); }
+        } catch(e: any) { console.error(e); }
     }
   };
 
@@ -471,15 +471,20 @@ export default function App() {
           const reader = new FileReader();
           reader.onload = async (event) => {
               try {
-                  const arrayBuffer = event.target?.result as ArrayBuffer;
-                  const result = await mammoth.extractRawText({ arrayBuffer });
-                  setRawText(result.value);
-              } catch (err) { console.error(err); }
+                  const target = event.target as FileReader;
+                  const arrayBuffer = target.result as ArrayBuffer;
+                  const result: any = await mammoth.extractRawText({ arrayBuffer } as any);
+                  setRawText(result.value ? String(result.value) : "");
+              } catch (err: any) { console.error(err); }
           };
           reader.readAsArrayBuffer(file);
       } else if (file.name.endsWith('.txt')) {
           const reader = new FileReader();
-          reader.onload = (event) => setRawText(event.target?.result as string || "");
+          reader.onload = (event) => {
+              const target = event.target as FileReader;
+              const text = target.result;
+              setRawText(typeof text === 'string' ? text : "");
+          };
           reader.readAsText(file);
       }
   };
@@ -547,7 +552,7 @@ export default function App() {
                         const visit = visitMap.get(id);
                         if (visit) visit.factoryLogo = url;
                     });
-                } catch(e) { console.error(e); }
+                } catch(e: any) { console.error(e); }
             }
         }
         updateCurrentReport(prev => ({ ...prev, visits: newVisits }));

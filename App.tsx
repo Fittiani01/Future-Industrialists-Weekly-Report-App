@@ -7,7 +7,6 @@ import { StatisticsSection } from './components/StatisticsSection';
 import { ReportPrintTemplate } from './components/ReportPrintTemplate';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
 import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock } from 'lucide-react';
-import mammoth from 'mammoth';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
@@ -222,16 +221,17 @@ export default function App() {
         for (let i = 0; i < pages.length; i++) {
             const pageEl = pages[i] as HTMLElement;
             
-            // Capture with html2canvas - Scale 3 (High Quality)
+            // Capture with html2canvas 
+            // UPDATED: Scale 4 (Maximum Quality) and specific window dimensions to prevent downsampling
             const canvas = await html2canvas(pageEl, {
-                scale: 3, 
+                scale: 4, 
                 useCORS: true, 
                 backgroundColor: '#ffffff',
                 logging: false,
                 width: 794,
                 height: 1123,
-                windowWidth: 794,
-                windowHeight: 1123,
+                windowWidth: 1600, // Force large viewport simulation
+                windowHeight: 2000,
                 allowTaint: true,
                 imageTimeout: 15000,
                 onclone: (doc) => {
@@ -244,7 +244,8 @@ export default function App() {
                 }
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.90); 
+            // UPDATED: Quality 1.0 to prevent JPEG compression artifacts
+            const imgData = canvas.toDataURL('image/jpeg', 1.0); 
             
             if (i > 0) pdf.addPage();
             pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
@@ -583,26 +584,6 @@ export default function App() {
           newPartners[index] = { ...newPartners[index], scale: newScale };
           return { ...prev, logos: { ...prev.logos, partners: newPartners } };
       });
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (file.name.endsWith('.docx')) {
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-              try {
-                  const arrayBuffer = event.target?.result as ArrayBuffer;
-                  const result = await mammoth.extractRawText({ arrayBuffer });
-                  setRawText(result.value);
-              } catch (err) { console.error(err); }
-          };
-          reader.readAsArrayBuffer(file);
-      } else if (file.name.endsWith('.txt')) {
-          const reader = new FileReader();
-          reader.onload = (event) => setRawText(event.target?.result as string || "");
-          reader.readAsText(file);
-      }
   };
 
   const handleSmartParse = async () => {
