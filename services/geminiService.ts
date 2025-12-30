@@ -2,11 +2,11 @@ import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
 const getAIClient = () => {
-    // @ts-ignore
-    const apiKey = import.meta.env.VITE_API_KEY ?? import.meta.env['VITE_API_KEY'];
+    // Ensure we use process.env.API_KEY as per guidelines
+    const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
-      throw new Error('VITE_API_KEY is missing');
+      throw new Error('API_KEY is missing');
     }
 
     return new GoogleGenAI({ apiKey });

@@ -30,7 +30,7 @@ const VisitImageItem = ({
 
     return (
         <div 
-            className={`relative aspect-video bg-gray-200 rounded-lg print:rounded-md overflow-hidden border border-gray-300 print:border-none flex items-center justify-center group shadow-sm print:shadow-none ${!isEditing ? 'cursor-zoom-in' : ''}`}
+            className={`relative h-32 md:h-40 bg-gray-200 rounded-lg print:rounded-md overflow-hidden border border-gray-300 print:border-none flex items-center justify-center group shadow-sm print:shadow-none ${!isEditing ? 'cursor-zoom-in' : ''}`}
             onClick={onClick}
         >
             {isLoading && (
@@ -41,7 +41,7 @@ const VisitImageItem = ({
             <img 
                 src={src} 
                 alt={`Visit ${idx + 1}`} 
-                className={`w-full h-full object-cover transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                className={`w-full h-full object-cover object-center transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                 onLoad={() => setIsLoading(false)} 
             />
             {isEditing && (
@@ -276,7 +276,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                             onClick={() => !isEditing && onImageClick(visit.images[idx])}
                         />
                     ) : (
-                        <div className="relative aspect-video bg-gray-200 rounded-lg print:rounded-md overflow-hidden border border-gray-300 print:border-none flex items-center justify-center group shadow-sm print:shadow-none">
+                        <div className="relative h-32 md:h-40 bg-gray-200 rounded-lg print:rounded-md overflow-hidden border border-gray-300 print:border-none flex items-center justify-center group shadow-sm print:shadow-none">
                             <div className="flex flex-col items-center justify-center text-gray-400">
                                 {isEditing ? (
                                     <>

@@ -59,6 +59,7 @@ export interface WeeklyReport {
   id?: string;
   createdAt?: any; // Firestore Timestamp
   coverImage?: string; // Optional full-page cover image
+  pageBackgroundImage?: string; // Optional full-page background for inner pages
   header: ReportHeader;
   visits: Visit[];
   stats: Statistics;

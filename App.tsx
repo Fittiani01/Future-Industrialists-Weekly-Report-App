@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Visit, WeeklyReport, Statistics, CategoryLogos, PartnerLogo, Decoration } from './types';
 import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
+import { ReportPrintTemplate } from './components/ReportPrintTemplate';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, FileDown } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock } from 'lucide-react';
 import mammoth from 'mammoth';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 // Firebase Imports
 import { db, auth } from './firebase';
@@ -27,10 +31,11 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   
-  // Admin Mode State - Default to FALSE (Public view)
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  // Admin Mode State - Default to TRUE to allow saving
+  const [isAdmin, setIsAdmin] = useState(true);
+  const [isEditing, setIsEditing] = useState(true);
 
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
@@ -47,8 +52,6 @@ export default function App() {
   const [isAnalyzingLogos, setIsAnalyzingLogos] = useState(false);
   const [imageMatchStatus, setImageMatchStatus] = useState<string>("");
   const [logoMatchStatus, setLogoMatchStatus] = useState<string>("");
-  
-  // Image Viewer State
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isViewerImageLoading, setIsViewerImageLoading] = useState(false);
 
@@ -57,6 +60,7 @@ export default function App() {
   const bulkImageInputRef = useRef<HTMLInputElement>(null);
   const bulkLogoInputRef = useRef<HTMLInputElement>(null);
   const coverImageRef = useRef<HTMLInputElement>(null);
+  const pageBgRef = useRef<HTMLInputElement>(null);
   const decorationInputRef1 = useRef<HTMLInputElement>(null);
   const decorationInputRef2 = useRef<HTMLInputElement>(null);
   const mainLogoRef = useRef<HTMLInputElement>(null);
@@ -66,10 +70,10 @@ export default function App() {
   // 1. Initial Load from Firebase
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const adminMode = params.get('mode') === 'admin';
+    const guestMode = params.get('mode') === 'guest';
     
-    setIsAdmin(adminMode);
-    setIsEditing(adminMode);
+    setIsAdmin(!guestMode);
+    setIsEditing(!guestMode);
 
     const init = async () => {
         setLoading(true);
@@ -152,74 +156,118 @@ export default function App() {
 
   const report = reports[currentReportIndex] || INITIAL_REPORT;
 
-  // --- PDF Generation Handler ---
-  const handleSavePDF = async () => {
+  // --- PDF Download Handler using Isolated Template ---
+  const handleDownloadPDF = async () => {
       setIsPrinting(true);
+      await new Promise(resolve => setTimeout(resolve, 100)); // Allow UI to update
+
       try {
-        // 1. Prepare HTML Content
-        const printContent = document.querySelector('.print-only-container');
-        if (!printContent) throw new Error("Print content not found");
+        // 1. Create a container that is technically "visible" but behind everything
+        // Fixed positioning ensures layout engine works correctly
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.top = '0';
+        container.style.left = '0';
+        container.style.zIndex = '-9999'; // Behind everything
+        container.style.background = 'white'; // Ensure correct contrast
+        document.body.appendChild(container);
 
-        // Extract Head elements (Tailwind script, Fonts, Styles)
-        const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('\n');
-        // Filter out app logic scripts, keep Tailwind and config
-        const scripts = Array.from(document.querySelectorAll('script'))
-            .filter(s => s.src.includes('tailwindcss') || s.innerText.includes('tailwind.config'))
-            .map(s => s.outerHTML).join('\n');
-        const links = Array.from(document.querySelectorAll('link')).map(l => l.outerHTML).join('\n');
+        // 2. Render the STRICT TEMPLATE into this container
+        const root = createRoot(container);
+        root.render(<ReportPrintTemplate report={report} />);
 
-        const html = `
-          <!DOCTYPE html>
-          <html lang="ar" dir="rtl">
-            <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>${document.title}</title>
-              ${links}
-              ${scripts}
-              ${styles}
-              <style>
-                body { background: white !important; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                .print-only-container { display: block !important; width: 210mm; margin: 0 auto; }
-                .screen-only-container, .no-print, canvas, .animated-bg, .glow-layer { display: none !important; }
-                @page { size: A4; margin: 0; }
-              </style>
-            </head>
-            <body>
-              ${printContent.outerHTML}
-            </body>
-          </html>
-        `;
-
-        // 2. Call API
-        const response = await fetch('/api/pdf', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ html })
+        // 3. WAIT FOR ALL IMAGES TO LOAD
+        // Collect all potential image URLs from the report data
+        const imageUrls: string[] = [
+            report.logos.main,
+            ...report.logos.rightLogos,
+            ...report.logos.partners.map(p => p.url),
+            report.logos.categories.artist,
+            report.logos.categories.ambassador,
+            report.logos.categories.discoverer,
+            report.logos.categories.creative,
+            report.coverImage || "",
+            report.pageBackgroundImage || ""
+        ];
+        
+        report.visits.forEach(v => {
+            if (v.factoryLogo) imageUrls.push(v.factoryLogo);
+            v.images.forEach(img => imageUrls.push(img));
         });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(errText || "فشل في إنشاء ملف PDF");
+        // Preload function
+        const preloadImage = (src: string) => {
+            return new Promise<void>((resolve) => {
+                if (!src) return resolve();
+                const img = new Image();
+                img.onload = () => resolve();
+                img.onerror = () => resolve(); // Don't fail the whole process if one image fails
+                img.src = src;
+            });
+        };
+
+        // Wait for images + Fonts + small delay for React render
+        await Promise.all([
+            ...imageUrls.map(preloadImage),
+            document.fonts.ready,
+            new Promise(r => setTimeout(r, 2000)) // Increased safety buffer for fonts
+        ]);
+
+        // 4. Setup PDF
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        // 5. Select the strict pages rendered by the template
+        const pages = container.querySelectorAll('.strict-page');
+
+        for (let i = 0; i < pages.length; i++) {
+            const pageEl = pages[i] as HTMLElement;
+            
+            // Capture with html2canvas - UPDATED SCALE
+            const canvas = await html2canvas(pageEl, {
+                scale: 3, // Reduced from 4 to 3 to optimize PDF size while maintaining 300dpi-ish quality (210mm * 3 ~= 2480px width)
+                useCORS: true, 
+                backgroundColor: '#ffffff',
+                logging: false,
+                width: 794, // 210mm @ 96dpi approx
+                height: 1123,
+                windowWidth: 794,
+                windowHeight: 1123,
+                allowTaint: true,
+                imageTimeout: 15000,
+                onclone: (doc) => {
+                    // Force text to be visible and correct
+                    const els = doc.querySelectorAll('*');
+                    els.forEach((el) => {
+                       if (el instanceof HTMLElement) {
+                           el.style.fontFamily = 'Tajawal, sans-serif';
+                       }
+                    });
+                }
+            });
+
+            // Use JPEG with 0.90 quality (good balance) to prevent huge file sizes
+            const imgData = canvas.toDataURL('image/jpeg', 0.90); 
+            
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
         }
 
-        // 3. Download Blob
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
+        // 6. Download
         const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-        link.download = `Weekly-Report-${safeWeek}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        document.body.removeChild(link);
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').substring(0, 10).trim();
+        pdf.save(`التقرير-الاسبوعي-${safeWeek}-${safeDate}.pdf`);
 
-      } catch (e: any) {
+        // 7. Cleanup
+        root.unmount();
+        document.body.removeChild(container);
+
+      } catch (e) {
           console.error(e);
-          alert(`حدث خطأ أثناء حفظ الملف: ${e.message}`);
+          alert("حدث خطأ أثناء تحميل الملف");
       } finally {
           setIsPrinting(false);
       }
@@ -359,6 +407,7 @@ export default function App() {
   };
 
   const saveReportToFirestore = async () => {
+    // Basic check, though UI prevents clicking if not admin mostly
     if (!report || !isAdmin) return;
     setSaving(true);
     try {
@@ -385,7 +434,8 @@ export default function App() {
         setIsDirty(false);
         if (!report.id) updateCurrentReport({ id: reportId });
     } catch (error: any) {
-        alert(`فشل الحفظ: ${error.message || "تأكد من الاتصال بالإنترنت"}`);
+        console.error("Save Error:", error);
+        alert(`فشل الحفظ: ${error.message || "تأكد من الاتصال بالإنترنت والصلاحيات"}`);
     } finally { setSaving(false); }
   };
 
@@ -486,8 +536,20 @@ export default function App() {
     const file = e.target.files?.[0];
     if (file && report.id) {
         try {
-            const url = await uploadReportImage(file, report.id, 'cover_page');
+            // UPDATED: Pass max width 3508 (A4 at 300dpi height) for cover images
+            const url = await uploadReportImage(file, report.id, 'cover_page', { maxWidth: 3508 });
             updateCurrentReport({ coverImage: url });
+        } catch(e) { console.error(e); }
+    }
+  };
+
+  const handlePageBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && report.id) {
+        try {
+            // UPDATED: Pass max width 3508 (A4 at 300dpi height) for background images
+            const url = await uploadReportImage(file, report.id, 'page_background', { maxWidth: 3508 });
+            updateCurrentReport({ pageBackgroundImage: url });
         } catch(e) { console.error(e); }
     }
   };
@@ -723,8 +785,8 @@ export default function App() {
       {isPrinting && (
           <div className="fixed inset-0 z-[9999] bg-white/95 flex flex-col items-center justify-center">
               <Loader2 className="w-16 h-16 text-brand-primary animate-spin mb-4" />
-              <h2 className="text-2xl font-bold text-brand-dark mb-2">جاري إصدار ملف PDF...</h2>
-              <p className="text-gray-500">قد يستغرق هذا بضع ثوانٍ</p>
+              <h2 className="text-2xl font-bold text-brand-dark mb-2">جاري تجهيز ملف PDF...</h2>
+              <p className="text-gray-500">قد يستغرق هذا بضع ثوانٍ، يرجى الانتظار</p>
           </div>
       )}
 
@@ -739,67 +801,31 @@ export default function App() {
           </div>
       )}
 
-      {/* ======================= PRINT VIEW ======================= */}
-      <div className="hidden print-only-container">
-          {report.coverImage && (
-            <div className="print-page">
-                <img src={report.coverImage} className="absolute inset-0 w-full h-full object-cover z-0" alt="Cover" />
-                <div className="absolute bottom-0 pb-12 left-0 w-full flex flex-col items-center justify-end z-10 text-white px-8">
-                    <h1 className="text-2xl font-bold font-sans mb-1 drop-shadow-md tracking-wide text-center">{report.header.weekTitle}</h1>
-                    <div className="w-24 h-0.5 bg-white/90 my-3 rounded-full shadow-sm"></div>
-                    <p className="text-lg font-bold font-sans dir-ltr drop-shadow-md opacity-95 text-center">{report.header.dateRange}</p>
-                </div>
+      {/* ======================= PRINT PREVIEW MODAL ======================= */}
+      {showPrintPreview && (
+         <div className="fixed inset-0 z-[5000] bg-black/90 flex flex-col items-center overflow-y-auto pt-16 pb-20 no-print animate-fade-in">
+            <div className="fixed top-0 left-0 w-full bg-gray-900/95 backdrop-blur-md text-white p-4 z-[5010] flex justify-between items-center shadow-md border-b border-gray-800">
+                 <div className="flex items-center gap-4">
+                     <h2 className="font-bold text-lg text-white">معاينة الطباعة (A4)</h2>
+                     <span className="text-xs text-gray-400 hidden md:inline">هذا ما سيظهر في ملف PDF تماماً</span>
+                 </div>
+                 <div className="flex gap-3">
+                     <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-brand-primary hover:bg-brand-dark rounded-lg font-bold text-xs text-white transition-colors"><FileDown size={14} /> تحميل PDF</button>
+                     <button onClick={() => setShowPrintPreview(false)} className="bg-white/10 hover:bg-red-600 text-white p-2 rounded-lg transition-colors"><X size={20} /></button>
+                 </div>
             </div>
-          )}
-          {visitChunks.map((chunk, pageIndex) => (
-              <div key={pageIndex} className="print-page">
-                  <DecorationLayer isPrint={true} />
-                  <div className="print-content-safe-area">
-                      <div className="relative z-10">
-                        <ReportHeaderContent />
-                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                                <div className="flex justify-between items-end px-2">
-                                    <div className="flex flex-col">
-                                        <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
-                                    </div>
-                                    <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
-                                </div>
-                        </div>
-                      </div>
-                      <div className="flex-grow flex flex-col justify-start gap-2 print:gap-1 pt-4 relative z-10">
-                          {chunk.map((visit: Visit) => (
-                               <VisitCard key={visit.id} visit={visit} isEditing={false} onUpdate={() => {}} onDelete={() => {}} onImageClick={() => {}} />
-                          ))}
-                      </div>
-                      <ReportFooterContent />
-                  </div>
-              </div>
-          ))}
-          <div className="print-page">
-               <DecorationLayer isPrint={true} />
-               <div className="print-content-safe-area">
-                   <div className="relative z-10">
-                       <ReportHeaderContent />
-                        <div className="mb-4 mt-2 border-b-2 border-brand-primary/20 pb-2">
-                                <div className="flex justify-between items-end px-2">
-                                    <div className="flex flex-col">
-                                        <h1 className="text-xl font-bold text-brand-dark">التقرير الأسبوعي ({report.header.weekTitle})</h1>
-                                        <span className="text-xs font-bold text-brand-primary/80">مبادرة صناعيو المستقبل – النسخة الرابعة</span>
-                                    </div>
-                                    <span className="text-sm text-gray-500 dir-ltr font-medium mb-0.5">{report.header.dateRange}</span>
-                                </div>
-                        </div>
-                       <div className="mb-6 print:mb-2 border-b-2 border-brand-primary/20 pb-2 mt-4 print:mt-1">
-                            <h2 className="text-3xl print:text-xl font-bold text-center text-brand-dark">إحصائيات المبادرة</h2>
-                       </div>
-                   </div>
-                   <div className="flex-grow flex flex-col justify-start py-4 print:py-0 relative z-10">
-                        <StatisticsSection stats={report.stats} categoryLogos={report.logos.categories} isEditing={false} onUpdate={() => {}} onLogoUpdate={() => (() => {})} />
-                   </div>
-                   <ReportFooterContent />
-               </div>
-          </div>
+            
+            {/* Container for the scaled A4 pages */}
+            <div className="transform-gpu origin-top scale-[0.45] md:scale-[0.6] lg:scale-[0.75] transition-transform flex flex-col gap-10 mt-4">
+                <ReportPrintTemplate report={report} />
+            </div>
+         </div>
+      )}
+
+      {/* ======================= PRINT VIEW (HIDDEN) ======================= */}
+      {/* This section is only for quick debugging if user uses browser print, but main export is PDF */}
+      <div className="hidden print-only-container">
+            {/* Browser print support is secondary to PDF generation */}
       </div>
 
       {/* ======================= SCREEN VIEW ======================= */}
@@ -834,12 +860,20 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button onClick={handleSavePDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><FileDown size={16} /> حفظ PDF</button>
+                <button 
+                    onClick={() => { setIsAdmin(!isAdmin); setIsEditing(!isAdmin); }} 
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title={isAdmin ? "Switch to View Mode" : "Switch to Admin Mode"}
+                >
+                    {isAdmin ? <Unlock size={16} /> : <Lock size={16} />}
+                </button>
+                <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><FileDown size={16} /> تحميل PDF</button>
                 {isAdmin && (
                     <>
-                        <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                        <button onClick={() => setShowPrintPreview(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"><Eye size={14} /> معاينة الطباعة</button>
                         <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}</button>
-                        <button onClick={saveReportToFirestore} disabled={!isDirty || saving} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-gray-200 text-gray-400'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "تم الحفظ"}</button>
+                        <button onClick={saveReportToFirestore} disabled={saving} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-brand-primary text-white hover:bg-brand-dark'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "حفظ"}</button>
                     </>
                 )}
             </div>
@@ -859,16 +893,25 @@ export default function App() {
                             {report.coverImage && <button onClick={() => updateCurrentReport({ coverImage: undefined })} className="text-red-500 text-xs underline">حذف</button>}
                         </div>
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2 mb-3 text-brand-dark"><Move className="text-purple-500" /><h2 className="font-bold text-lg">0.1 زخارف حرة (Free SVG)</h2></div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <input type="file" ref={decorationInputRef1} accept="image/*,.svg" onChange={handleDecorationUpload(0)} className="hidden" />
-                            <button onClick={() => decorationInputRef1.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50"><Plus size={16} /> زخرفة 1</button>
-                            <input type="file" ref={decorationInputRef2} accept="image/*,.svg" onChange={handleDecorationUpload(1)} className="hidden" />
-                            <button onClick={() => decorationInputRef2.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50"><Plus size={16} /> زخرفة 2</button>
+                     <div>
+                        <div className="flex items-center gap-2 mb-3 text-brand-dark"><LayoutTemplate className="text-blue-500" /><h2 className="font-bold text-lg">0.1 خلفية الصفحات (الداخلية)</h2></div>
+                        <div className="flex gap-4 items-center">
+                            <input type="file" ref={pageBgRef} accept="image/*" onChange={handlePageBackgroundUpload} className="hidden" />
+                            <button onClick={() => pageBgRef.current?.click()} className="bg-white border border-blue-300 text-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-blue-50"><ImageIcon size={16} /> رفع خلفية (A4)</button>
+                            {report.pageBackgroundImage && <button onClick={() => updateCurrentReport({ pageBackgroundImage: undefined })} className="text-red-500 text-xs underline">حذف</button>}
                         </div>
                     </div>
                 </div>
+                 <div className="border-b border-indigo-100 pb-6">
+                    <div className="flex items-center gap-2 mb-3 text-brand-dark"><Move className="text-purple-500" /><h2 className="font-bold text-lg">0.2 زخارف حرة (Free SVG)</h2></div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="file" ref={decorationInputRef1} accept="image/*,.svg" onChange={handleDecorationUpload(0)} className="hidden" />
+                        <button onClick={() => decorationInputRef1.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50"><Plus size={16} /> زخرفة 1</button>
+                        <input type="file" ref={decorationInputRef2} accept="image/*,.svg" onChange={handleDecorationUpload(1)} className="hidden" />
+                        <button onClick={() => decorationInputRef2.current?.click()} className="bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:bg-purple-50"><Plus size={16} /> زخرفة 2</button>
+                    </div>
+                </div>
+
                 <div className="border-b border-indigo-100 pb-6">
                     <div className="flex items-center gap-2 mb-3 text-brand-dark"><Sparkles className="text-yellow-500" /><h2 className="font-bold text-lg">1. استيراد البيانات</h2></div>
                     <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="نص التقرير..." className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm mb-2" dir="rtl" />
@@ -922,10 +965,7 @@ export default function App() {
                         isEditing={isEditing} 
                         onUpdate={handleUpdateVisit}
                         onDelete={handleDeleteVisit}
-                        onImageClick={(url) => {
-                             setSelectedImage(url);
-                             setIsViewerImageLoading(true); // Reset loading state for new image
-                        }}
+                        onImageClick={(url) => setSelectedImage(url)}
                         onUploadImages={(files) => handleManualVisitImageUpload(files, visit.id)}
                         onUploadLogo={(file) => handleVisitLogoUpload(file, visit.id)}
                     />
