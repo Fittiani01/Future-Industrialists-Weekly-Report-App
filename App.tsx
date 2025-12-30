@@ -33,9 +33,9 @@ export default function App() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   
-  // Admin Mode State - Default to TRUE to allow saving
-  const [isAdmin, setIsAdmin] = useState(true);
-  const [isEditing, setIsEditing] = useState(true);
+  // Admin Mode State - Default to FALSE (Public User View)
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
@@ -70,10 +70,11 @@ export default function App() {
   // 1. Initial Load from Firebase
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const guestMode = params.get('mode') === 'guest';
+    // Enable Admin mode ONLY if ?mode=admin is present
+    const adminMode = params.get('mode') === 'admin';
     
-    setIsAdmin(!guestMode);
-    setIsEditing(!guestMode);
+    setIsAdmin(adminMode);
+    setIsEditing(adminMode);
 
     const init = async () => {
         setLoading(true);
@@ -84,9 +85,8 @@ export default function App() {
         }
 
         try {
-            // UPDATED: 'asc' means Oldest First. 
+            // 'asc' means Oldest First. 
             // In RTL, index 0 is RIGHT, index N is LEFT.
-            // This ensures Week 1 is on the right.
             const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
@@ -98,7 +98,7 @@ export default function App() {
 
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
-                // Open the LATEST report by default (the one at the end of the array)
+                // Open the LATEST report by default
                 setCurrentReportIndex(loadedReports.length - 1);
             } else {
                 setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`}]);
@@ -163,7 +163,6 @@ export default function App() {
 
       try {
         // 1. Create a container that is technically "visible" but behind everything
-        // Fixed positioning ensures layout engine works correctly
         const container = document.createElement('div');
         container.style.position = 'fixed';
         container.style.top = '0';
@@ -177,7 +176,6 @@ export default function App() {
         root.render(<ReportPrintTemplate report={report} />);
 
         // 3. WAIT FOR ALL IMAGES TO LOAD
-        // Collect all potential image URLs from the report data
         const imageUrls: string[] = [
             report.logos.main,
             ...report.logos.rightLogos,
@@ -195,18 +193,16 @@ export default function App() {
             v.images.forEach(img => imageUrls.push(img));
         });
 
-        // Preload function
         const preloadImage = (src: string) => {
             return new Promise<void>((resolve) => {
                 if (!src) return resolve();
                 const img = new Image();
                 img.onload = () => resolve();
-                img.onerror = () => resolve(); // Don't fail the whole process if one image fails
+                img.onerror = () => resolve(); 
                 img.src = src;
             });
         };
 
-        // Wait for images + Fonts + small delay for React render
         await Promise.all([
             ...imageUrls.map(preloadImage),
             document.fonts.ready,
@@ -226,20 +222,19 @@ export default function App() {
         for (let i = 0; i < pages.length; i++) {
             const pageEl = pages[i] as HTMLElement;
             
-            // Capture with html2canvas - UPDATED SCALE
+            // Capture with html2canvas - Scale 3 (High Quality)
             const canvas = await html2canvas(pageEl, {
-                scale: 3, // Reduced from 4 to 3 to optimize PDF size while maintaining 300dpi-ish quality (210mm * 3 ~= 2480px width)
+                scale: 3, 
                 useCORS: true, 
                 backgroundColor: '#ffffff',
                 logging: false,
-                width: 794, // 210mm @ 96dpi approx
+                width: 794,
                 height: 1123,
                 windowWidth: 794,
                 windowHeight: 1123,
                 allowTaint: true,
                 imageTimeout: 15000,
                 onclone: (doc) => {
-                    // Force text to be visible and correct
                     const els = doc.querySelectorAll('*');
                     els.forEach((el) => {
                        if (el instanceof HTMLElement) {
@@ -249,7 +244,6 @@ export default function App() {
                 }
             });
 
-            // Use JPEG with 0.90 quality (good balance) to prevent huge file sizes
             const imgData = canvas.toDataURL('image/jpeg', 0.90); 
             
             if (i > 0) pdf.addPage();
@@ -860,17 +854,10 @@ export default function App() {
                 {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
-                <button 
-                    onClick={() => { setIsAdmin(!isAdmin); setIsEditing(!isAdmin); }} 
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    title={isAdmin ? "Switch to View Mode" : "Switch to Admin Mode"}
-                >
-                    {isAdmin ? <Unlock size={16} /> : <Lock size={16} />}
-                </button>
-                <div className="h-6 w-px bg-gray-300 mx-1"></div>
                 <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><FileDown size={16} /> تحميل PDF</button>
                 {isAdmin && (
                     <>
+                        <div className="h-6 w-px bg-gray-300 mx-1"></div>
                         <button onClick={() => setShowPrintPreview(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"><Eye size={14} /> معاينة الطباعة</button>
                         <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}</button>
                         <button onClick={saveReportToFirestore} disabled={saving} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-brand-primary text-white hover:bg-brand-dark'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "حفظ"}</button>
