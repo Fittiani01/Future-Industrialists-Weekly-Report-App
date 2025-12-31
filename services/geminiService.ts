@@ -35,6 +35,8 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
   2. Visits: List of visits with School Name, Participant Count, Date, and Factory Name.
   3. Statistics: Total beneficiaries, tweets, posts, videos, and category breakdowns.
 
+  IMPORTANT: Format all dates as YYYY/MM/DD (e.g., 2025/12/15) to ensure correct display.
+
   Return ONLY a valid JSON object matching this TypeScript interface:
   {
     header: { weekTitle: string, dateRange: string },

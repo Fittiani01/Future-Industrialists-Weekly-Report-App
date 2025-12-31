@@ -9,6 +9,7 @@ import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from 
 import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import mammoth from 'mammoth';
 
 // Firebase Imports
 import { db, auth } from './firebase';
@@ -158,8 +159,7 @@ export default function App() {
   // --- PDF Download Handler using Isolated Template ---
   const handleDownloadPDF = async () => {
       setIsPrinting(true);
-      await new Promise(resolve => setTimeout(resolve, 100)); // Allow UI to update
-
+      
       try {
         // 1. Create a container that is technically "visible" but behind everything
         const container = document.createElement('div');
@@ -174,39 +174,28 @@ export default function App() {
         const root = createRoot(container);
         root.render(<ReportPrintTemplate report={report} />);
 
-        // 3. WAIT FOR ALL IMAGES TO LOAD
-        const imageUrls: string[] = [
-            report.logos.main,
-            ...report.logos.rightLogos,
-            ...report.logos.partners.map(p => p.url),
-            report.logos.categories.artist,
-            report.logos.categories.ambassador,
-            report.logos.categories.discoverer,
-            report.logos.categories.creative,
-            report.coverImage || "",
-            report.pageBackgroundImage || ""
-        ];
-        
-        report.visits.forEach(v => {
-            if (v.factoryLogo) imageUrls.push(v.factoryLogo);
-            v.images.forEach(img => imageUrls.push(img));
+        // 3. ROBUST WAIT STRATEGY
+        // Wait for React to complete rendering the DOM nodes
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Find all images within the container and wait for them to load explicitly
+        const images = Array.from(container.querySelectorAll('img'));
+        const imagePromises = images.map((img) => {
+            if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+            return new Promise<void>((resolve) => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve(); // Resolve anyway so we don't hang indefinitely
+            });
         });
 
-        const preloadImage = (src: string) => {
-            return new Promise<void>((resolve) => {
-                if (!src) return resolve();
-                const img = new Image();
-                img.onload = () => resolve();
-                img.onerror = () => resolve(); 
-                img.src = src;
-            });
-        };
+        // Wait for all images to trigger onload/onerror
+        await Promise.all(imagePromises);
 
-        await Promise.all([
-            ...imageUrls.map(preloadImage),
-            document.fonts.ready,
-            new Promise(r => setTimeout(r, 2000)) // Increased safety buffer for fonts
-        ]);
+        // Wait for fonts
+        await document.fonts.ready;
+        
+        // Final buffer for decoding large images
+        await new Promise(r => setTimeout(r, 1500));
 
         // 4. Setup PDF
         const pdf = new jsPDF({
@@ -233,7 +222,7 @@ export default function App() {
                 windowWidth: 1600, // Force large viewport simulation
                 windowHeight: 2000,
                 allowTaint: true,
-                imageTimeout: 15000,
+                imageTimeout: 30000, // Increased timeout
                 onclone: (doc) => {
                     const els = doc.querySelectorAll('*');
                     els.forEach((el) => {
@@ -584,6 +573,26 @@ export default function App() {
           newPartners[index] = { ...newPartners[index], scale: newScale };
           return { ...prev, logos: { ...prev.logos, partners: newPartners } };
       });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.name.endsWith('.docx')) {
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+              try {
+                  const arrayBuffer = event.target?.result as ArrayBuffer;
+                  const result = await mammoth.extractRawText({ arrayBuffer } as any);
+                  setRawText(result.value as string);
+              } catch (err: any) { console.error(err); }
+          };
+          reader.readAsArrayBuffer(file);
+      } else if (file.name.endsWith('.txt')) {
+          const reader = new FileReader();
+          reader.onload = (event) => setRawText(event.target?.result as string || "");
+          reader.readAsText(file);
+      }
   };
 
   const handleSmartParse = async () => {

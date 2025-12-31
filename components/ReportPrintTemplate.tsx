@@ -129,15 +129,15 @@ const VisitItem: React.FC<{ visit: Visit }> = ({ visit }) => {
                 {/* Left Side: Stats & Logo */}
                 <div className="flex items-center gap-2 flex-shrink-0 h-full py-0">
                     <div className="flex items-end gap-2 h-full pb-[2mm]">
-                        {/* Date Pill */}
+                        {/* Date Pill - Swapped Icon/Text */}
                         <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[70px]">
-                            <span className="text-white text-[10px] font-bold dir-ltr pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.date}</span>
                             <Calendar size={12} className="text-white/90 mb-[1px]" />
+                            <span className="text-white text-[10px] font-bold pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif', direction: 'ltr', unicodeBidi: 'plaintext' }}>{visit.date}</span>
                         </div>
-                        {/* Participants Pill */}
+                        {/* Participants Pill - Swapped Icon/Text */}
                         <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[45px]">
+                             <Users size={12} className="text-white/90 mb-[1px]" />
                             <span className="text-white text-[10px] font-bold pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.participants}</span>
-                            <Users size={12} className="text-white/90 mb-[1px]" />
                         </div>
                     </div>
                     

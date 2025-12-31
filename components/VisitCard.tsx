@@ -113,25 +113,27 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
     >
         {/* Date */}
         <div className="flex items-center gap-1.5">
+            <Calendar size={compact ? 12 : 16} className="text-indigo-200 opacity-80" />
             {isEditing ? (
                 <input
                     type="text"
                     value={visit.date}
                     onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
-                    className="bg-transparent text-white text-right focus:outline-none font-bold text-xs md:text-sm w-20"
+                    className="bg-transparent text-white text-center focus:outline-none font-bold text-xs md:text-sm w-24"
+                    style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
                 />
             ) : (
-                <span className="font-bold text-indigo-50 dir-ltr text-xs md:text-sm print:text-xs leading-none pt-0.5">
+                <span className="font-bold text-indigo-50 text-xs md:text-sm print:text-xs leading-none pt-0.5 inline-block" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>
                     {visit.date}
                 </span>
             )}
-            <Calendar size={compact ? 12 : 16} className="text-indigo-200 opacity-80" />
         </div>
 
         <div className="w-px h-3 bg-white/20 mx-0.5" />
 
         {/* Participants */}
         <div className="flex items-center gap-1.5">
+            <Users size={compact ? 12 : 16} className="text-indigo-200 opacity-80" />
             {isEditing ? (
                     <input
                     type="number"
@@ -145,7 +147,6 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                 </span>
             )}
             <span className="text-indigo-200 text-[9px] md:text-xs print:text-[9px] leading-none">مشارك</span>
-            <Users size={compact ? 12 : 16} className="text-indigo-200 opacity-80" />
         </div>
     </div>
   );

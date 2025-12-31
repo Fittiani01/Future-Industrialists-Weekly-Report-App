@@ -16,7 +16,7 @@ export const INITIAL_REPORT: WeeklyReport = {
   coverImage: undefined,
   header: {
     weekTitle: "الأسبوع الأول",
-    dateRange: "من 2026/01/18 الى 2026/01/22"
+    dateRange: "من 14 ديسمبر الى 18 ديسمبر 2025"
   },
   logos: {
       main: LOGOS.main,
@@ -39,7 +39,7 @@ export const INITIAL_REPORT: WeeklyReport = {
       id: "1",
       schoolName: "أكاديمية جدة (بنين)",
       participants: 55,
-      date: "2026/01/19",
+      date: "2025/12/15",
       factory: "يورك",
       images: []
     }
