@@ -14,6 +14,22 @@ function chunkArray<T>(array: T[], size: number): T[][] {
     return result;
 }
 
+// Helper to ensure date is displayed as YYYY/MM/DD
+const formatDisplayDate = (dateString: string) => {
+    if (!dateString) return "";
+    const cleanDate = dateString.trim();
+    // Check if format is DD/MM/YYYY or DD-MM-YYYY (1 or 2 digits, separator, 1 or 2 digits, separator, 4 digits)
+    const ddmmyyyyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/;
+    const match = cleanDate.match(ddmmyyyyRegex);
+    
+    if (match) {
+        // match[1] = DD, match[2] = MM, match[3] = YYYY
+        // Return as YYYY/MM/DD
+        return `${match[3]}/${match[2].padStart(2, '0')}/${match[1].padStart(2, '0')}`;
+    }
+    return cleanDate;
+};
+
 // --- CONSTANTS FOR LAYOUT ---
 const BRAND_COLOR = "#2a3590";
 
@@ -132,7 +148,7 @@ const VisitItem: React.FC<{ visit: Visit }> = ({ visit }) => {
                         {/* Date Pill - Swapped Icon/Text */}
                         <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[70px]">
                             <Calendar size={12} className="text-white/90 mb-[1px]" />
-                            <span className="text-white text-[10px] font-bold pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif', direction: 'ltr', unicodeBidi: 'plaintext' }}>{visit.date}</span>
+                            <span className="text-white text-[10px] font-bold pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif', direction: 'ltr', unicodeBidi: 'plaintext' }}>{formatDisplayDate(visit.date)}</span>
                         </div>
                         {/* Participants Pill - Swapped Icon/Text */}
                         <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[45px]">

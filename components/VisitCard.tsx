@@ -12,6 +12,22 @@ interface VisitCardProps {
   onUploadLogo?: (file: File) => Promise<string>;
 }
 
+// Helper to ensure date is displayed as YYYY/MM/DD
+const formatDisplayDate = (dateString: string) => {
+    if (!dateString) return "";
+    const cleanDate = dateString.trim();
+    // Check if format is DD/MM/YYYY or DD-MM-YYYY (1 or 2 digits, separator, 1 or 2 digits, separator, 4 digits)
+    const ddmmyyyyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/;
+    const match = cleanDate.match(ddmmyyyyRegex);
+    
+    if (match) {
+        // match[1] = DD, match[2] = MM, match[3] = YYYY
+        // Return as YYYY/MM/DD
+        return `${match[3]}/${match[2].padStart(2, '0')}/${match[1].padStart(2, '0')}`;
+    }
+    return cleanDate;
+};
+
 // Sub-component for individual image handling (loading state)
 const VisitImageItem = ({ 
     src, 
@@ -121,10 +137,11 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                     onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
                     className="bg-transparent text-white text-center focus:outline-none font-bold text-xs md:text-sm w-24"
                     style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
+                    placeholder="YYYY/MM/DD"
                 />
             ) : (
                 <span className="font-bold text-indigo-50 text-xs md:text-sm print:text-xs leading-none pt-0.5 inline-block" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>
-                    {visit.date}
+                    {formatDisplayDate(visit.date)}
                 </span>
             )}
         </div>
