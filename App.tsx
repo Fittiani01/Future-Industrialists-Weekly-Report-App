@@ -5,15 +5,16 @@ import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { ReportPrintTemplate } from './components/ReportPrintTemplate';
+import { LandingMap } from './components/LandingMap';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock, ArrowRight, Map as MapIcon } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import mammoth from 'mammoth';
 
 // Firebase Imports
 import { db, auth } from './firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, where } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
 
@@ -24,9 +25,13 @@ const getArabicOrdinal = (n: number) => {
 };
 
 export default function App() {
+  // Navigation State
+  const [currentView, setCurrentView] = useState<'map' | 'report'>('map');
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [currentReportIndex, setCurrentReportIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -40,7 +45,6 @@ export default function App() {
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Track dragging state to distinguish between click and drag
   const isDraggingRef = useRef(false);
 
   // Parsing & AI State
@@ -50,72 +54,74 @@ export default function App() {
   
   const [isAnalyzingImages, setIsAnalyzingImages] = useState(false);
   const [isAnalyzingLogos, setIsAnalyzingLogos] = useState(false);
-  const [imageMatchStatus, setImageMatchStatus] = useState<string>("");
-  const [logoMatchStatus, setLogoMatchStatus] = useState<string>("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isViewerImageLoading, setIsViewerImageLoading] = useState(false);
 
   // Refs
-  const wordInputRef = useRef<HTMLInputElement>(null);
   const bulkImageInputRef = useRef<HTMLInputElement>(null);
   const bulkLogoInputRef = useRef<HTMLInputElement>(null);
   const coverImageRef = useRef<HTMLInputElement>(null);
   const pageBgRef = useRef<HTMLInputElement>(null);
   const decorationInputRef1 = useRef<HTMLInputElement>(null);
   const decorationInputRef2 = useRef<HTMLInputElement>(null);
-  const mainLogoRef = useRef<HTMLInputElement>(null);
-  const rightLogoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const partnerRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // 1. Initial Load from Firebase
+  // 1. Check Admin Mode
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // Enable Admin mode ONLY if ?mode=admin is present
     const adminMode = params.get('mode') === 'admin';
-    
     setIsAdmin(adminMode);
     setIsEditing(adminMode);
+    
+    // Auth
+    signInAnonymously(auth).catch(console.error);
+  }, []);
 
-    const init = async () => {
+  // 2. Fetch Reports when Region is Selected
+  useEffect(() => {
+    if (!selectedRegion) return;
+
+    const fetchReports = async () => {
         setLoading(true);
         try {
-            await signInAnonymously(auth);
-        } catch (error) {
-            console.error("Auth Error", error);
-        }
-
-        try {
-            // 'asc' means Oldest First. 
-            // In RTL, index 0 is RIGHT, index N is LEFT.
+            // Get all reports first, then filter client-side to handle "missing region field = makkah" legacy logic
+            // Ideally we should update DB, but for now this is safer.
             const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
             const querySnapshot = await getDocs(q);
+            
             const loadedReports: WeeklyReport[] = [];
             
             querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                loadedReports.push({ id: doc.id, ...data, visits: data.visits || [] } as WeeklyReport);
+                const data = doc.data() as WeeklyReport;
+                // LEGACY HANDLING: If no region is set, assume 'makkah'.
+                const reportRegion = data.region || 'makkah';
+                
+                if (reportRegion === selectedRegion) {
+                    loadedReports.push({ id: doc.id, ...data, visits: data.visits || [] } as WeeklyReport);
+                }
             });
 
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
-                // Open the LATEST report by default
                 setCurrentReportIndex(loadedReports.length - 1);
             } else {
-                setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`}]);
+                setReports([]); // No reports for this region
             }
         } catch (error) {
             console.error("Error fetching reports:", error);
-            setReports([INITIAL_REPORT]);
+            setReports([]);
         } finally {
             setLoading(false);
         }
     };
 
-    init();
-  }, []);
+    fetchReports();
+  }, [selectedRegion]);
 
-  // 2. Fetch Visits Subcollection
+  // 3. Fetch Visits Subcollection
   useEffect(() => {
+      if (currentView !== 'report' || reports.length === 0) return;
+
       const fetchVisits = async () => {
           const reportId = reports[currentReportIndex]?.id;
           if (!reportId) return;
@@ -150,68 +156,65 @@ export default function App() {
               setVisitsLoading(false);
           }
       };
-      if (reports.length > 0) fetchVisits();
-  }, [currentReportIndex, reports.length > 0 ? reports[currentReportIndex]?.id : null]);
+      
+      fetchVisits();
+  }, [currentReportIndex, currentView, reports.length > 0 ? reports[currentReportIndex]?.id : null]);
 
 
-  const report = reports[currentReportIndex] || INITIAL_REPORT;
+  // --- Handlers ---
+
+  const handleRegionSelect = (regionId: string) => {
+      setSelectedRegion(regionId);
+      setCurrentView('report');
+  };
+
+  const handleBackToMap = () => {
+      setSelectedRegion(null);
+      setCurrentView('map');
+      setReports([]);
+  };
+
+  const report = reports[currentReportIndex] || { ...INITIAL_REPORT, region: selectedRegion || 'makkah' };
 
   // --- PDF Download Handler using Isolated Template ---
   const handleDownloadPDF = async () => {
       setIsPrinting(true);
       
       try {
-        // 1. Create a container that is technically "visible" but behind everything
         const container = document.createElement('div');
         container.style.position = 'fixed';
         container.style.top = '0';
         container.style.left = '0';
-        container.style.zIndex = '-9999'; // Behind everything
-        container.style.background = 'white'; // Ensure correct contrast
+        container.style.zIndex = '-9999';
+        container.style.background = 'white'; 
         document.body.appendChild(container);
 
-        // 2. Render the STRICT TEMPLATE into this container
         const root = createRoot(container);
         root.render(<ReportPrintTemplate report={report} />);
 
-        // 3. ROBUST WAIT STRATEGY
-        // Wait for React to complete rendering the DOM nodes
         await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Find all images within the container and wait for them to load explicitly
         const images = Array.from(container.querySelectorAll('img'));
         const imagePromises = images.map((img) => {
             if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
             return new Promise<void>((resolve) => {
                 img.onload = () => resolve();
-                img.onerror = () => resolve(); // Resolve anyway so we don't hang indefinitely
+                img.onerror = () => resolve(); 
             });
         });
-
-        // Wait for all images to trigger onload/onerror
         await Promise.all(imagePromises);
-
-        // Wait for fonts
         await document.fonts.ready;
-        
-        // Final buffer for decoding large images
         await new Promise(r => setTimeout(r, 1500));
 
-        // 4. Setup PDF
         const pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
             format: 'a4'
         });
 
-        // 5. Select the strict pages rendered by the template
         const pages = container.querySelectorAll('.strict-page');
 
         for (let i = 0; i < pages.length; i++) {
             const pageEl = pages[i] as HTMLElement;
-            
-            // Capture with html2canvas 
-            // UPDATED: Scale 4 (Maximum Quality) and specific window dimensions to prevent downsampling
             const canvas = await html2canvas(pageEl, {
                 scale: 4, 
                 useCORS: true, 
@@ -219,10 +222,10 @@ export default function App() {
                 logging: false,
                 width: 794,
                 height: 1123,
-                windowWidth: 1600, // Force large viewport simulation
+                windowWidth: 1600,
                 windowHeight: 2000,
                 allowTaint: true,
-                imageTimeout: 30000, // Increased timeout
+                imageTimeout: 30000,
                 onclone: (doc) => {
                     const els = doc.querySelectorAll('*');
                     els.forEach((el) => {
@@ -233,19 +236,16 @@ export default function App() {
                 }
             });
 
-            // UPDATED: Quality 1.0 to prevent JPEG compression artifacts
             const imgData = canvas.toDataURL('image/jpeg', 1.0); 
-            
             if (i > 0) pdf.addPage();
             pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
         }
 
-        // 6. Download
         const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
         const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').substring(0, 10).trim();
-        pdf.save(`التقرير-الاسبوعي-${safeWeek}-${safeDate}.pdf`);
+        const safeRegion = selectedRegion || 'report';
+        pdf.save(`${safeRegion}-${safeWeek}-${safeDate}.pdf`);
 
-        // 7. Cleanup
         root.unmount();
         document.body.removeChild(container);
 
@@ -257,7 +257,6 @@ export default function App() {
       }
   };
 
-  // --- Update Helpers ---
   const updateCurrentReport = (newData: Partial<WeeklyReport> | ((prev: WeeklyReport) => WeeklyReport)) => {
       setReports(prevReports => {
           const newReports = [...prevReports];
@@ -399,7 +398,8 @@ export default function App() {
         const { visits, ...mainReportData } = report;
         const reportToSave = { 
             ...mainReportData, 
-            visits: [], 
+            visits: [],
+            region: selectedRegion || 'makkah', // Ensure region is saved
             id: reportId,
             createdAt: report.createdAt || serverTimestamp() 
         };
@@ -430,24 +430,22 @@ export default function App() {
       const newReport: WeeklyReport = {
           ...INITIAL_REPORT,
           id: newId,
+          region: selectedRegion || 'makkah', // Set selected region
           header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
           logos: report.logos, 
           visits: [], 
           decorations: report.decorations || [],
           createdAt: serverTimestamp() 
       };
-      // UPDATED: Append to the end of array so newest appears on the LEFT in RTL
       setReports(prev => [...prev, newReport]); 
-      setCurrentReportIndex(reports.length); // Focus the newly added report
+      setCurrentReportIndex(reports.length); 
       setIsDirty(true);
   };
 
   const handleDeleteCurrentReport = async () => {
       if (!isAdmin) return;
-      if (reports.length <= 1) {
-          alert("لا يمكن حذف التقرير الأخير.");
-          return;
-      }
+      if (reports.length <= 0) return;
+      
       if (window.confirm("هل أنت متأكد من حذف هذا التقرير نهائياً من قاعدة البيانات؟")) {
           const reportId = report.id;
           if (reportId) {
@@ -520,7 +518,6 @@ export default function App() {
     const file = e.target.files?.[0];
     if (file && report.id) {
         try {
-            // UPDATED: Pass max width 3508 (A4 at 300dpi height) for cover images
             const url = await uploadReportImage(file, report.id, 'cover_page', { maxWidth: 3508 });
             updateCurrentReport({ coverImage: url });
         } catch(e) { console.error(e); }
@@ -531,7 +528,6 @@ export default function App() {
     const file = e.target.files?.[0];
     if (file && report.id) {
         try {
-            // UPDATED: Pass max width 3508 (A4 at 300dpi height) for background images
             const url = await uploadReportImage(file, report.id, 'page_background', { maxWidth: 3508 });
             updateCurrentReport({ pageBackgroundImage: url });
         } catch(e) { console.error(e); }
@@ -672,22 +668,19 @@ export default function App() {
   };
   const visitChunks = chunkArray(report.visits, 4);
 
-  // --- Render Sub-components ---
+  // --- Sub-Components for Render ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            {/* UPDATED: h-10 md:h-20 for better visibility on mobile */}
             <div className="flex items-center gap-1 md:gap-4 h-10 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            {/* UPDATED: max-h-[30px] for mobile */}
                             <img src={logo} alt="" className="h-full object-contain max-h-[30px] md:max-h-14 print:max-h-10" />
                         </div>
                         {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            {/* UPDATED: h-12 md:h-24 for main logo on mobile */}
             <div className="flex flex-col gap-2 relative h-12 md:h-24 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
@@ -756,13 +749,53 @@ export default function App() {
       </div>
   );
 
-  if (loading) return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-          <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
-          <p className="text-gray-500 font-medium animate-pulse">جاري تحميل البيانات، يرجى الانتظار...</p>
-      </div>
-  );
+  // ================= MAIN RENDER =================
 
+  // 1. Map View (Landing Page)
+  if (currentView === 'map') {
+      return <LandingMap onSelectRegion={handleRegionSelect} />;
+  }
+
+  // 2. Loading State (Transitioning to Report)
+  if (loading) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 animate-fade-in relative z-50">
+            <Loader2 className="w-10 h-10 text-white animate-spin" />
+            <p className="text-white font-medium animate-pulse">جاري تحميل تقارير {selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'المنطقة الشرقية' : 'القصيم'}...</p>
+        </div>
+      );
+  }
+
+  // 3. Empty State (No Reports for selected region)
+  if (reports.length === 0 && !loading) {
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center gap-6 animate-fade-in px-4 relative z-50">
+              <div className="bg-white/10 backdrop-blur-md p-8 rounded-2xl border border-white/20 text-center max-w-md w-full">
+                  <MapIcon className="w-16 h-16 text-indigo-300 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                      {selectedRegion === 'riyadh' ? 'منطقة الرياض' : selectedRegion === 'sharqiyah' ? 'المنطقة الشرقية' : selectedRegion === 'qassim' ? 'منطقة القصيم' : 'هذه المنطقة'}
+                  </h2>
+                  <p className="text-indigo-100 mb-8">
+                      لم تبدأ التقارير لهذه المنطقة بعد. سيتم إضافة البيانات قريباً.
+                  </p>
+                  
+                  <div className="flex flex-col gap-3">
+                      <button onClick={handleBackToMap} className="w-full py-3 bg-white text-brand-dark font-bold rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                          <ArrowRight size={18} /> عودة للخريطة
+                      </button>
+                      
+                      {isAdmin && (
+                          <button onClick={handleCreateNewReport} className="w-full py-3 bg-brand-primary text-white font-bold rounded-xl hover:bg-brand-dark transition-colors flex items-center justify-center gap-2 border border-white/20">
+                             <Plus size={18} /> البدء بإنشاء تقرير جديد (مشرف)
+                          </button>
+                      )}
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
+  // 4. Report View
   return (
     <div className="min-h-screen pb-4 relative">
       {/* Print Loading Overlay */}
@@ -785,7 +818,7 @@ export default function App() {
           </div>
       )}
 
-      {/* ======================= PRINT PREVIEW MODAL ======================= */}
+      {/* Print Preview Modal */}
       {showPrintPreview && (
          <div className="fixed inset-0 z-[5000] bg-black/90 flex flex-col items-center overflow-y-auto pt-16 pb-20 no-print animate-fade-in">
             <div className="fixed top-0 left-0 w-full bg-gray-900/95 backdrop-blur-md text-white p-4 z-[5010] flex justify-between items-center shadow-md border-b border-gray-800">
@@ -798,32 +831,22 @@ export default function App() {
                      <button onClick={() => setShowPrintPreview(false)} className="bg-white/10 hover:bg-red-600 text-white p-2 rounded-lg transition-colors"><X size={20} /></button>
                  </div>
             </div>
-            
-            {/* Container for the scaled A4 pages */}
             <div className="transform-gpu origin-top scale-[0.45] md:scale-[0.6] lg:scale-[0.75] transition-transform flex flex-col gap-10 mt-4">
                 <ReportPrintTemplate report={report} />
             </div>
          </div>
       )}
 
-      {/* ======================= PRINT VIEW (HIDDEN) ======================= */}
-      {/* This section is only for quick debugging if user uses browser print, but main export is PDF */}
-      <div className="hidden print-only-container">
-            {/* Browser print support is secondary to PDF generation */}
-      </div>
-
-      {/* ======================= SCREEN VIEW ======================= */}
+      {/* Screen Image Viewer */}
       {selectedImage && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-fade-in no-print" onClick={() => setSelectedImage(null)}>
             <div className="relative max-w-5xl max-h-[90vh] animate-zoom-in w-full h-full flex items-center justify-center">
                  <button onClick={() => setSelectedImage(null)} className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black/50 rounded-full p-2 z-50"><X size={32} /></button>
-                 
                  {isViewerImageLoading && (
                      <div className="absolute inset-0 flex items-center justify-center">
                          <Loader2 className="w-12 h-12 text-white animate-spin" />
                      </div>
                  )}
-                 
                  <img 
                     src={selectedImage} 
                     alt="View" 
@@ -837,19 +860,27 @@ export default function App() {
 
       <div className="max-w-[210mm] mx-auto mt-4 md:mt-8 relative z-50 no-print px-4 md:px-0">
         <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-white/40 flex flex-col items-end md:flex-row md:justify-between md:items-center gap-4 shadow-xl">
-            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide">
-                {reports.map((r: WeeklyReport, idx) => (
-                    <button key={r.id} onClick={() => setCurrentReportIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white/50 text-gray-700 hover:bg-white border border-transparent hover:border-gray-200'}`}>{r.header.weekTitle}</button>
-                ))}
-                {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
+            <div className="flex items-center gap-3 w-full">
+                {/* Back Button */}
+                <button onClick={handleBackToMap} className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors" title="عودة للخريطة">
+                    <ArrowRight size={20} />
+                </button>
+
+                <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide flex-grow">
+                    {reports.map((r: WeeklyReport, idx) => (
+                        <button key={r.id} onClick={() => setCurrentReportIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white/50 text-gray-700 hover:bg-white border border-transparent hover:border-gray-200'}`}>{r.header.weekTitle}</button>
+                    ))}
+                    {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
+                </div>
             </div>
+
             <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto pl-2 md:pl-0">
                 <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><FileDown size={16} /> تحميل PDF</button>
                 {isAdmin && (
                     <>
                         <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                        <button onClick={() => setShowPrintPreview(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"><Eye size={14} /> معاينة الطباعة</button>
-                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "وضع التعديل" : "معاينة"}</button>
+                        <button onClick={() => setShowPrintPreview(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"><Eye size={14} /> معاينة</button>
+                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "تعديل" : "معاينة"}</button>
                         <button onClick={saveReportToFirestore} disabled={saving} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-brand-primary text-white hover:bg-brand-dark'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "حفظ"}</button>
                     </>
                 )}
@@ -910,7 +941,7 @@ export default function App() {
 
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
             <div className="text-right order-2 md:order-1">
-                <h1 className="text-2xl md:text-3xl font-bold mb-1">التقرير الأسبوعي</h1>
+                <h1 className="text-2xl md:text-3xl font-bold mb-1">التقرير الأسبوعي ({selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'الشرقية' : selectedRegion === 'qassim' ? 'القصيم' : ''})</h1>
                 <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
             </div>
             <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm order-1 md:order-2 w-full md:w-auto">

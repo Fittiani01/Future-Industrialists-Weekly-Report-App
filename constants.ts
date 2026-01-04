@@ -13,6 +13,7 @@ export const LOGOS = {
 
 export const INITIAL_REPORT: WeeklyReport = {
   id: "draft-report-1",
+  region: "makkah",
   coverImage: undefined,
   header: {
     weekTitle: "الأسبوع الأول",

@@ -57,6 +57,7 @@ export interface ReportLogos {
 
 export interface WeeklyReport {
   id?: string;
+  region?: string; // 'makkah', 'riyadh', 'sharqiyah', 'qassim'
   createdAt?: any; // Firestore Timestamp
   coverImage?: string; // Optional full-page cover image
   pageBackgroundImage?: string; // Optional full-page background for inner pages
