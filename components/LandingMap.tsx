@@ -218,8 +218,6 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                     className="transition-all duration-300 ease-out"
                     filter="url(#shadow)"
                 />
-
-                {/* REMOVED: Icons and Labels as requested */}
             </g>
         );
     };
@@ -229,7 +227,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
     }
 
     return (
-        <div className="flex flex-col items-center justify-center w-full min-h-[90vh] relative z-10 px-4 overflow-hidden pt-10">
+        <div className="flex flex-col items-center justify-center w-full min-h-[85vh] relative z-10 px-4 overflow-hidden pt-4 md:pt-8">
             
             {/* Admin Controls */}
             {isAdmin && (
@@ -296,11 +294,11 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
             )}
 
             {/* Header */}
-            <div className="text-center mb-2 animate-fade-in relative z-20 pointer-events-none select-none">
-                <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-2 font-sans tracking-tight">
+            <div className="text-center mb-1 animate-fade-in relative z-20 pointer-events-none select-none scale-90 md:scale-100 origin-bottom">
+                <h1 className="text-4xl md:text-6xl font-black text-white drop-shadow-2xl mb-1 font-sans tracking-tight">
                     صناعيو المستقبل
                 </h1>
-                <div className="flex items-center justify-center gap-2 text-indigo-200 text-lg md:text-2xl font-light">
+                <div className="flex items-center justify-center gap-2 text-indigo-200 text-base md:text-xl font-light">
                     <span>النسخة الرابعة</span>
                     <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
                     <span>2025</span>
@@ -308,13 +306,13 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
             </div>
 
             {/* Selection Text */}
-            <div className="text-center text-indigo-200/80 text-sm md:text-base flex items-center justify-center gap-2 animate-bounce mb-4 relative z-20 pointer-events-none">
+            <div className="text-center text-indigo-200/80 text-xs md:text-sm flex items-center justify-center gap-2 animate-bounce mb-2 relative z-20 pointer-events-none">
                 <span>اختر المنطقة لاستعراض التقارير</span>
-                <ChevronRight size={16} className="rotate-90" />
+                <ChevronRight size={14} className="rotate-90" />
             </div>
 
             {/* Map Container */}
-            <div className="relative w-full max-w-5xl aspect-[4/3] md:aspect-[16/9] flex items-center justify-center perspective-1000">
+            <div className="relative w-full max-w-3xl lg:max-w-4xl aspect-[4/3] md:aspect-[16/9] flex items-center justify-center perspective-1000">
                 <svg 
                     ref={svgRef}
                     viewBox="0 0 800 600" 
