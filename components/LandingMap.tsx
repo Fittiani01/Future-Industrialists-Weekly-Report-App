@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Building2, Factory, MapPin, ChevronRight, Upload, Grip, RefreshCw } from 'lucide-react';
+import { Users, Building2, Factory, MapPin, ChevronRight, Upload, Grip, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { uploadReportImage } from '../utils/uploadImage';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -52,11 +52,12 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
     const [isDraggingNode, setIsDraggingNode] = useState<string | null>(null);
     const [isLoadingSettings, setIsLoadingSettings] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
+    const [showLines, setShowLines] = useState(true); // Control visibility of connection lines
     
     const svgRef = useRef<SVGSVGElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Static Data for Labels/Icons
+    // Static Data for Labels/Icons (Used only for keys now)
     const nodeMetadata: Record<string, NodeData> = {
         qassim: { label: "القصيم", icon: <Factory size={20} /> },
         riyadh: { label: "الرياض", icon: <Building2 size={24} /> },
@@ -69,7 +70,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
         bg: "transparent",
         mapFill: "rgba(30, 41, 59, 0.6)", 
         mapStroke: "rgba(148, 163, 184, 0.3)",
-        lineColor: "rgba(99, 102, 241, 0.3)", 
+        lineColor: "rgba(99, 102, 241, 0.5)", 
         nodeBase: "#1e293b", 
         nodeStroke: "#6366f1", 
         text: "#f8fafc",
@@ -87,6 +88,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                     const data = docSnap.data();
                     if (data.landingMapUrl) setMapImageUrl(data.landingMapUrl);
                     if (data.nodeLocations) setNodeLocations(data.nodeLocations);
+                    if (data.showLines !== undefined) setShowLines(data.showLines);
                 }
             } catch (e) {
                 console.error("Failed to load map settings", e);
@@ -98,12 +100,9 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
     }, []);
 
     // --- 2. Save Settings ---
-    const saveSettings = async (newUrl?: string, newLocations?: Record<string, Coordinate>) => {
+    const saveSettings = async (updates: any) => {
         try {
-            await setDoc(doc(db, "settings", "general"), {
-                landingMapUrl: newUrl !== undefined ? newUrl : mapImageUrl,
-                nodeLocations: newLocations !== undefined ? newLocations : nodeLocations
-            }, { merge: true });
+            await setDoc(doc(db, "settings", "general"), updates, { merge: true });
         } catch (e) {
             console.error("Failed to save settings", e);
         }
@@ -117,11 +116,9 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
 
         setIsUploading(true);
         try {
-            // Use a fixed ID 'global_settings' for reportId and 'landing_map' for visitId
-            // This reuses the existing upload utility
             const url = await uploadReportImage(file, 'global_settings', 'landing_map', { maxWidth: 2000 });
             setMapImageUrl(url);
-            await saveSettings(url, undefined);
+            await saveSettings({ landingMapUrl: url });
         } catch (error) {
             console.error(error);
             alert("فشل رفع الخريطة");
@@ -134,8 +131,15 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
         if (confirm("هل أنت متأكد من استعادة الخريطة الافتراضية ومواقع المدن؟")) {
             setMapImageUrl(null);
             setNodeLocations(DEFAULT_LOCATIONS);
-            await saveSettings(null, DEFAULT_LOCATIONS);
+            setShowLines(true);
+            await saveSettings({ landingMapUrl: null, nodeLocations: DEFAULT_LOCATIONS, showLines: true });
         }
+    };
+
+    const toggleLines = async () => {
+        const newState = !showLines;
+        setShowLines(newState);
+        await saveSettings({ showLines: newState });
     };
 
     // Drag Logic
@@ -166,7 +170,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
         if (isDraggingNode) {
             setIsDraggingNode(null);
             // Save new locations on drop
-            await saveSettings(undefined, nodeLocations);
+            await saveSettings({ nodeLocations });
         }
     };
 
@@ -174,8 +178,11 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
 
     const renderNode = (id: string, coord: Coordinate, meta: NodeData) => {
         const isHovered = hoveredRegion === id;
-        const isActive = id === 'makkah' && !hoveredRegion;
         const isDragging = isDraggingNode === id;
+        
+        // Increased radius to better frame text on background maps
+        // Previous: 28/32 -> New: 48/56
+        const radius = isHovered || isDragging ? 56 : 48;
 
         return (
             <g 
@@ -189,63 +196,30 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
             >
                 {/* Admin Drag Indicator */}
                 {isAdmin && (
-                    <circle cx={coord.x} cy={coord.y} r="60" fill="transparent" stroke="white" strokeDasharray="4 4" opacity="0.5" className="animate-spin-slow" />
+                    <circle cx={coord.x} cy={coord.y} r={radius + 15} fill="transparent" stroke="yellow" strokeDasharray="4 4" opacity="0.6" strokeWidth="2" className="animate-spin-slow" />
                 )}
 
-                {/* Ripple Effect (Pulse) - Only non-admin or dragging */}
-                {(!isAdmin && (isHovered || isActive)) && (
-                    <circle cx={coord.x} cy={coord.y} r="50" fill={theme.glow} opacity="0.2">
-                        <animate attributeName="r" from="30" to="60" dur="1.5s" repeatCount="indefinite" />
-                        <animate attributeName="opacity" from="0.4" to="0" dur="1.5s" repeatCount="indefinite" />
+                {/* Ripple Effect (Pulse) - Optional feedback */}
+                {(!isAdmin && (isHovered)) && (
+                    <circle cx={coord.x} cy={coord.y} r={radius + 5} fill={theme.glow} opacity="0.4">
+                        <animate attributeName="r" from={radius} to={radius + 15} dur="1.5s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite" />
                     </circle>
                 )}
 
-                {/* Connecting Line (Only visible if default SVG map is used OR specifically desired) */}
-                {!mapImageUrl && (
-                    <line x1={coord.x} y1={coord.y} x2={coord.x} y2={coord.y + 40} stroke={theme.lineColor} strokeWidth="1" />
-                )}
-
-                {/* Main Circle */}
+                {/* Main Hollow Circle */}
                 <circle 
                     cx={coord.x} 
                     cy={coord.y} 
-                    r={isHovered || isDragging ? 40 : 30} 
-                    fill={isHovered || isDragging ? theme.highlight : theme.nodeBase} 
-                    stroke={theme.text} 
-                    strokeWidth={isHovered ? 3 : 1}
+                    r={radius} 
+                    fill="rgba(255,255,255,0.01)" /* Almost transparent for clickability */
+                    stroke={isHovered ? "#ffffff" : "rgba(255,255,255,0.7)"} 
+                    strokeWidth={isHovered ? 4 : 2}
                     className="transition-all duration-300 ease-out"
                     filter="url(#shadow)"
                 />
 
-                {/* Icon */}
-                <foreignObject x={coord.x - (isHovered ? 15 : 12)} y={coord.y - (isHovered ? 25 : 20)} width={isHovered ? 30 : 24} height={isHovered ? 30 : 24} className="pointer-events-none">
-                    <div className={`flex items-center justify-center w-full h-full text-white transition-all duration-300`}>
-                        {React.cloneElement(meta.icon as React.ReactElement, { size: isHovered ? 28 : 20 })}
-                    </div>
-                </foreignObject>
-
-                {/* Label Box */}
-                <g transform={`translate(${coord.x}, ${coord.y + (isHovered ? 55 : 45)})`}>
-                    <rect 
-                        x="-50" 
-                        y="-15" 
-                        width="100" 
-                        height="30" 
-                        rx="15" 
-                        fill={isHovered || isDragging ? "#ffffff" : "rgba(30, 41, 59, 0.8)"} 
-                        className="transition-colors duration-300"
-                    />
-                    <text 
-                        x="0" 
-                        y="5" 
-                        textAnchor="middle" 
-                        fill={isHovered || isDragging ? theme.highlight : "#ffffff"} 
-                        className="text-sm font-bold transition-colors duration-300" 
-                        style={{ fontFamily: 'Tajawal', fontSize: isHovered ? '14px' : '12px' }}
-                    >
-                        {meta.label}
-                    </text>
-                </g>
+                {/* REMOVED: Icons and Labels as requested */}
             </g>
         );
     };
@@ -259,31 +233,43 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
             
             {/* Admin Controls */}
             {isAdmin && (
-                <div className="absolute top-4 left-4 z-50 flex gap-2 animate-fade-in bg-white/10 backdrop-blur-md p-3 rounded-lg border border-white/20">
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleMapUpload} 
-                        accept="image/png, image/jpeg, image/svg+xml" 
-                        className="hidden" 
-                    />
-                    <button 
-                        onClick={() => fileInputRef.current?.click()} 
-                        disabled={isUploading}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
-                    >
-                        {isUploading ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <Upload size={16} />}
-                        {mapImageUrl ? "تغيير الخريطة" : "رفع خريطة (PNG)"}
-                    </button>
+                <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 animate-fade-in bg-white/10 backdrop-blur-md p-3 rounded-lg border border-white/20">
+                    <div className="flex gap-2">
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleMapUpload} 
+                            accept="image/png, image/jpeg, image/svg+xml" 
+                            className="hidden" 
+                        />
+                        <button 
+                            onClick={() => fileInputRef.current?.click()} 
+                            disabled={isUploading}
+                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
+                        >
+                            {isUploading ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <Upload size={16} />}
+                            {mapImageUrl ? "تغيير الخريطة" : "رفع خريطة (PNG)"}
+                        </button>
+                        
+                        <button 
+                            onClick={toggleLines}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${showLines ? 'bg-indigo-500 text-white' : 'bg-gray-600 text-gray-300'}`}
+                            title={showLines ? "إخفاء الخطوط" : "إظهار الخطوط"}
+                        >
+                            {showLines ? <Eye size={16} /> : <EyeOff size={16} />}
+                        </button>
+                    </div>
+
                     {mapImageUrl && (
                         <button 
                             onClick={handleResetMap}
-                            className="flex items-center gap-2 bg-red-500/80 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
+                            className="flex items-center gap-2 bg-red-500/80 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm transition-colors w-full justify-center"
                         >
                             <RefreshCw size={16} /> استعادة الافتراضي
                         </button>
                     )}
-                    <div className="text-white text-xs flex items-center gap-1 opacity-70 border-r border-white/20 pr-3 mr-1">
+                    
+                    <div className="text-white text-xs flex items-center gap-1 opacity-70 border-t border-white/20 pt-2 mt-1">
                         <Grip size={14} />
                         <span>اسحب المدن لتعديل مواقعها</span>
                     </div>
@@ -302,7 +288,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                 </div>
             </div>
 
-            {/* Selection Text - Moved UP above map */}
+            {/* Selection Text */}
             <div className="text-center text-indigo-200/80 text-sm md:text-base flex items-center justify-center gap-2 animate-bounce mb-4 relative z-20 pointer-events-none">
                 <span>اختر المنطقة لاستعراض التقارير</span>
                 <ChevronRight size={16} className="rotate-90" />
@@ -329,18 +315,6 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                         </filter>
                     </defs>
 
-                    {/* Network Lines (Only if no custom map) */}
-                    {!mapImageUrl && (
-                        <path 
-                            d={`M${nodeLocations.makkah.x},${nodeLocations.makkah.y} L${nodeLocations.qassim.x},${nodeLocations.qassim.y} L${nodeLocations.riyadh.x},${nodeLocations.riyadh.y} L${nodeLocations.sharqiyah.x},${nodeLocations.sharqiyah.y}`}
-                            fill="none"
-                            stroke={theme.lineColor}
-                            strokeWidth="2"
-                            strokeDasharray="5,5"
-                            className="animate-pulse"
-                        />
-                    )}
-
                     {/* Base Map Layer */}
                     {mapImageUrl ? (
                         <image 
@@ -357,6 +331,18 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                             fill="url(#mapGradient)" 
                             stroke={theme.mapStroke}
                             strokeWidth="1.5"
+                        />
+                    )}
+
+                    {/* Network Lines - Restored and controlled by state */}
+                    {showLines && (
+                        <path 
+                            d={`M${nodeLocations.makkah.x},${nodeLocations.makkah.y} L${nodeLocations.qassim.x},${nodeLocations.qassim.y} L${nodeLocations.riyadh.x},${nodeLocations.riyadh.y} L${nodeLocations.sharqiyah.x},${nodeLocations.sharqiyah.y}`}
+                            fill="none"
+                            stroke={theme.lineColor}
+                            strokeWidth="2"
+                            strokeDasharray="5,5"
+                            className="animate-pulse"
                         />
                     )}
 
