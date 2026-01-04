@@ -255,7 +255,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
     }
 
     return (
-        <div className="flex flex-col items-center justify-center w-full min-h-[90vh] relative z-10 px-4 overflow-hidden">
+        <div className="flex flex-col items-center justify-center w-full min-h-[90vh] relative z-10 px-4 overflow-hidden pt-10">
             
             {/* Admin Controls */}
             {isAdmin && (
@@ -291,7 +291,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
             )}
 
             {/* Header */}
-            <div className="text-center mb-4 md:mb-8 animate-fade-in relative z-20 mt-10 pointer-events-none select-none">
+            <div className="text-center mb-2 animate-fade-in relative z-20 pointer-events-none select-none">
                 <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-2 font-sans tracking-tight">
                     صناعيو المستقبل
                 </h1>
@@ -300,6 +300,12 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                     <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
                     <span>2025</span>
                 </div>
+            </div>
+
+            {/* Selection Text - Moved UP above map */}
+            <div className="text-center text-indigo-200/80 text-sm md:text-base flex items-center justify-center gap-2 animate-bounce mb-4 relative z-20 pointer-events-none">
+                <span>اختر المنطقة لاستعراض التقارير</span>
+                <ChevronRight size={16} className="rotate-90" />
             </div>
 
             {/* Map Container */}
@@ -360,12 +366,6 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                     )}
 
                 </svg>
-            </div>
-
-            {/* Footer Text */}
-            <div className="mt-4 text-center text-indigo-200/60 text-sm flex items-center gap-2 animate-bounce pointer-events-none">
-                <span>اختر المنطقة لاستعراض التقارير</span>
-                <ChevronRight size={14} className="rotate-90" />
             </div>
         </div>
     );
