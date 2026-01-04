@@ -122,44 +122,44 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
     <div
         className={[
         "flex items-center gap-2 rounded-md bg-white/10 border border-white/5",
-        compact ? "px-2 py-1" : "px-3 py-1.5",
+        compact ? "bg-transparent border-none flex-col items-end gap-1 p-0" : "px-3 py-1.5", // Compact (Mobile) style changes
         "flex-shrink-0",
         ].join(" ")}
         style={{ fontVariantNumeric: "tabular-nums" }}
     >
         {/* Date */}
-        <div className="flex items-center gap-1.5">
-            <Calendar size={compact ? 12 : 16} className="text-indigo-200 opacity-80" />
+        <div className={`flex items-center gap-1.5 ${compact ? "bg-white/20 px-1.5 py-0.5 rounded" : ""}`}>
+            <Calendar size={compact ? 10 : 16} className="text-indigo-200 opacity-80" />
             {isEditing ? (
                 <input
                     type="text"
                     value={visit.date}
                     onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
-                    className="bg-transparent text-white text-center focus:outline-none font-bold text-xs md:text-sm w-24"
+                    className="bg-transparent text-white text-center focus:outline-none font-bold text-[10px] md:text-sm w-16 md:w-24"
                     style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
                     placeholder="YYYY/MM/DD"
                 />
             ) : (
-                <span className="font-bold text-indigo-50 text-xs md:text-sm print:text-xs leading-none pt-0.5 inline-block" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>
+                <span className="font-bold text-indigo-50 text-[10px] md:text-sm print:text-xs leading-none pt-0.5 inline-block" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>
                     {formatDisplayDate(visit.date)}
                 </span>
             )}
         </div>
 
-        <div className="w-px h-3 bg-white/20 mx-0.5" />
+        {!compact && <div className="w-px h-3 bg-white/20 mx-0.5" />}
 
         {/* Participants */}
-        <div className="flex items-center gap-1.5">
-            <Users size={compact ? 12 : 16} className="text-indigo-200 opacity-80" />
+        <div className={`flex items-center gap-1.5 ${compact ? "bg-white/20 px-1.5 py-0.5 rounded" : ""}`}>
+            <Users size={compact ? 10 : 16} className="text-indigo-200 opacity-80" />
             {isEditing ? (
                     <input
                     type="number"
                     value={visit.participants}
                     onChange={(e) => onUpdate(visit.id, { participants: parseInt(e.target.value) || 0 })}
-                    className="bg-transparent text-white text-right focus:outline-none font-bold text-xs md:text-sm w-8"
+                    className="bg-transparent text-white text-right focus:outline-none font-bold text-[10px] md:text-sm w-8"
                 />
             ) : (
-                <span className="font-bold text-indigo-50 text-xs md:text-sm print:text-xs leading-none pt-0.5">
+                <span className="font-bold text-indigo-50 text-[10px] md:text-sm print:text-xs leading-none pt-0.5">
                     {visit.participants}
                 </span>
             )}
@@ -207,12 +207,13 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                                 placeholder="اسم المدرسة..."
                             />
                         ) : (
-                            <h3 className="text-sm md:text-lg print:text-base font-bold leading-tight truncate text-white">{visit.schoolName}</h3>
+                            // UPDATED: text-xs for mobile as requested
+                            <h3 className="text-xs md:text-lg print:text-base font-bold leading-tight truncate text-white">{visit.schoolName}</h3>
                         )}
                     </div>
                 </div>
 
-                {/* Row 2: Factory + Mobile Stats */}
+                {/* Row 2: Factory */}
                 <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
                     
                     {/* Factory Name */}
@@ -234,12 +235,6 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                             )}
                         </div>
                     </div>
-
-                    {/* Stats Mobile */}
-                    <div className="flex md:hidden mt-1">
-                        <Stats compact />
-                    </div>
-
                 </div>
             </div>
 
@@ -248,8 +243,14 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                 <Stats />
             </div>
 
-            {/* LEFT: Big Factory Logo */}
-            <div className="flex-shrink-0 flex items-center pt-1 md:pt-0">
+            {/* LEFT CONTAINER: Logo + Mobile Stats */}
+            <div className="flex-shrink-0 flex items-center gap-2 pt-1 md:pt-0">
+                 
+                 {/* Mobile Stats (Stacked on Left) */}
+                 <div className="flex md:hidden">
+                    <Stats compact />
+                 </div>
+
                  <div 
                     className={`w-14 h-14 md:w-20 md:h-20 print:w-16 print:h-16 bg-white rounded-lg md:rounded-xl p-1 md:p-1.5 flex items-center justify-center relative shadow-lg overflow-hidden ${isEditing ? 'cursor-pointer hover:ring-4 ring-indigo-300' : ''}`}
                     onClick={() => isEditing && logoInputRef.current?.click()}
