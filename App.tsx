@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createRoot } from 'react-dom/client';
 import { Visit, WeeklyReport, Statistics, CategoryLogos, PartnerLogo, Decoration } from './types';
 import { INITIAL_REPORT } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
-import { ReportPrintTemplate } from './components/ReportPrintTemplate';
 import { LandingMap } from './components/LandingMap';
+import { ReportPrintTemplate } from './components/ReportPrintTemplate';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock, ArrowRight, Map as MapIcon } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { 
+    Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, 
+    UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, Printer, 
+    Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, 
+    ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand,
+    Map as MapIcon, ArrowRight, FileDown, Eye
+} from 'lucide-react';
 import mammoth from 'mammoth';
 
 // Firebase Imports
 import { db, auth } from './firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, writeBatch, where } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
 
@@ -25,26 +28,29 @@ const getArabicOrdinal = (n: number) => {
 };
 
 export default function App() {
-  // Navigation State
-  const [currentView, setCurrentView] = useState<'map' | 'report'>('map');
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [currentReportIndex, setCurrentReportIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  
+  // App View State
+  const [currentView, setCurrentView] = useState<'map' | 'report'>('map');
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  
+  // Printing & Preview State
   const [isPrinting, setIsPrinting] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   
-  // Admin Mode State - Default to FALSE (Public User View)
+  // Admin Mode State - Default to FALSE (Public view)
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
   // Dragging State for Decorations
   const [activeDecoId, setActiveDecoId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Track dragging state to distinguish between click and drag
   const isDraggingRef = useRef(false);
 
   // Parsing & AI State
@@ -54,74 +60,81 @@ export default function App() {
   
   const [isAnalyzingImages, setIsAnalyzingImages] = useState(false);
   const [isAnalyzingLogos, setIsAnalyzingLogos] = useState(false);
+  const [imageMatchStatus, setImageMatchStatus] = useState<string>("");
+  const [logoMatchStatus, setLogoMatchStatus] = useState<string>("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isViewerImageLoading, setIsViewerImageLoading] = useState(false);
 
   // Refs
+  const wordInputRef = useRef<HTMLInputElement>(null);
   const bulkImageInputRef = useRef<HTMLInputElement>(null);
   const bulkLogoInputRef = useRef<HTMLInputElement>(null);
   const coverImageRef = useRef<HTMLInputElement>(null);
   const pageBgRef = useRef<HTMLInputElement>(null);
   const decorationInputRef1 = useRef<HTMLInputElement>(null);
   const decorationInputRef2 = useRef<HTMLInputElement>(null);
+  const mainLogoRef = useRef<HTMLInputElement>(null);
+  const rightLogoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const partnerRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // 1. Check Admin Mode
+  // 1. Initial Load from Firebase
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const adminMode = params.get('mode') === 'admin';
+    
     setIsAdmin(adminMode);
     setIsEditing(adminMode);
-    
-    // Auth
-    signInAnonymously(auth).catch(console.error);
-  }, []);
 
-  // 2. Fetch Reports when Region is Selected
-  useEffect(() => {
-    if (!selectedRegion) return;
-
-    const fetchReports = async () => {
+    const init = async () => {
         setLoading(true);
         try {
-            // Get all reports first, then filter client-side to handle "missing region field = makkah" legacy logic
-            // Ideally we should update DB, but for now this is safer.
-            const q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
-            const querySnapshot = await getDocs(q);
+            await signInAnonymously(auth);
+        } catch (error) {
+            console.error("Auth Error", error);
+        }
+
+        try {
+            // Fetch reports based on selected region or fetch all if in map view (though usually we fetch after selection)
+            let q;
+            if (selectedRegion) {
+                q = query(collection(db, "weeklyReports"), where("region", "==", selectedRegion), orderBy("createdAt", "asc"));
+            } else {
+                q = query(collection(db, "weeklyReports"), orderBy("createdAt", "asc"));
+            }
             
+            const querySnapshot = await getDocs(q);
             const loadedReports: WeeklyReport[] = [];
             
             querySnapshot.forEach((doc) => {
-                const data = doc.data() as WeeklyReport;
-                // LEGACY HANDLING: If no region is set, assume 'makkah'.
-                const reportRegion = data.region || 'makkah';
-                
-                if (reportRegion === selectedRegion) {
-                    loadedReports.push({ id: doc.id, ...data, visits: data.visits || [] } as WeeklyReport);
-                }
+                const data = doc.data();
+                loadedReports.push({ id: doc.id, ...data, visits: data.visits || [] } as WeeklyReport);
             });
 
             if (loadedReports.length > 0) {
                 setReports(loadedReports);
+                // Open the LATEST report by default (the one at the end of the array)
                 setCurrentReportIndex(loadedReports.length - 1);
             } else {
-                setReports([]); // No reports for this region
+                // If no reports found for region, initialize a draft
+                setReports([{...INITIAL_REPORT, id: `week-${Date.now()}`, region: selectedRegion || 'makkah'}]);
             }
         } catch (error) {
             console.error("Error fetching reports:", error);
-            setReports([]);
+            setReports([INITIAL_REPORT]);
         } finally {
             setLoading(false);
         }
     };
 
-    fetchReports();
-  }, [selectedRegion]);
+    if (currentView === 'report') {
+        init();
+    } else {
+        setLoading(false);
+    }
+  }, [currentView, selectedRegion]);
 
-  // 3. Fetch Visits Subcollection
+  // 2. Fetch Visits Subcollection
   useEffect(() => {
-      if (currentView !== 'report' || reports.length === 0) return;
-
       const fetchVisits = async () => {
           const reportId = reports[currentReportIndex]?.id;
           if (!reportId) return;
@@ -156,16 +169,78 @@ export default function App() {
               setVisitsLoading(false);
           }
       };
-      
-      fetchVisits();
-  }, [currentReportIndex, currentView, reports.length > 0 ? reports[currentReportIndex]?.id : null]);
+      if (reports.length > 0 && currentView === 'report') fetchVisits();
+  }, [currentReportIndex, reports.length > 0 ? reports[currentReportIndex]?.id : null, currentView]);
 
 
-  // --- Handlers ---
+  const report = reports[currentReportIndex] || INITIAL_REPORT;
+
+  // --- Printing Handler (Set File Name) ---
+  const handlePrint = () => {
+      const originalTitle = document.title;
+      const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+      document.title = `${safeWeek} - ${safeDate}`;
+      window.print();
+      setTimeout(() => {
+          document.title = originalTitle;
+      }, 1000);
+  };
+
+  const handleDownloadPDF = async () => {
+      setIsPrinting(true);
+      try {
+          const printContent = document.querySelector('.print-only-container');
+          if (printContent) {
+              const html = `
+                <!DOCTYPE html>
+                <html dir="rtl" lang="ar">
+                <head>
+                    <meta charset="UTF-8">
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+                    <style>
+                        body { font-family: 'Tajawal', sans-serif; }
+                        @page { size: A4; margin: 0; }
+                        .strict-page { width: 210mm; height: 297mm; overflow: hidden; page-break-after: always; position: relative; }
+                    </style>
+                </head>
+                <body>
+                    ${printContent.innerHTML}
+                </body>
+                </html>
+              `;
+              
+              const response = await fetch('/api/pdf', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ html })
+              });
+              
+              if (!response.ok) throw new Error('PDF Generation failed');
+              
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `report-${report.header.weekTitle}.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+          }
+      } catch (error) {
+          console.error("PDF download error:", error);
+          alert("فشل تحميل ملف PDF");
+      } finally {
+          setIsPrinting(false);
+      }
+  };
 
   const handleRegionSelect = (regionId: string) => {
       setSelectedRegion(regionId);
       setCurrentView('report');
+      setLoading(true);
   };
 
   const handleBackToMap = () => {
@@ -174,89 +249,7 @@ export default function App() {
       setReports([]);
   };
 
-  const report = reports[currentReportIndex] || { ...INITIAL_REPORT, region: selectedRegion || 'makkah' };
-
-  // --- PDF Download Handler using Isolated Template ---
-  const handleDownloadPDF = async () => {
-      setIsPrinting(true);
-      
-      try {
-        const container = document.createElement('div');
-        container.style.position = 'fixed';
-        container.style.top = '0';
-        container.style.left = '0';
-        container.style.zIndex = '-9999';
-        container.style.background = 'white'; 
-        document.body.appendChild(container);
-
-        const root = createRoot(container);
-        root.render(<ReportPrintTemplate report={report} />);
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const images = Array.from(container.querySelectorAll('img'));
-        const imagePromises = images.map((img) => {
-            if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
-            return new Promise<void>((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => resolve(); 
-            });
-        });
-        await Promise.all(imagePromises);
-        await document.fonts.ready;
-        await new Promise(r => setTimeout(r, 1500));
-
-        const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-        });
-
-        const pages = container.querySelectorAll('.strict-page');
-
-        for (let i = 0; i < pages.length; i++) {
-            const pageEl = pages[i] as HTMLElement;
-            const canvas = await html2canvas(pageEl, {
-                scale: 4, 
-                useCORS: true, 
-                backgroundColor: '#ffffff',
-                logging: false,
-                width: 794,
-                height: 1123,
-                windowWidth: 1600,
-                windowHeight: 2000,
-                allowTaint: true,
-                imageTimeout: 30000,
-                onclone: (doc) => {
-                    const els = doc.querySelectorAll('*');
-                    els.forEach((el) => {
-                       if (el instanceof HTMLElement) {
-                           el.style.fontFamily = 'Tajawal, sans-serif';
-                       }
-                    });
-                }
-            });
-
-            const imgData = canvas.toDataURL('image/jpeg', 1.0); 
-            if (i > 0) pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-        }
-
-        const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-        const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').substring(0, 10).trim();
-        const safeRegion = selectedRegion || 'report';
-        pdf.save(`${safeRegion}-${safeWeek}-${safeDate}.pdf`);
-
-        root.unmount();
-        document.body.removeChild(container);
-
-      } catch (e) {
-          console.error(e);
-          alert("حدث خطأ أثناء تحميل الملف");
-      } finally {
-          setIsPrinting(false);
-      }
-  };
-
+  // --- Update Helpers ---
   const updateCurrentReport = (newData: Partial<WeeklyReport> | ((prev: WeeklyReport) => WeeklyReport)) => {
       setReports(prevReports => {
           const newReports = [...prevReports];
@@ -390,7 +383,6 @@ export default function App() {
   };
 
   const saveReportToFirestore = async () => {
-    // Basic check, though UI prevents clicking if not admin mostly
     if (!report || !isAdmin) return;
     setSaving(true);
     try {
@@ -398,9 +390,9 @@ export default function App() {
         const { visits, ...mainReportData } = report;
         const reportToSave = { 
             ...mainReportData, 
-            visits: [],
-            region: selectedRegion || 'makkah', // Ensure region is saved
+            visits: [], 
             id: reportId,
+            region: selectedRegion || 'makkah', // Ensure region is saved
             createdAt: report.createdAt || serverTimestamp() 
         };
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
@@ -418,8 +410,7 @@ export default function App() {
         setIsDirty(false);
         if (!report.id) updateCurrentReport({ id: reportId });
     } catch (error: any) {
-        console.error("Save Error:", error);
-        alert(`فشل الحفظ: ${error.message || "تأكد من الاتصال بالإنترنت والصلاحيات"}`);
+        alert(`فشل الحفظ: ${error.message || "تأكد من الاتصال بالإنترنت"}`);
     } finally { setSaving(false); }
   };
 
@@ -430,22 +421,25 @@ export default function App() {
       const newReport: WeeklyReport = {
           ...INITIAL_REPORT,
           id: newId,
-          region: selectedRegion || 'makkah', // Set selected region
           header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
           logos: report.logos, 
           visits: [], 
           decorations: report.decorations || [],
+          region: selectedRegion || 'makkah',
           createdAt: serverTimestamp() 
       };
+      // UPDATED: Append to the end of array so newest appears on the LEFT in RTL
       setReports(prev => [...prev, newReport]); 
-      setCurrentReportIndex(reports.length); 
+      setCurrentReportIndex(reports.length); // Focus the newly added report
       setIsDirty(true);
   };
 
   const handleDeleteCurrentReport = async () => {
       if (!isAdmin) return;
-      if (reports.length <= 0) return;
-      
+      if (reports.length <= 1) {
+          alert("لا يمكن حذف التقرير الأخير.");
+          return;
+      }
       if (window.confirm("هل أنت متأكد من حذف هذا التقرير نهائياً من قاعدة البيانات؟")) {
           const reportId = report.id;
           if (reportId) {
@@ -518,9 +512,9 @@ export default function App() {
     const file = e.target.files?.[0];
     if (file && report.id) {
         try {
-            const url = await uploadReportImage(file, report.id, 'cover_page', { maxWidth: 3508 });
+            const url = await uploadReportImage(file, report.id, 'cover_page');
             updateCurrentReport({ coverImage: url });
-        } catch(e) { console.error(e); }
+        } catch(e: any) { console.error(e); }
     }
   };
 
@@ -528,9 +522,9 @@ export default function App() {
     const file = e.target.files?.[0];
     if (file && report.id) {
         try {
-            const url = await uploadReportImage(file, report.id, 'page_background', { maxWidth: 3508 });
+            const url = await uploadReportImage(file, report.id, 'page_background');
             updateCurrentReport({ pageBackgroundImage: url });
-        } catch(e) { console.error(e); }
+        } catch(e: any) { console.error(e); }
     }
   };
 
@@ -578,15 +572,20 @@ export default function App() {
           const reader = new FileReader();
           reader.onload = async (event) => {
               try {
-                  const arrayBuffer = event.target?.result as ArrayBuffer;
-                  const result = await mammoth.extractRawText({ arrayBuffer } as any);
-                  setRawText(result.value as string);
+                  const target = event.target as FileReader;
+                  const arrayBuffer = target.result as ArrayBuffer;
+                  const result: any = await mammoth.extractRawText({ arrayBuffer } as any);
+                  setRawText(result.value ? String(result.value) : "");
               } catch (err: any) { console.error(err); }
           };
           reader.readAsArrayBuffer(file);
       } else if (file.name.endsWith('.txt')) {
           const reader = new FileReader();
-          reader.onload = (event) => setRawText(event.target?.result as string || "");
+          reader.onload = (event) => {
+              const target = event.target as FileReader;
+              const text = target.result;
+              setRawText(typeof text === 'string' ? text : "");
+          };
           reader.readAsText(file);
       }
   };
@@ -654,7 +653,7 @@ export default function App() {
                         const visit = visitMap.get(id);
                         if (visit) visit.factoryLogo = url;
                     });
-                } catch(e) { console.error(e); }
+                } catch(e: any) { console.error(e); }
             }
         }
         updateCurrentReport(prev => ({ ...prev, visits: newVisits }));
@@ -668,20 +667,23 @@ export default function App() {
   };
   const visitChunks = chunkArray(report.visits, 4);
 
-  // --- Sub-Components for Render ---
+  // --- Render Sub-components ---
   const ReportHeaderContent = () => (
       <header className="flex justify-between items-center w-full mb-1 relative z-20">
-            <div className="flex items-center gap-1 md:gap-4 h-10 md:h-16 print:h-12">
+            {/* UPDATED: h-3 md:h-16 for smaller mobile logos */}
+            <div className="flex items-center gap-1 md:gap-4 h-3 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
                         <div className="relative h-full flex items-center">
-                            <img src={logo} alt="" className="h-full object-contain max-h-[30px] md:max-h-14 print:max-h-10" />
+                            {/* UPDATED: max-h-2.5 for mobile */}
+                            <img src={logo} alt="" className="h-full object-contain max-h-[10px] md:max-h-14 print:max-h-10" />
                         </div>
-                        {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
+                        {idx < report.logos.rightLogos.length - 1 && <div className="h-3 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
                  ))}
             </div>
-            <div className="flex flex-col gap-2 relative h-12 md:h-24 print:h-14 items-end justify-center">
+            {/* UPDATED: h-5 md:h-20 for smaller mobile logo */}
+            <div className="flex flex-col gap-2 relative h-5 md:h-20 print:h-14 items-end justify-center">
                  <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
             </div>
       </header>
@@ -753,15 +755,15 @@ export default function App() {
 
   // 1. Map View (Landing Page)
   if (currentView === 'map') {
-      return <LandingMap onSelectRegion={handleRegionSelect} />;
+      return <LandingMap onSelectRegion={handleRegionSelect} isAdmin={isAdmin} />;
   }
 
-  // 2. Loading State (Transitioning to Report)
+  // ... (Loading State)
   if (loading) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 animate-fade-in relative z-50">
-            <Loader2 className="w-10 h-10 text-white animate-spin" />
-            <p className="text-white font-medium animate-pulse">جاري تحميل تقارير {selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'المنطقة الشرقية' : 'القصيم'}...</p>
+            <Loader2 className="w-10 h-10 text-brand-dark animate-spin" />
+            <p className="text-brand-dark font-medium animate-pulse">جاري تحميل تقارير {selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'المنطقة الشرقية' : 'القصيم'}...</p>
         </div>
       );
   }
@@ -772,10 +774,10 @@ export default function App() {
           <div className="min-h-screen flex flex-col items-center justify-center gap-6 animate-fade-in px-4 relative z-50">
               <div className="bg-white/10 backdrop-blur-md p-8 rounded-2xl border border-white/20 text-center max-w-md w-full">
                   <MapIcon className="w-16 h-16 text-indigo-300 mx-auto mb-4" />
-                  <h2 className="text-2xl font-bold text-white mb-2">
+                  <h2 className="text-2xl font-bold text-brand-dark mb-2">
                       {selectedRegion === 'riyadh' ? 'منطقة الرياض' : selectedRegion === 'sharqiyah' ? 'المنطقة الشرقية' : selectedRegion === 'qassim' ? 'منطقة القصيم' : 'هذه المنطقة'}
                   </h2>
-                  <p className="text-indigo-100 mb-8">
+                  <p className="text-indigo-900 mb-8">
                       لم تبدأ التقارير لهذه المنطقة بعد. سيتم إضافة البيانات قريباً.
                   </p>
                   
@@ -857,6 +859,11 @@ export default function App() {
             </div>
         </div>
       )}
+
+      {/* ======================= PRINT VIEW ======================= */}
+      <div className="hidden print-only-container">
+          <ReportPrintTemplate report={report} />
+      </div>
 
       <div className="max-w-[210mm] mx-auto mt-4 md:mt-8 relative z-50 no-print px-4 md:px-0">
         <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-white/40 flex flex-col items-end md:flex-row md:justify-between md:items-center gap-4 shadow-xl">
