@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Building2, Factory, MapPin, ChevronRight, Upload, Grip, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Users, Building2, Factory, MapPin, ChevronRight, Upload, Grip, RefreshCw, Eye, EyeOff, Edit } from 'lucide-react';
 import { uploadReportImage } from '../utils/uploadImage';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -233,7 +233,7 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
             
             {/* Admin Controls */}
             {isAdmin && (
-                <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 animate-fade-in bg-white/10 backdrop-blur-md p-3 rounded-lg border border-white/20">
+                <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 animate-fade-in bg-white/10 backdrop-blur-md p-3 rounded-lg border border-white/20 shadow-xl max-w-xs">
                     <div className="flex gap-2">
                         <input 
                             type="file" 
@@ -269,9 +269,28 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                         </button>
                     )}
                     
-                    <div className="text-white text-xs flex items-center gap-1 opacity-70 border-t border-white/20 pt-2 mt-1">
+                    {/* Region Navigation Buttons */}
+                    <div className="border-t border-white/20 pt-2 mt-2">
+                        <div className="flex items-center gap-2 mb-2 text-white/80 text-xs font-bold">
+                            <Edit size={12} />
+                            <span>تعديل تقارير المناطق:</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {Object.entries(nodeMetadata).map(([key, data]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => onSelectRegion(key)}
+                                    className="flex items-center justify-center gap-1 bg-white/5 hover:bg-indigo-600 text-white text-xs py-2 px-2 rounded border border-white/10 transition-all hover:border-indigo-400"
+                                >
+                                    {data.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="text-white text-xs flex items-center gap-1 opacity-70 border-t border-white/20 pt-2 mt-2">
                         <Grip size={14} />
-                        <span>اسحب المدن لتعديل مواقعها</span>
+                        <span>اسحب الدوائر لتعديل مواقعها</span>
                     </div>
                 </div>
             )}
