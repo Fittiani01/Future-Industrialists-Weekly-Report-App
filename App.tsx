@@ -420,7 +420,11 @@ export default function App() {
             region: selectedRegion || 'makkah', // Ensure region is saved
             createdAt: report.createdAt || serverTimestamp() 
         };
+        
+        // 1. Save the MAIN report (including header, stats, and the LOGOS which are now updated)
         await setDoc(doc(db, "weeklyReports", reportId), reportToSave, { merge: true });
+
+        // 2. Save Visits (Subcollection)
         const visitsRef = collection(db, "weeklyReports", reportId, "visits");
         const existingSnapshot = await getDocs(visitsRef);
         const existingIds = new Set(existingSnapshot.docs.map(d => d.id));
@@ -431,7 +435,20 @@ export default function App() {
         });
         await Promise.all(deletePromises);
         const savePromises = visits.map(visit => setDoc(doc(visitsRef, visit.id), visit));
-        await Promise.all(savePromises);
+        
+        // 3. CRITICAL: Sync LOGOS to ALL other reports in this region
+        // This ensures if we updated partners on Week 2, Week 1 also gets the DB update.
+        // We filter out the current reportId because we already saved it in step 1.
+        const logoSyncPromises = reports
+            .filter(r => r.id !== reportId)
+            .map(r => {
+                // Only update the 'logos' field
+                return setDoc(doc(db, "weeklyReports", r.id), { logos: report.logos }, { merge: true });
+            });
+
+        // Run all saves in parallel
+        await Promise.all([...savePromises, ...logoSyncPromises]);
+        
         setIsDirty(false);
         if (!report.id) updateCurrentReport({ id: reportId });
     } catch (error: any) {
@@ -560,41 +577,56 @@ export default function App() {
     }
   };
 
+  // UPDATED: Modify handleLogoUpdate to update ALL reports in state for the current region
   const handleLogoUpdate = (section: 'main' | 'right' | 'partners' | 'categories', indexOrKey: number | string = -1) => async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
           try {
+             // Use current timestamp for uniqueness, but it's shared
              const rId = report.id || `week-${Date.now()}`;
              const url = await uploadReportImage(file, rId, 'general_logos');
-             updateCurrentReport(prev => {
-                if (section === 'main') return { ...prev, logos: { ...prev.logos, main: url } };
-                if (section === 'right' && typeof indexOrKey === 'number') {
-                    const newRightLogos = [...prev.logos.rightLogos];
-                    newRightLogos[indexOrKey] = url;
-                    return { ...prev, logos: { ...prev.logos, rightLogos: newRightLogos } };
-                }
-                if (section === 'partners' && typeof indexOrKey === 'number') {
-                    const newPartners = [...prev.logos.partners];
-                    newPartners[indexOrKey] = { ...newPartners[indexOrKey], url: url };
-                    return { ...prev, logos: { ...prev.logos, partners: newPartners } };
-                }
-                if (section === 'categories' && typeof indexOrKey === 'string') {
-                    return { ...prev, logos: { ...prev.logos, categories: { ...prev.logos.categories, [indexOrKey]: url } } };
-                }
-                return prev;
+             
+             // Update ALL reports in the current list (Region) to keep logos synced
+             setReports(prevReports => {
+                 return prevReports.map(r => {
+                    const newLogos = { ...r.logos };
+                    
+                    if (section === 'main') {
+                        newLogos.main = url;
+                    } else if (section === 'right' && typeof indexOrKey === 'number') {
+                        const newRightLogos = [...newLogos.rightLogos];
+                        newRightLogos[indexOrKey] = url;
+                        newLogos.rightLogos = newRightLogos;
+                    } else if (section === 'partners' && typeof indexOrKey === 'number') {
+                        const newPartners = [...newLogos.partners];
+                        newPartners[indexOrKey] = { ...newPartners[indexOrKey], url: url };
+                        newLogos.partners = newPartners;
+                    } else if (section === 'categories' && typeof indexOrKey === 'string') {
+                         newLogos.categories = { ...newLogos.categories, [indexOrKey]: url };
+                    }
+                    
+                    return { ...r, logos: newLogos };
+                 });
              });
+             
+             if (isAdmin) setIsDirty(true);
+
           } catch (e) { console.error(e); }
       }
   };
 
+  // UPDATED: Modify changePartnerScale to update ALL reports in state
   const changePartnerScale = (index: number, delta: number) => {
-      updateCurrentReport(prev => {
-          const newPartners = [...prev.logos.partners];
-          const currentScale = newPartners[index].scale;
-          const newScale = Math.max(0.5, Math.min(3.0, currentScale + delta));
-          newPartners[index] = { ...newPartners[index], scale: newScale };
-          return { ...prev, logos: { ...prev.logos, partners: newPartners } };
+      setReports(prevReports => {
+          return prevReports.map(r => {
+              const newPartners = [...r.logos.partners];
+              const currentScale = newPartners[index].scale;
+              const newScale = Math.max(0.5, Math.min(3.0, currentScale + delta));
+              newPartners[index] = { ...newPartners[index], scale: newScale };
+              return { ...r, logos: { ...r.logos, partners: newPartners } };
+          });
       });
+      if (isAdmin) setIsDirty(true);
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
