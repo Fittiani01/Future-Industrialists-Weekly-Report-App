@@ -30,6 +30,16 @@ const formatDisplayDate = (dateString: string) => {
     return cleanDate;
 };
 
+// Helper for Arabic Region Names
+const getRegionArabicName = (region?: string) => {
+    switch(region) {
+        case 'riyadh': return 'الرياض';
+        case 'sharqiyah': return 'المنطقة الشرقية';
+        case 'qassim': return 'القصيم';
+        case 'makkah': default: return 'مكة المكرمة';
+    }
+}
+
 // --- CONSTANTS FOR LAYOUT ---
 const BRAND_COLOR = "#2a3590";
 
@@ -232,6 +242,7 @@ const SocialStat: React.FC<{ label: string; value: number; icon: React.ReactNode
 export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report }) => {
   const visitsChunks = chunkArray<Visit>(report.visits, 4); 
   const hasPageBg = !!report.pageBackgroundImage;
+  const regionArabicName = getRegionArabicName(report.region);
 
   return (
     <div 
@@ -274,11 +285,11 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
 
                 {/* Content - MT-10 */}
                 <div className="flex-grow px-8 py-4 mt-10 flex flex-col z-10 box-border">
-                    {/* Header with Lifted Text */}
+                    {/* Header with Lifted Text - Updated Title to include Region */}
                     <div className="flex justify-between items-end mb-4 border-b border-indigo-100 pb-3">
                          {/* Lifted using pb-1 */}
                          <h2 className="text-lg font-bold text-[#2a3590] leading-tight whitespace-nowrap pb-1" style={{ fontFamily: 'Tajawal, sans-serif' }}>
-                             تقرير الزيارات ({report.header.weekTitle})
+                             التقرير الأسبوعي ({regionArabicName}) - {report.header.weekTitle}
                          </h2>
                          {/* Lifted using pb-1 */}
                          <span className="text-xs text-gray-500 font-bold dir-ltr leading-tight whitespace-nowrap pb-1" style={{ fontFamily: 'Tajawal, sans-serif' }}>{report.header.dateRange}</span>
@@ -317,7 +328,7 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
              <div className="flex-grow px-10 pt-16 pb-8 flex flex-col gap-6 z-10 box-border">
                  
                  <div className="text-center mb-2">
-                     <h2 className="text-2xl font-black text-[#2a3590] leading-tight" style={{ fontFamily: 'Tajawal, sans-serif' }}>إحصائيات المبادرة</h2>
+                     <h2 className="text-2xl font-black text-[#2a3590] leading-tight" style={{ fontFamily: 'Tajawal, sans-serif' }}>إحصائيات المبادرة ({regionArabicName})</h2>
                      <div className="w-16 h-1 bg-[#2a3590] mx-auto mt-2 rounded-full opacity-20"></div>
                  </div>
 

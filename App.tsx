@@ -251,7 +251,17 @@ export default function App() {
 
         const safeWeek = report.header.weekTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
         const safeDate = report.header.dateRange.replace(/[\/\\?%*:|"<>]/g, '-').substring(0, 10).trim();
-        const safeRegion = selectedRegion || 'report';
+        
+        // Use Arabic Region Name for Filename
+        const regionNames: Record<string, string> = {
+            'makkah': 'مكة_المكرمة',
+            'riyadh': 'الرياض',
+            'sharqiyah': 'المنطقة_الشرقية',
+            'qassim': 'القصيم'
+        };
+        const regionKey = selectedRegion || report.region || 'makkah';
+        const safeRegion = regionNames[regionKey] || 'تقرير';
+        
         pdf.save(`${safeRegion}-${safeWeek}-${safeDate}.pdf`);
 
         root.unmount();
@@ -965,6 +975,7 @@ export default function App() {
 
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
             <div className="text-right order-2 md:order-1">
+                {/* MODIFIED: text-2xl -> text-lg on mobile for better fit */}
                 <h1 className="text-lg md:text-3xl font-bold mb-1">التقرير الأسبوعي ({selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'الشرقية' : selectedRegion === 'qassim' ? 'القصيم' : ''})</h1>
                 <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
             </div>
