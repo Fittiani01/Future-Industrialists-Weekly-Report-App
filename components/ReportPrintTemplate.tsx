@@ -44,6 +44,7 @@ const getRegionArabicName = (region?: string) => {
 const BRAND_COLOR = "#2a3590";
 
 // --- HELPERS ---
+// UPDATED: Changed styling to prevent image distortion (squashing)
 const SafeImage = ({ src, className, style }: { src: string; className?: string; style?: React.CSSProperties }) => (
     <div 
         className={`${className} flex items-center justify-center overflow-hidden relative`}
@@ -52,11 +53,11 @@ const SafeImage = ({ src, className, style }: { src: string; className?: string;
         <img 
             src={src} 
             style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
+                width: 'auto',
+                height: 'auto',
                 maxWidth: '100%',
                 maxHeight: '100%',
+                objectFit: 'contain', // Backup
                 display: 'block',
             }}
             alt=""
@@ -105,7 +106,12 @@ const PrintFooter: React.FC<{ partners: PartnerLogo[] }> = ({ partners }) => (
                 <div key={idx} className="flex items-center justify-center h-[15mm] w-[22mm]">
                      <img 
                         src={p.url} 
-                        className="w-full h-full object-contain"
+                        style={{
+                            width: 'auto',
+                            height: 'auto',
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                        }}
                         alt=""
                      />
                 </div>
@@ -217,7 +223,8 @@ const MainStatBox: React.FC<{ label: string; value: number; primary?: boolean }>
 
 const CategoryStat: React.FC<{ label: string; value: number; icon: string }> = ({ label, value, icon }) => (
     <div className="flex flex-col items-center justify-center h-[45mm]">
-        <div className="w-[20mm] h-[20mm] mb-2 flex items-center justify-center">
+        {/* UPDATED: Fixed dimensions for container but removed w-full/h-full from image component inside SafeImage to respect aspect ratio */}
+        <div className="w-[20mm] h-[20mm] mb-2 flex items-center justify-center border border-transparent">
             <SafeImage src={icon} className="w-full h-full" />
         </div>
         <span className="text-gray-600 font-bold text-sm leading-tight" style={{ fontFamily: 'Tajawal, sans-serif' }}>{label}</span>

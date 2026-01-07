@@ -615,13 +615,16 @@ export default function App() {
       }
   };
 
-  // UPDATED: Modify changePartnerScale to update ALL reports in state
+  // UPDATED: Modify changePartnerScale to allow fine-grained control (0.05 steps) and lower minimum (0.15)
   const changePartnerScale = (index: number, delta: number) => {
       setReports(prevReports => {
           return prevReports.map(r => {
               const newPartners = [...r.logos.partners];
               const currentScale = newPartners[index].scale;
-              const newScale = Math.max(0.5, Math.min(3.0, currentScale + delta));
+              // UPDATED: Math.round trick to avoid float precision issues (1.1 + 0.1 = 1.2000002)
+              const rawNewScale = currentScale + delta;
+              const newScale = Math.max(0.15, Math.min(4.0, Math.round(rawNewScale * 100) / 100));
+              
               newPartners[index] = { ...newPartners[index], scale: newScale };
               return { ...r, logos: { ...r.logos, partners: newPartners } };
           });
@@ -1007,7 +1010,6 @@ export default function App() {
 
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
             <div className="text-right order-2 md:order-1">
-                {/* MODIFIED: text-2xl -> text-lg on mobile for better fit */}
                 <h1 className="text-lg md:text-3xl font-bold mb-1">التقرير الأسبوعي ({selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'الشرقية' : selectedRegion === 'qassim' ? 'القصيم' : ''})</h1>
                 <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
             </div>
@@ -1068,9 +1070,9 @@ export default function App() {
                                 </div>
                                 {isEditing && (
                                     <div className="flex items-center gap-1 bg-white shadow-sm border border-gray-200 rounded-md px-1 py-0.5 no-print z-20 absolute -bottom-6 left-1/2 -translate-x-1/2">
-                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={10} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.05); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={12} /></button>
                                         <div className="w-px h-3 bg-gray-300"></div>
-                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.1); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={10} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.05); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={12} /></button>
                                     </div>
                                 )}
                             </div>
