@@ -22,7 +22,7 @@ export const INITIAL_REPORT: WeeklyReport = {
   logos: {
       main: LOGOS.main,
       rightLogos: [LOGOS.right1, LOGOS.right2, LOGOS.right3, LOGOS.right4],
-      partners: Array(11).fill(null).map((_, i) => ({
+      partners: Array(12).fill(null).map((_, i) => ({
           id: `partner-${i}`,
           url: `${LOGOS.partner}${i+1}`,
           scale: 1.0 // Default scale 100%

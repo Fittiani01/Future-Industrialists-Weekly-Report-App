@@ -96,8 +96,16 @@ export default function App() {
                 // LEGACY HANDLING: If no region is set, assume 'makkah'.
                 const reportRegion = data.region || 'makkah';
                 
+                // Safe patch for partners to ensure 12 slots
+                const currentPartners = data.logos?.partners || [];
+                const patchedPartners = [...currentPartners];
+                if (patchedPartners.length < 12) {
+                     patchedPartners.push(...INITIAL_REPORT.logos.partners.slice(patchedPartners.length, 12));
+                }
+                const patchedLogos = { ...(data.logos || INITIAL_REPORT.logos), partners: patchedPartners };
+                
                 if (reportRegion === selectedRegion) {
-                    loadedReports.push({ id: doc.id, ...data, visits: data.visits || [] } as WeeklyReport);
+                    loadedReports.push({ id: doc.id, ...data, visits: data.visits || [], logos: patchedLogos } as WeeklyReport);
                 }
             });
 
@@ -425,11 +433,19 @@ export default function App() {
       const nextWeekNum = reports.length + 1;
       const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
       const newId = `week-${Date.now()}`;
+      
+      // Ensure partners array is 12 items for new reports
+      const currentPartners = report.logos.partners || [];
+      const mergedPartners = [...currentPartners];
+      if (mergedPartners.length < 12) {
+           mergedPartners.push(...INITIAL_REPORT.logos.partners.slice(mergedPartners.length, 12));
+      }
+
       const newReport: WeeklyReport = {
           ...INITIAL_REPORT,
           id: newId,
           header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
-          logos: report.logos, 
+          logos: { ...report.logos, partners: mergedPartners }, 
           visits: [], 
           decorations: report.decorations || [],
           createdAt: serverTimestamp() 
@@ -718,12 +734,12 @@ export default function App() {
                     ))}
                 </div>
                  <div className="flex justify-center items-center gap-6 w-full px-2 flex-nowrap">
-                    {report.logos.partners.slice(6, 11).map((partner: PartnerLogo, idx) => (
+                    {report.logos.partners.slice(6, 12).map((partner: PartnerLogo, idx) => (
                         <React.Fragment key={partner.id}>
                             <div className="relative flex items-center justify-center h-7 px-1">
                                 <img src={partner.url} className="h-full w-auto object-contain max-w-[50px]" alt="" />
                             </div>
-                            {idx < 4 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
+                            {idx < 5 && <div className="h-4 w-px bg-gray-300 flex-shrink-0"></div>}
                         </React.Fragment>
                     ))}
                 </div>
@@ -949,7 +965,6 @@ export default function App() {
 
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
             <div className="text-right order-2 md:order-1">
-                {/* MODIFIED: text-2xl -> text-lg on mobile for better fit */}
                 <h1 className="text-lg md:text-3xl font-bold mb-1">التقرير الأسبوعي ({selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'الشرقية' : selectedRegion === 'qassim' ? 'القصيم' : ''})</h1>
                 <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
             </div>
