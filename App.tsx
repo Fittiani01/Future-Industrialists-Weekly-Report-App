@@ -7,7 +7,7 @@ import { StatisticsSection } from './components/StatisticsSection';
 import { ReportPrintTemplate } from './components/ReportPrintTemplate';
 import { LandingMap } from './components/LandingMap';
 import { parseReportFromText, matchImagesToVisits, matchLogosToFactories } from './services/geminiService';
-import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock, ArrowRight, Map as MapIcon } from 'lucide-react';
+import { Edit3, Sparkles, Loader2, Plus, FileText, Image as ImageIcon, UploadCloud, Factory, Eraser, Trash2, CheckCircle2, X, FileDown, Cloud, Save, AlertCircle, Minus, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, LayoutTemplate, Move, MousePointer2, Hand, Eye, Printer, Lock, Unlock, ArrowRight, Map as MapIcon, ExternalLink } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import mammoth from 'mammoth';
@@ -994,12 +994,29 @@ export default function App() {
                     <div className="flex items-center gap-2 mb-3 text-brand-dark"><Sparkles className="text-yellow-500" /><h2 className="font-bold text-lg">1. استيراد البيانات</h2></div>
                     <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="نص التقرير..." className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm mb-2" dir="rtl" />
                     <button onClick={handleSmartParse} disabled={isParsing || !rawText.trim()} className="bg-brand-primary text-white px-6 py-2 rounded-lg flex items-center gap-2">{isParsing ? <Loader2 className="animate-spin" /> : "تعبئة الجدول تلقائياً"}</button>
-                    {/* ADDED ERROR DISPLAY */}
+                    {/* ADDED ERROR DISPLAY WITH DIRECT LINK */}
                     {parseError && (
-                        <div className="mt-2 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2 border border-red-100 animate-fade-in">
-                            <AlertCircle size={16} />
-                            <span>{parseError}</span>
-                            <button onClick={() => setParseError(null)} className="mr-auto text-red-400 hover:text-red-700"><X size={14} /></button>
+                        <div className="mt-2 p-4 bg-red-50 text-red-700 text-sm rounded-xl flex flex-col gap-2 border border-red-100 animate-fade-in shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <AlertCircle size={18} className="text-red-600" />
+                                <span className="font-bold">{parseError.startsWith("API_DISABLED:") ? parseError.replace("API_DISABLED:", "") : parseError}</span>
+                                <button onClick={() => setParseError(null)} className="mr-auto text-red-400 hover:text-red-700 bg-red-100 p-1 rounded-full"><X size={14} /></button>
+                            </div>
+                            
+                            {/* ACTION BUTTON FOR DISABLED API */}
+                            {parseError.includes("API_DISABLED") && (
+                                <div className="mr-6 mt-1 flex flex-col gap-2">
+                                    <p className="text-xs text-red-600 opacity-90">الخدمة غير مفعلة في مشروعك على جوجل كلاود. هذا طبيعي عند استخدام مفتاح جديد.</p>
+                                    <a 
+                                        href="https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=282582549925" 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="flex items-center gap-2 w-fit bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-xs transition-colors shadow-md hover:shadow-lg"
+                                    >
+                                        <ExternalLink size={14} /> تفعيل الخدمة الآن (اضغط هنا)
+                                    </a>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

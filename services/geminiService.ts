@@ -39,8 +39,10 @@ const handleGeminiError = (error: any) => {
     const msg = error.message || error.toString();
     const stringError = JSON.stringify(error);
 
+    // Check for specific "Service Disabled" error (403)
     if (msg.includes("Generative Language API has not been used") || msg.includes("SERVICE_DISABLED") || stringError.includes("SERVICE_DISABLED")) {
-        throw new Error("خدمة الذكاء الاصطناعي غير مفعلة في مشروع Google Cloud هذا. يرجى تفعيل 'Generative Language API' من لوحة التحكم.");
+        // We throw a specific message that the UI will recognize to show the "Enable" button
+        throw new Error("API_DISABLED: خدمة الذكاء الاصطناعي غير مفعلة. يرجى تفعيلها من لوحة تحكم جوجل.");
     }
     
     if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
@@ -92,7 +94,7 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview',
       contents: text,
       config: { 
           responseMimeType: "application/json",
@@ -140,7 +142,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: { responseMimeType: "application/json" }
         });
@@ -180,7 +182,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: { responseMimeType: "application/json" }
         });
