@@ -3,23 +3,28 @@ import { WeeklyReport, Visit } from '../types';
 
 // المفتاح الاحتياطي الخاص بـ Firebase للمشروع (لضمان عدم توقف التطبيق)
 const FALLBACK_KEY = "AIzaSyBh61RDyPcpP03Kp7YEyCQhGLP7JhBw-IY";
+const STORAGE_KEY = "custom_gemini_api_key";
 
 const getAIClient = () => {
-    // 1. نبدأ بالمفتاح الاحتياطي كقيمة افتراضية لضمان وجود قيمة دائماً
-    let apiKey = FALLBACK_KEY;
+    // 1. الأولوية القصوى: مفتاح خاص من المستخدم (يحل مشاكل القيود)
+    if (typeof window !== 'undefined') {
+        const customKey = localStorage.getItem(STORAGE_KEY);
+        if (customKey && customKey.trim().length > 10) {
+            return new GoogleGenAI({ apiKey: customKey.trim() });
+        }
+    }
 
-    // 2. نحاول جلب المفتاح من البيئة بطريقة آمنة تماماً للمتصفح
-    // نستخدم typeof لتجنب ReferenceError إذا كان process غير معرف
+    // 2. نحاول جلب المفتاح من البيئة بطريقة آمنة
+    let apiKey = FALLBACK_KEY;
     if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
         apiKey = process.env.API_KEY;
     }
 
-    // 3. التحقق النهائي: إذا كانت القيمة فارغة، نعود للمفتاح الاحتياطي
+    // 3. التحقق النهائي
     if (!apiKey) {
         apiKey = FALLBACK_KEY;
     }
 
-    // تهيئة العميل مع المفتاح المضمون
     return new GoogleGenAI({ apiKey });
 };
 
@@ -46,15 +51,15 @@ const handleGeminiError = (error: any) => {
         stringError.includes("SERVICE_DISABLED") ||
         msg.includes("403")) {
         
-        throw new Error("API_DISABLED: خدمة الذكاء الاصطناعي مفعلة في المشروع، ولكن مفتاح API المستخدم قد يكون مقيداً (API Key Restrictions). يرجى الذهاب إلى Google Cloud Console > Credentials وتعديل قيود المفتاح لتشمل 'Generative Language API'.");
+        throw new Error("API_DISABLED: خدمة الذكاء الاصطناعي غير مفعلة أو المفتاح مقيد. جرب استخدام مفتاح خاص بك.");
     }
     
     if (msg.includes("API key not valid") || msg.includes("API_KEY_INVALID")) {
-         throw new Error("مفتاح API غير صالح. يرجى التحقق من إعدادات المشروع.");
+         throw new Error("مفتاح API غير صالح.");
     }
 
     if (msg.includes("An API Key must be set")) {
-        throw new Error("لم يتم العثور على مفتاح API. يرجى التأكد من الكود.");
+        throw new Error("لم يتم العثور على مفتاح API.");
     }
 
     throw new Error(msg || "حدث خطأ غير متوقع أثناء الاتصال بالذكاء الاصطناعي");
