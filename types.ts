@@ -6,6 +6,7 @@ export interface Visit {
   factory: string;
   factoryLogo?: string; // URL for the factory logo image
   images: string[]; // Local object URLs
+  imagePositions?: Record<string, 'top' | 'center' | 'bottom'>; // Map image URL to crop position
 }
 
 export interface Statistics {

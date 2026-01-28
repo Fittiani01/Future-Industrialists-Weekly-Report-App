@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Visit } from '../types';
-import { Building2, Calendar, Users, Upload, X, ImagePlus, ZoomIn, Factory, Loader2 } from 'lucide-react';
+import { Building2, Calendar, Users, Upload, X, ImagePlus, ZoomIn, Factory, Loader2, ChevronsUpDown } from 'lucide-react';
 
 interface VisitCardProps {
   visit: Visit;
@@ -32,17 +32,38 @@ const formatDisplayDate = (dateString: string) => {
 const VisitImageItem = ({ 
     src, 
     idx, 
+    position,
     isEditing, 
     onDelete, 
+    onTogglePosition,
     onClick 
 }: { 
     src: string, 
     idx: number, 
+    position: 'top' | 'center' | 'bottom',
     isEditing: boolean, 
     onDelete: () => void, 
+    onTogglePosition: () => void,
     onClick: () => void 
 }) => {
     const [isLoading, setIsLoading] = useState(true);
+
+    // Map the string position to CSS object-position class or style
+    const getObjectPosition = () => {
+        switch(position) {
+            case 'top': return 'object-top';
+            case 'bottom': return 'object-bottom';
+            default: return 'object-center';
+        }
+    };
+
+    const getPositionLabel = () => {
+        switch(position) {
+            case 'top': return 'أعلى';
+            case 'bottom': return 'أسفل';
+            default: return 'وسط';
+        }
+    }
 
     return (
         <div 
@@ -57,16 +78,29 @@ const VisitImageItem = ({
             <img 
                 src={src} 
                 alt={`Visit ${idx + 1}`} 
-                className={`w-full h-full object-cover object-center transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                className={`w-full h-full object-cover ${getObjectPosition()} transition-all duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                 onLoad={() => setIsLoading(false)} 
             />
             {isEditing && (
-                <button 
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                >
-                <X size={12} />
-                </button>
+                <>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                        className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm"
+                        title="حذف الصورة"
+                    >
+                        <X size={12} />
+                    </button>
+                    
+                    {/* Position Toggle Button */}
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onTogglePosition(); }}
+                        className="absolute bottom-1 right-1 bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-1 text-[10px] backdrop-blur-sm"
+                        title="تغيير تركيز الصورة (أعلى/وسط/أسفل)"
+                    >
+                        <ChevronsUpDown size={10} />
+                        <span>{getPositionLabel()}</span>
+                    </button>
+                </>
             )}
             {!isEditing && !isLoading && (
                 <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
@@ -81,15 +115,52 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  // Helper to detect image orientation and set default focus
+  const detectImageOrientations = async (files: File[]): Promise<('top' | 'center')[]> => {
+      const positions: ('top' | 'center')[] = [];
+      for (const file of files) {
+          try {
+              const url = URL.createObjectURL(file);
+              const img = new Image();
+              await new Promise<void>((resolve) => {
+                  img.onload = () => resolve();
+                  img.src = url;
+              });
+              // Heuristic: If Height > Width, it's portrait. People's heads are at top. Default to 'top'.
+              positions.push(img.height > img.width ? 'top' : 'center');
+              URL.revokeObjectURL(url);
+          } catch (e) {
+              positions.push('center');
+          }
+      }
+      return positions;
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files) as File[];
       
       if (onUploadImages) {
           try {
+              // 1. Detect Orientations BEFORE upload complete to have UI ready
+              const newPositions = await detectImageOrientations(files);
+              
+              // 2. Upload
               const urls = await onUploadImages(files);
-              const combined = [...visit.images, ...urls].slice(0, 4);
-              onUpdate(visit.id, { images: combined });
+              
+              // 3. Update State
+              const combinedImages = [...visit.images, ...urls].slice(0, 4);
+              const updatedPositions = { ...(visit.imagePositions || {}) };
+              
+              urls.forEach((url, idx) => {
+                  if (url) updatedPositions[url] = newPositions[idx] || 'center';
+              });
+
+              onUpdate(visit.id, { 
+                  images: combinedImages,
+                  imagePositions: updatedPositions
+              });
+
           } catch (error) {
               console.error("Upload failed", error);
               alert("فشل رفع الصور. حاول مرة أخرى.");
@@ -112,6 +183,22 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
           }
       }
   }
+
+  const toggleImagePosition = (imgUrl: string) => {
+      const currentPos = visit.imagePositions?.[imgUrl] || 'center';
+      let newPos: 'top' | 'center' | 'bottom' = 'center';
+      
+      if (currentPos === 'center') newPos = 'top';
+      else if (currentPos === 'top') newPos = 'bottom';
+      else newPos = 'center';
+
+      onUpdate(visit.id, {
+          imagePositions: {
+              ...(visit.imagePositions || {}),
+              [imgUrl]: newPos
+          }
+      });
+  };
 
   // Logic to determine header color based on gender
   const isGirls = visit.schoolName.includes("بنات");
@@ -285,8 +372,10 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                         <VisitImageItem 
                             src={visit.images[idx]} 
                             idx={idx} 
+                            position={visit.imagePositions?.[visit.images[idx]] || 'center'}
                             isEditing={isEditing} 
                             onDelete={() => { const newImages = [...visit.images]; newImages.splice(idx, 1); onUpdate(visit.id, { images: newImages }); }}
+                            onTogglePosition={() => toggleImagePosition(visit.images[idx])}
                             onClick={() => !isEditing && onImageClick(visit.images[idx])}
                         />
                     ) : (

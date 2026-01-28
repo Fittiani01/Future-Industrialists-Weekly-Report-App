@@ -423,8 +423,29 @@ export default function App() {
     try {
         const reportId = report.id || `week-${Date.now()}`;
         const { visits, ...mainReportData } = report;
+
+        // SANITIZE: Recursively replace undefined with null for Firestore
+        const deepSanitize = (obj: any): any => {
+            if (obj === undefined) return null;
+            if (obj === null || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) return obj.map(deepSanitize);
+            
+            // Check for Firestore Timestamp-like objects (don't recurse into them)
+            if (obj.seconds !== undefined && obj.nanoseconds !== undefined) return obj;
+
+            const newObj: any = {};
+            for (const key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                    newObj[key] = deepSanitize(obj[key]);
+                }
+            }
+            return newObj;
+        };
+
+        const sanitizedReportData = deepSanitize(mainReportData);
+
         const reportToSave = { 
-            ...mainReportData, 
+            ...sanitizedReportData, 
             visits: [], 
             id: reportId,
             region: selectedRegion || 'makkah', // Ensure region is saved
@@ -444,7 +465,10 @@ export default function App() {
             if (!currentIds.has(id)) deletePromises.push(deleteDoc(doc(visitsRef, id)));
         });
         await Promise.all(deletePromises);
-        const savePromises = visits.map(visit => setDoc(doc(visitsRef, visit.id), visit));
+        
+        const savePromises = visits.map(visit => {
+            return setDoc(doc(visitsRef, visit.id), deepSanitize(visit));
+        });
         
         // 3. CRITICAL: Sync LOGOS to ALL other reports in this region
         // This ensures if we updated partners on Week 2, Week 1 also gets the DB update.
@@ -453,7 +477,7 @@ export default function App() {
             .filter(r => r.id !== reportId)
             .map(r => {
                 // Only update the 'logos' field to ensure all weeks for this region match
-                return setDoc(doc(db, "weeklyReports", r.id), { logos: report.logos }, { merge: true });
+                return setDoc(doc(db, "weeklyReports", r.id), { logos: deepSanitize(report.logos) }, { merge: true });
             });
 
         // Run all saves in parallel
@@ -463,6 +487,7 @@ export default function App() {
         if (!report.id) updateCurrentReport({ id: reportId });
     } catch (error: any) {
         alert(`فشل الحفظ: ${error.message || "تأكد من الاتصال بالإنترنت"}`);
+        console.error("Save Error Details:", error);
     } finally { setSaving(false); }
   };
 
@@ -552,6 +577,11 @@ export default function App() {
   const handleManualVisitImageUpload = async (files: File[], visitId: string): Promise<string[]> => {
       if (!report.id) return [];
       const urls: string[] = [];
+      
+      // We assume detection is done inside VisitCard for manual upload, 
+      // but VisitCard's onUploadImages expects just returning strings.
+      // So we just upload here. VisitCard handles detection logic separately now.
+      
       for (const file of files) {
           try {
               const url = await uploadReportImage(file, report.id, visitId);
@@ -693,17 +723,40 @@ export default function App() {
       try {
         const filenames = files.map(f => f.name);
         const mapping = await matchImagesToVisits(filenames, report.visits);
+        
+        // Prepare to update visits
         const newVisits = [...report.visits];
         const visitMap = new Map(newVisits.map((v: Visit) => [v.id, v]));
+        
+        // Loop through files to detect aspect ratio AND upload
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const visitId = mapping[i.toString()];
+            
             if (visitId && visitMap.has(visitId)) {
                 const visit = visitMap.get(visitId)!;
                 if (visit.images.length < 4) {
                     try {
+                        // 1. Detect aspect ratio BEFORE uploading
+                        const imgUrl = URL.createObjectURL(file);
+                        const img = new Image();
+                        await new Promise<void>((resolve) => {
+                             img.onload = () => resolve();
+                             img.src = imgUrl;
+                        });
+                        const isPortrait = img.height > img.width * 1.1; // 10% tolerance
+                        URL.revokeObjectURL(imgUrl);
+                        
+                        // 2. Upload
                         const url = await uploadReportImage(file, report.id, visitId);
+                        
+                        // 3. Update Visit
                         visit.images.push(url);
+                        
+                        // 4. Set Smart Position
+                        if (!visit.imagePositions) visit.imagePositions = {};
+                        visit.imagePositions[url] = isPortrait ? 'top' : 'center';
+
                     } catch (err) { console.error(err); }
                 }
             }
@@ -1039,7 +1092,7 @@ export default function App() {
                     )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <button onClick={() => bulkImageInputRef.current?.click()} disabled={isAnalyzingImages} className="w-full border-2 border-dashed border-teal-300 bg-teal-50 text-teal-700 py-4 rounded-lg flex flex-col items-center justify-center"><input type="file" multiple accept="image/*" ref={bulkImageInputRef} onChange={handleBulkImageUpload} className="hidden" />{isAnalyzingImages ? <Loader2 className="animate-spin" /> : <UploadCloud size={24} />}<span className="font-bold text-sm">توزيع صور الزيارات</span></button>
+                    <button onClick={() => bulkImageInputRef.current?.click()} disabled={isAnalyzingImages} className="w-full border-2 border-dashed border-teal-300 bg-teal-50 text-teal-700 py-4 rounded-lg flex flex-col items-center justify-center"><input type="file" multiple accept="image/*" ref={bulkImageInputRef} onChange={handleBulkImageUpload} className="hidden" />{isAnalyzingImages ? <Loader2 className="animate-spin" /> : <UploadCloud size={24} />}<span className="font-bold text-sm">توزيع صور الزيارات (ذكي)</span></button>
                     <button onClick={() => bulkLogoInputRef.current?.click()} disabled={isAnalyzingLogos} className="w-full border-2 border-dashed border-purple-300 bg-purple-50 text-purple-700 py-4 rounded-lg flex flex-col items-center justify-center"><input type="file" multiple accept="image/*" ref={bulkLogoInputRef} onChange={handleBulkFactoryLogoUpload} className="hidden" />{isAnalyzingLogos ? <Loader2 className="animate-spin" /> : <Factory size={24} />}<span className="font-bold text-sm">توزيع شعارات المصانع</span></button>
                 </div>
                  <div className="border-t border-indigo-100 pt-4 flex justify-end">
