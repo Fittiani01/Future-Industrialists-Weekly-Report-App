@@ -5,25 +5,22 @@ import { WeeklyReport, Visit } from '../types';
 const FALLBACK_KEY = "AIzaSyBh61RDyPcpP03Kp7YEyCQhGLP7JhBw-IY";
 
 const getAIClient = () => {
-    let apiKey = "";
+    // 1. نبدأ بالمفتاح الاحتياطي كقيمة افتراضية لضمان وجود قيمة دائماً
+    let apiKey = FALLBACK_KEY;
 
-    // 1. محاولة آمنة لجلب المفتاح من البيئة (تمنع توقف المتصفح إذا كان process غير معرف)
-    try {
-        apiKey = process.env.API_KEY || "";
-    } catch (e) {
-        // تجاهل الخطأ في حال لم يكن process متاحاً في المتصفح
-        console.warn("process.env is not accessible, switching to fallback.");
+    // 2. نحاول جلب المفتاح من البيئة بطريقة آمنة تماماً للمتصفح
+    // نستخدم typeof لتجنب ReferenceError إذا كان process غير معرف
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+        apiKey = process.env.API_KEY;
     }
 
-    // 2. إذا لم نجد مفتاح (أو حدث خطأ)، نستخدم المفتاح الاحتياطي
+    // 3. التحقق النهائي: إذا كانت القيمة فارغة، نعود للمفتاح الاحتياطي
     if (!apiKey) {
         apiKey = FALLBACK_KEY;
     }
 
-    // 3. حماية إضافية: نمرر مفتاح وهمي إذا فشل كل شيء لمنع انهيار التطبيق (Crash)
-    const safeKey = apiKey || "dummy_key_to_prevent_crash";
-
-    return new GoogleGenAI({ apiKey: safeKey });
+    // تهيئة العميل مع المفتاح المضمون
+    return new GoogleGenAI({ apiKey });
 };
 
 // تحسين دالة التنظيف
@@ -43,17 +40,21 @@ const handleGeminiError = (error: any) => {
     const msg = error.message || error.toString();
     const stringError = JSON.stringify(error);
 
-    // التحقق من خطأ "الخدمة غير مفعلة"
+    // التحقق من خطأ "الخدمة غير مفعلة" أو مشاكل الصلاحيات
     if (msg.includes("Generative Language API has not been used") || 
         msg.includes("SERVICE_DISABLED") || 
         stringError.includes("SERVICE_DISABLED") ||
         msg.includes("403")) {
         
-        throw new Error("API_DISABLED: خدمة الذكاء الاصطناعي غير مفعلة في مشروع Google Cloud. يرجى الضغط على الرابط أدناه لتفعيلها.");
+        throw new Error("API_DISABLED: خدمة الذكاء الاصطناعي مفعلة في المشروع، ولكن مفتاح API المستخدم قد يكون مقيداً (API Key Restrictions). يرجى الذهاب إلى Google Cloud Console > Credentials وتعديل قيود المفتاح لتشمل 'Generative Language API'.");
     }
     
-    if (msg.includes("API key not valid") || msg.includes("API_KEY_INVALID") || msg.includes("dummy_key")) {
-         throw new Error("مفتاح API غير صالح أو مفقود. يرجى التحقق من إعدادات المشروع.");
+    if (msg.includes("API key not valid") || msg.includes("API_KEY_INVALID")) {
+         throw new Error("مفتاح API غير صالح. يرجى التحقق من إعدادات المشروع.");
+    }
+
+    if (msg.includes("An API Key must be set")) {
+        throw new Error("لم يتم العثور على مفتاح API. يرجى التأكد من الكود.");
     }
 
     throw new Error(msg || "حدث خطأ غير متوقع أثناء الاتصال بالذكاء الاصطناعي");
