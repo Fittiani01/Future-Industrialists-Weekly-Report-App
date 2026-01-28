@@ -1,12 +1,22 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
+// Fallback API Key from Firebase config (often shared for the project)
+const FALLBACK_KEY = "AIzaSyBh61RDyPcpP03Kp7YEyCQhGLP7JhBw-IY";
+
 const getAIClient = () => {
     // Ensure we use process.env.API_KEY as per guidelines
-    const apiKey = process.env.API_KEY;
+    // Safe access to process.env for browser environments
+    let apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+
+    // Use fallback if environment variable is missing
+    if (!apiKey) {
+        console.warn("Using fallback API Key. Please configure process.env.API_KEY for production.");
+        apiKey = FALLBACK_KEY;
+    }
 
     if (!apiKey) {
-      throw new Error('API_KEY is missing');
+      throw new Error('عذراً، مفتاح الربط مع الذكاء الاصطناعي (API Key) مفقود. يرجى إضافته في إعدادات البيئة للمتابعة.');
     }
 
     return new GoogleGenAI({ apiKey });
@@ -61,7 +71,7 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash',
       contents: text,
       config: { 
           responseMimeType: "application/json",
@@ -107,21 +117,17 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
     3. Do NOT use filenames as keys. Use the provided INDEX.
     `;
 
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: { responseMimeType: "application/json" }
-        });
+    // Removed internal try/catch to allow error propagation to UI
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+    });
 
-        const text = response.text;
-        if (!text) return {};
-        console.log("AI Image Match Response (Index-based):", text);
-        return JSON.parse(cleanJson(text));
-    } catch (error) {
-        console.error("Error matching images:", error);
-        return {}; 
-    }
+    const text = response.text;
+    if (!text) return {};
+    console.log("AI Image Match Response (Index-based):", text);
+    return JSON.parse(cleanJson(text));
 };
 
 export const matchLogosToFactories = async (filenames: string[], visits: Visit[]): Promise<Record<string, string[]>> => {
@@ -147,19 +153,15 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
     3. Example Output: { "0": ["id_1", "id_2"], "1": ["id_3"] }
     `;
 
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: { responseMimeType: "application/json" }
-        });
+    // Removed internal try/catch to allow error propagation to UI
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+    });
 
-        const text = response.text;
-        if (!text) return {};
-        console.log("AI Logo Match Response (Index-based):", text);
-        return JSON.parse(cleanJson(text));
-    } catch (error) {
-        console.error("Error matching logos:", error);
-        return {}; 
-    }
+    const text = response.text;
+    if (!text) return {};
+    console.log("AI Logo Match Response (Index-based):", text);
+    return JSON.parse(cleanJson(text));
 };
