@@ -223,9 +223,9 @@ const MainStatBox: React.FC<{ label: string; value: number; primary?: boolean }>
 
 const CategoryStat: React.FC<{ label: string; value: number; icon: string }> = ({ label, value, icon }) => (
     <div className="flex flex-col items-center justify-center h-[45mm]">
-        {/* UPDATED: Fixed dimensions for container but removed w-full/h-full from image component inside SafeImage to respect aspect ratio */}
+        {/* UPDATED: Removed hard-coded class 'w-full h-full' on inner SafeImage to prevent forced stretching */}
         <div className="w-[20mm] h-[20mm] mb-2 flex items-center justify-center border border-transparent">
-            <SafeImage src={icon} className="w-full h-full" />
+            <SafeImage src={icon} className="max-w-full max-h-full" />
         </div>
         <span className="text-gray-600 font-bold text-sm leading-tight" style={{ fontFamily: 'Tajawal, sans-serif' }}>{label}</span>
         <span className="text-[#2a3590] font-black text-4xl mt-2 leading-none pb-2" style={{ fontFamily: 'Tajawal, sans-serif' }}>{value}</span>

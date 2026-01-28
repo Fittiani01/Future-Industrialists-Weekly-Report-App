@@ -442,7 +442,7 @@ export default function App() {
         const logoSyncPromises = reports
             .filter(r => r.id !== reportId)
             .map(r => {
-                // Only update the 'logos' field
+                // Only update the 'logos' field to ensure all weeks for this region match
                 return setDoc(doc(db, "weeklyReports", r.id), { logos: report.logos }, { merge: true });
             });
 
@@ -615,7 +615,7 @@ export default function App() {
       }
   };
 
-  // UPDATED: Modify changePartnerScale to allow fine-grained control (0.05 steps) and lower minimum (0.15)
+  // UPDATED: Modify changePartnerScale to allow fine-grained control (0.05 steps) and lower minimum (0.1)
   const changePartnerScale = (index: number, delta: number) => {
       setReports(prevReports => {
           return prevReports.map(r => {
@@ -623,7 +623,8 @@ export default function App() {
               const currentScale = newPartners[index].scale;
               // UPDATED: Math.round trick to avoid float precision issues (1.1 + 0.1 = 1.2000002)
               const rawNewScale = currentScale + delta;
-              const newScale = Math.max(0.15, Math.min(4.0, Math.round(rawNewScale * 100) / 100));
+              // LOWER MINIMUM: 0.1
+              const newScale = Math.max(0.1, Math.min(4.0, Math.round(rawNewScale * 100) / 100));
               
               newPartners[index] = { ...newPartners[index], scale: newScale };
               return { ...r, logos: { ...r.logos, partners: newPartners } };
@@ -993,6 +994,14 @@ export default function App() {
                     <div className="flex items-center gap-2 mb-3 text-brand-dark"><Sparkles className="text-yellow-500" /><h2 className="font-bold text-lg">1. استيراد البيانات</h2></div>
                     <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="نص التقرير..." className="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm mb-2" dir="rtl" />
                     <button onClick={handleSmartParse} disabled={isParsing || !rawText.trim()} className="bg-brand-primary text-white px-6 py-2 rounded-lg flex items-center gap-2">{isParsing ? <Loader2 className="animate-spin" /> : "تعبئة الجدول تلقائياً"}</button>
+                    {/* ADDED ERROR DISPLAY */}
+                    {parseError && (
+                        <div className="mt-2 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2 border border-red-100 animate-fade-in">
+                            <AlertCircle size={16} />
+                            <span>{parseError}</span>
+                            <button onClick={() => setParseError(null)} className="mr-auto text-red-400 hover:text-red-700"><X size={14} /></button>
+                        </div>
+                    )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <button onClick={() => bulkImageInputRef.current?.click()} disabled={isAnalyzingImages} className="w-full border-2 border-dashed border-teal-300 bg-teal-50 text-teal-700 py-4 rounded-lg flex flex-col items-center justify-center"><input type="file" multiple accept="image/*" ref={bulkImageInputRef} onChange={handleBulkImageUpload} className="hidden" />{isAnalyzingImages ? <Loader2 className="animate-spin" /> : <UploadCloud size={24} />}<span className="font-bold text-sm">توزيع صور الزيارات</span></button>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Users, Building2, Factory, MapPin, ChevronRight, Upload, Grip, RefreshCw, Eye, EyeOff, Edit } from 'lucide-react';
 import { uploadReportImage } from '../utils/uploadImage';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface LandingMapProps {
     onSelectRegion: (regionId: string) => void;
@@ -80,6 +81,8 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
 
     // --- 1. Load Settings from Firestore ---
     useEffect(() => {
+        let unsubscribeAuth: (() => void) | undefined;
+
         const loadSettings = async () => {
             try {
                 const docRef = doc(db, "settings", "general");
@@ -96,7 +99,21 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                 setIsLoadingSettings(false);
             }
         };
-        loadSettings();
+
+        // Wait for auth to be ready before fetching to avoid permission errors
+        unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loadSettings();
+            } else {
+                // If not logged in yet (or anonymous auth failing), we might still want to try 
+                // but usually App.tsx handles the sign-in. We just wait for it here.
+                // If it takes too long, we might show default.
+            }
+        });
+
+        return () => {
+            if (unsubscribeAuth) unsubscribeAuth();
+        };
     }, []);
 
     // --- 2. Save Settings ---
