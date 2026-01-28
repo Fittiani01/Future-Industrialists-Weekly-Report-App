@@ -5,16 +5,22 @@ import { WeeklyReport, Visit } from '../types';
 const FALLBACK_KEY = "AIzaSyBh61RDyPcpP03Kp7YEyCQhGLP7JhBw-IY";
 
 const getAIClient = () => {
-    // 1. نحاول جلب المفتاح من متغيرات البيئة (الأولوية)
-    let apiKey = process.env.API_KEY;
+    let apiKey = "";
 
-    // 2. إذا لم نجد مفتاح في البيئة، نستخدم المفتاح الاحتياطي (لمنع توقف التطبيق)
+    // 1. محاولة آمنة لجلب المفتاح من البيئة (تمنع توقف المتصفح إذا كان process غير معرف)
+    try {
+        apiKey = process.env.API_KEY || "";
+    } catch (e) {
+        // تجاهل الخطأ في حال لم يكن process متاحاً في المتصفح
+        console.warn("process.env is not accessible, switching to fallback.");
+    }
+
+    // 2. إذا لم نجد مفتاح (أو حدث خطأ)، نستخدم المفتاح الاحتياطي
     if (!apiKey) {
         apiKey = FALLBACK_KEY;
     }
 
-    // 3. حماية إضافية: المكتبة ترفض القيمة الفارغة وتسبب Crash
-    // نمرر قيمة نصية حتى لو كانت غير صالحة للسماح للتطبيق بالعمل، ثم نعالج خطأ الاتصال لاحقاً
+    // 3. حماية إضافية: نمرر مفتاح وهمي إذا فشل كل شيء لمنع انهيار التطبيق (Crash)
     const safeKey = apiKey || "dummy_key_to_prevent_crash";
 
     return new GoogleGenAI({ apiKey: safeKey });
