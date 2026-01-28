@@ -33,6 +33,27 @@ const cleanJson = (text: string): string => {
     return text.replace(/```json\n?|```/g, '').trim();
 };
 
+// دالة مساعدة لمعالجة أخطاء Gemini الشائعة
+const handleGeminiError = (error: any) => {
+    console.error("Gemini API Error:", error);
+    const msg = error.message || error.toString();
+    const stringError = JSON.stringify(error);
+
+    if (msg.includes("Generative Language API has not been used") || msg.includes("SERVICE_DISABLED") || stringError.includes("SERVICE_DISABLED")) {
+        throw new Error("خدمة الذكاء الاصطناعي غير مفعلة في مشروع Google Cloud هذا. يرجى تفعيل 'Generative Language API' من لوحة التحكم.");
+    }
+    
+    if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
+         throw new Error("تم رفض الوصول (403). تأكد من تفعيل Gemini API في مشروع Google Cloud الخاص بك.");
+    }
+
+    if (msg.includes("API key not valid") || msg.includes("API_KEY_INVALID")) {
+         throw new Error("مفتاح API غير صالح. يرجى التحقق من المفتاح.");
+    }
+
+    throw new Error(msg || "حدث خطأ غير متوقع أثناء الاتصال بالذكاء الاصطناعي");
+};
+
 export const parseReportFromText = async (text: string): Promise<Partial<WeeklyReport>> => {
   const ai = getAIClient();
   
@@ -84,8 +105,8 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
 
     return JSON.parse(cleanJson(responseText));
   } catch (error: any) {
-    console.error("Error parsing text with Gemini:", error);
-    throw error;
+    handleGeminiError(error);
+    return {}; // Unreachable due to throw, but satisfies TS
   }
 };
 
@@ -117,17 +138,21 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
     3. Do NOT use filenames as keys. Use the provided INDEX.
     `;
 
-    // Removed internal try/catch to allow error propagation to UI
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-    });
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
 
-    const text = response.text;
-    if (!text) return {};
-    console.log("AI Image Match Response (Index-based):", text);
-    return JSON.parse(cleanJson(text));
+        const text = response.text;
+        if (!text) return {};
+        console.log("AI Image Match Response (Index-based):", text);
+        return JSON.parse(cleanJson(text));
+    } catch (error: any) {
+        handleGeminiError(error);
+        return {};
+    }
 };
 
 export const matchLogosToFactories = async (filenames: string[], visits: Visit[]): Promise<Record<string, string[]>> => {
@@ -153,15 +178,19 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
     3. Example Output: { "0": ["id_1", "id_2"], "1": ["id_3"] }
     `;
 
-    // Removed internal try/catch to allow error propagation to UI
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-    });
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
 
-    const text = response.text;
-    if (!text) return {};
-    console.log("AI Logo Match Response (Index-based):", text);
-    return JSON.parse(cleanJson(text));
+        const text = response.text;
+        if (!text) return {};
+        console.log("AI Logo Match Response (Index-based):", text);
+        return JSON.parse(cleanJson(text));
+    } catch (error: any) {
+        handleGeminiError(error);
+        return {};
+    }
 };
