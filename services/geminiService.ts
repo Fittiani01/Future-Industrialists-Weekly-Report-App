@@ -1,25 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
-// Fallback API Key from Firebase config (often shared for the project)
-const FALLBACK_KEY = "AIzaSyBh61RDyPcpP03Kp7YEyCQhGLP7JhBw-IY";
-
 const getAIClient = () => {
-    // Ensure we use process.env.API_KEY as per guidelines
-    // Safe access to process.env for browser environments
-    let apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
-
-    // Use fallback if environment variable is missing
-    if (!apiKey) {
-        console.warn("Using fallback API Key. Please configure process.env.API_KEY for production.");
-        apiKey = FALLBACK_KEY;
-    }
-
-    if (!apiKey) {
-      throw new Error('عذراً، مفتاح الربط مع الذكاء الاصطناعي (API Key) مفقود. يرجى إضافته في إعدادات البيئة للمتابعة.');
-    }
-
-    return new GoogleGenAI({ apiKey });
+    // Guideline: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+    // We assume process.env.API_KEY is available and valid.
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 // تحسين دالة التنظيف
@@ -31,29 +16,6 @@ const cleanJson = (text: string): string => {
         return text.substring(firstBrace, lastBrace + 1);
     }
     return text.replace(/```json\n?|```/g, '').trim();
-};
-
-// دالة مساعدة لمعالجة أخطاء Gemini الشائعة
-const handleGeminiError = (error: any) => {
-    console.error("Gemini API Error:", error);
-    const msg = error.message || error.toString();
-    const stringError = JSON.stringify(error);
-
-    // Check for specific "Service Disabled" error (403)
-    if (msg.includes("Generative Language API has not been used") || msg.includes("SERVICE_DISABLED") || stringError.includes("SERVICE_DISABLED")) {
-        // We throw a specific message that the UI will recognize to show the "Enable" button
-        throw new Error("API_DISABLED: خدمة الذكاء الاصطناعي غير مفعلة. يرجى تفعيلها من لوحة تحكم جوجل.");
-    }
-    
-    if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
-         throw new Error("تم رفض الوصول (403). تأكد من تفعيل Gemini API في مشروع Google Cloud الخاص بك.");
-    }
-
-    if (msg.includes("API key not valid") || msg.includes("API_KEY_INVALID")) {
-         throw new Error("مفتاح API غير صالح. يرجى التحقق من المفتاح.");
-    }
-
-    throw new Error(msg || "حدث خطأ غير متوقع أثناء الاتصال بالذكاء الاصطناعي");
 };
 
 export const parseReportFromText = async (text: string): Promise<Partial<WeeklyReport>> => {
@@ -107,12 +69,10 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
 
     return JSON.parse(cleanJson(responseText));
   } catch (error: any) {
-    handleGeminiError(error);
-    return {}; // Unreachable due to throw, but satisfies TS
+    console.error("Gemini Parse Error:", error);
+    throw error;
   }
 };
-
-// --- تغيير جذري: المطابقة بناءً على Index وليس اسم الملف ---
 
 export const matchImagesToVisits = async (filenames: string[], visits: Visit[]): Promise<Record<string, string>> => {
     const ai = getAIClient();
@@ -149,10 +109,9 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
 
         const text = response.text;
         if (!text) return {};
-        console.log("AI Image Match Response (Index-based):", text);
         return JSON.parse(cleanJson(text));
     } catch (error: any) {
-        handleGeminiError(error);
+        console.error("Gemini Image Match Error:", error);
         return {};
     }
 };
@@ -189,10 +148,9 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
 
         const text = response.text;
         if (!text) return {};
-        console.log("AI Logo Match Response (Index-based):", text);
         return JSON.parse(cleanJson(text));
     } catch (error: any) {
-        handleGeminiError(error);
+        console.error("Gemini Logo Match Error:", error);
         return {};
     }
 };
