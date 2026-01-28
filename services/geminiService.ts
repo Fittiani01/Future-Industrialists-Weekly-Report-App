@@ -2,8 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { WeeklyReport, Visit } from '../types';
 
 const getAIClient = () => {
-    // Guideline: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-    // We assume process.env.API_KEY is available and valid.
+    // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
     return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
@@ -16,6 +15,28 @@ const cleanJson = (text: string): string => {
         return text.substring(firstBrace, lastBrace + 1);
     }
     return text.replace(/```json\n?|```/g, '').trim();
+};
+
+// دالة مركزية لمعالجة الأخطاء
+const handleGeminiError = (error: any) => {
+    console.error("Gemini API Error details:", error);
+    const msg = error.message || error.toString();
+    const stringError = JSON.stringify(error);
+
+    // التحقق من خطأ "الخدمة غير مفعلة"
+    if (msg.includes("Generative Language API has not been used") || 
+        msg.includes("SERVICE_DISABLED") || 
+        stringError.includes("SERVICE_DISABLED") ||
+        msg.includes("403")) {
+        
+        throw new Error("API_DISABLED: خدمة الذكاء الاصطناعي غير مفعلة في مشروع Google Cloud. يرجى الضغط على الرابط أدناه لتفعيلها.");
+    }
+    
+    if (msg.includes("API key not valid") || msg.includes("API_KEY_INVALID")) {
+         throw new Error("مفتاح API غير صالح. يرجى التحقق من المفتاح.");
+    }
+
+    throw new Error(msg || "حدث خطأ غير متوقع أثناء الاتصال بالذكاء الاصطناعي");
 };
 
 export const parseReportFromText = async (text: string): Promise<Partial<WeeklyReport>> => {
@@ -69,8 +90,8 @@ export const parseReportFromText = async (text: string): Promise<Partial<WeeklyR
 
     return JSON.parse(cleanJson(responseText));
   } catch (error: any) {
-    console.error("Gemini Parse Error:", error);
-    throw error;
+    handleGeminiError(error);
+    return {}; 
   }
 };
 
@@ -83,7 +104,6 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
         factory: v.factory
     }));
 
-    // إعداد قائمة مرقمة للملفات
     const indexedFiles = filenames.map((name, index) => ({ index, name }));
 
     const prompt = `
@@ -111,7 +131,7 @@ export const matchImagesToVisits = async (filenames: string[], visits: Visit[]):
         if (!text) return {};
         return JSON.parse(cleanJson(text));
     } catch (error: any) {
-        console.error("Gemini Image Match Error:", error);
+        handleGeminiError(error);
         return {};
     }
 };
@@ -150,7 +170,7 @@ export const matchLogosToFactories = async (filenames: string[], visits: Visit[]
         if (!text) return {};
         return JSON.parse(cleanJson(text));
     } catch (error: any) {
-        console.error("Gemini Logo Match Error:", error);
+        handleGeminiError(error);
         return {};
     }
 };
