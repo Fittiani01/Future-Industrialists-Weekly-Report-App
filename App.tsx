@@ -47,6 +47,10 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
+  // Dragging State for Visit Cards
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
   // Parsing & AI State
   const [rawText, setRawText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
@@ -145,8 +149,19 @@ export default function App() {
                   fetchedVisits.push({ id: doc.id, ...doc.data() } as Visit);
               });
               
-              // SORT: Order visits by Date (Ascending - Oldest First)
+              // SORT PRIORITY: 
+              // 1. Order field (Ascending) for manual sort
+              // 2. Date (Ascending/Oldest First) for default
               fetchedVisits.sort((a, b) => {
+                  // Check if both have explicit order (manual sort)
+                  if (a.order !== undefined && b.order !== undefined) {
+                      return a.order - b.order;
+                  }
+                  
+                  // If mixed (one has order, one doesn't), prefer the one with order (it's been touched)
+                  if (a.order !== undefined) return -1;
+                  if (b.order !== undefined) return 1;
+
                   // Normalize date format (replace / with -) for consistent parsing
                   const dateA = new Date(a.date ? a.date.replace(/\//g, '-') : '9999-12-31').getTime();
                   const dateB = new Date(b.date ? b.date.replace(/\//g, '-') : '9999-12-31').getTime();
@@ -180,6 +195,49 @@ export default function App() {
 
 
   // --- Handlers ---
+  
+  // DRAG AND DROP HANDLERS FOR VISITS
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+      dragItem.current = position;
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+      dragOverItem.current = position;
+      // Optional: Visual feedback or temporary swap here for smoother UX
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+      if (dragItem.current === null || dragOverItem.current === null || dragItem.current === dragOverItem.current) {
+          dragItem.current = null;
+          dragOverItem.current = null;
+          return;
+      }
+
+      // Reorder the array
+      const currentVisits = [...report.visits];
+      const draggedItemContent = currentVisits[dragItem.current];
+      
+      // Remove item from old pos
+      currentVisits.splice(dragItem.current, 1);
+      // Insert at new pos
+      currentVisits.splice(dragOverItem.current, 0, draggedItemContent);
+
+      // Re-assign 'order' property to all items based on new index
+      const reorderedVisits = currentVisits.map((visit, index) => ({
+          ...visit,
+          order: index
+      }));
+
+      // Update State
+      updateCurrentReport(prev => ({
+          ...prev,
+          visits: reorderedVisits
+      }));
+
+      // Reset
+      dragItem.current = null;
+      dragOverItem.current = null;
+  };
 
   const handleRegionSelect = (regionId: string) => {
       setSelectedRegion(regionId);
@@ -1142,7 +1200,7 @@ export default function App() {
             {visitsLoading ? (
                  <div className="flex items-center justify-center h-40"><Loader2 className="w-8 h-8 text-brand-primary animate-spin" /></div>
             ) : (
-                report.visits.map((visit: Visit) => (
+                report.visits.map((visit: Visit, index: number) => (
                     <VisitCard 
                         key={visit.id} 
                         visit={visit} 
@@ -1152,6 +1210,9 @@ export default function App() {
                         onImageClick={(url) => setSelectedImage(url)}
                         onUploadImages={(files) => handleManualVisitImageUpload(files, visit.id)}
                         onUploadLogo={(file) => handleVisitLogoUpload(file, visit.id)}
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDragEnd={handleDragEnd}
                     />
                 ))
             )}

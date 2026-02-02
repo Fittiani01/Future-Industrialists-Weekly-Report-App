@@ -1,3 +1,4 @@
+
 export interface Visit {
   id: string;
   schoolName: string;
@@ -7,6 +8,7 @@ export interface Visit {
   factoryLogo?: string; // URL for the factory logo image
   images: string[]; // Local object URLs
   imagePositions?: Record<string, 'top' | 'center' | 'bottom'>; // Map image URL to crop position
+  order?: number; // For manual sorting
 }
 
 export interface Statistics {

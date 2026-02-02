@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Visit } from '../types';
-import { Building2, Calendar, Users, Upload, X, ImagePlus, ZoomIn, Factory, Loader2, ChevronsUpDown } from 'lucide-react';
+import { Building2, Calendar, Users, Upload, X, ImagePlus, ZoomIn, Factory, Loader2, ChevronsUpDown, GripVertical } from 'lucide-react';
 
 interface VisitCardProps {
   visit: Visit;
@@ -10,6 +10,10 @@ interface VisitCardProps {
   onImageClick: (imageUrl: string) => void;
   onUploadImages?: (files: File[]) => Promise<string[]>;
   onUploadLogo?: (file: File) => Promise<string>;
+  // Drag and Drop Props
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnter?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
 // Helper to ensure date is displayed as YYYY/MM/DD
@@ -111,7 +115,7 @@ const VisitImageItem = ({
     );
 };
 
-export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate, onDelete, onImageClick, onUploadImages, onUploadLogo }) => {
+export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate, onDelete, onImageClick, onUploadImages, onUploadLogo, onDragStart, onDragEnter, onDragEnd }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -254,7 +258,14 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   );
 
   return (
-    <div className="mb-4 md:mb-6 break-inside-avoid relative shadow-md rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent print:mb-0">
+    <div 
+        className={`mb-4 md:mb-6 break-inside-avoid relative shadow-md rounded-xl overflow-hidden bg-white border border-gray-100 print:shadow-none print:border-none print:bg-transparent print:mb-0 transition-transform ${isEditing ? 'hover:scale-[1.01] hover:shadow-lg' : ''}`}
+        draggable={isEditing}
+        onDragStart={isEditing ? onDragStart : undefined}
+        onDragEnter={isEditing ? onDragEnter : undefined}
+        onDragEnd={isEditing ? onDragEnd : undefined}
+        onDragOver={(e) => isEditing && e.preventDefault()} // Allow Drop
+    >
       
       {/* Header Bar */}
       <div 
@@ -262,13 +273,23 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
         style={{ backgroundColor: headerColor }}
       >
          {isEditing && (
-            <button 
-                onClick={() => onDelete(visit.id)}
-                className="absolute top-2 left-2 z-20 bg-red-500 hover:bg-red-600 p-1.5 rounded-full text-white no-print shadow-sm transition-colors"
-                title="حذف الزيارة"
-            >
-                <X size={14} />
-            </button>
+            <>
+                {/* Drag Handle */}
+                <div 
+                    className="absolute top-1/2 -translate-y-1/2 -right-10 md:-right-12 z-20 bg-gray-100 p-2 rounded-l-lg text-gray-400 cursor-grab active:cursor-grabbing shadow-sm border border-gray-200 flex items-center justify-center group-hover:bg-indigo-50"
+                    title="اسحب لإعادة الترتيب"
+                >
+                    <GripVertical size={20} />
+                </div>
+
+                <button 
+                    onClick={() => onDelete(visit.id)}
+                    className="absolute top-2 left-2 z-20 bg-red-500 hover:bg-red-600 p-1.5 rounded-full text-white no-print shadow-sm transition-colors"
+                    title="حذف الزيارة"
+                >
+                    <X size={14} />
+                </button>
+            </>
         )}
         
         {/* Main Flex Container */}
