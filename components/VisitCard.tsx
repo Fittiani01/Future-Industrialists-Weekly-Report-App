@@ -208,36 +208,34 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
   const Stats = ({ compact }: { compact?: boolean }) => (
     <div
         className={[
-        "flex items-center gap-2 rounded-md bg-white/10 border border-white/5",
-        compact ? "bg-transparent border-none flex-col items-end gap-1 p-0" : "px-3 py-1.5", // Compact (Mobile) style changes
-        "flex-shrink-0",
+        "flex gap-1 rounded-md bg-white/10 border border-white/5",
+        "flex-col items-end p-2", // Always Vertical Stack now
+        "flex-shrink-0 min-w-[90px]",
         ].join(" ")}
         style={{ fontVariantNumeric: "tabular-nums" }}
     >
-        {/* Date */}
-        <div className={`flex items-center gap-1.5 ${compact ? "bg-white/20 px-1.5 py-0.5 rounded" : ""}`}>
-            <Calendar size={compact ? 10 : 16} className="text-indigo-200 opacity-80" />
+        {/* Date (Top) */}
+        <div className="flex items-center justify-end gap-1.5 w-full">
             {isEditing ? (
                 <input
                     type="text"
                     value={visit.date}
                     onChange={(e) => onUpdate(visit.id, { date: e.target.value })}
-                    className="bg-transparent text-white text-center focus:outline-none font-bold text-[10px] md:text-sm w-16 md:w-24"
+                    className="bg-transparent text-white text-right focus:outline-none font-bold text-[10px] md:text-sm w-full"
                     style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
                     placeholder="YYYY/MM/DD"
                 />
             ) : (
-                <span className="font-bold text-indigo-50 text-[10px] md:text-sm print:text-xs leading-none pt-0.5 inline-block" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>
+                <span className="font-bold text-indigo-50 text-[10px] md:text-xs print:text-xs leading-none inline-block" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>
                     {formatDisplayDate(visit.date)}
                 </span>
             )}
+             <Calendar size={12} className="text-indigo-200 opacity-80" />
         </div>
 
-        {!compact && <div className="w-px h-3 bg-white/20 mx-0.5" />}
-
-        {/* Participants */}
-        <div className={`flex items-center gap-1.5 ${compact ? "bg-white/20 px-1.5 py-0.5 rounded" : ""}`}>
-            <Users size={compact ? 10 : 16} className="text-indigo-200 opacity-80" />
+        {/* Participants (Bottom) */}
+        <div className="flex items-center justify-end gap-1.5 w-full">
+             <span className="text-indigo-200 text-[9px] md:text-[10px] print:text-[9px] leading-none">مشارك</span>
             {isEditing ? (
                     <input
                     type="number"
@@ -246,11 +244,11 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                     className="bg-transparent text-white text-right focus:outline-none font-bold text-[10px] md:text-sm w-8"
                 />
             ) : (
-                <span className="font-bold text-indigo-50 text-[10px] md:text-sm print:text-xs leading-none pt-0.5">
+                <span className="font-bold text-indigo-50 text-[10px] md:text-sm print:text-xs leading-none">
                     {visit.participants}
                 </span>
             )}
-            <span className="text-indigo-200 text-[9px] md:text-xs print:text-[9px] leading-none">مشارك</span>
+             <Users size={12} className="text-indigo-200 opacity-80" />
         </div>
     </div>
   );
@@ -290,12 +288,12 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                                 type="text" 
                                 value={visit.schoolName}
                                 onChange={(e) => onUpdate(visit.id, { schoolName: e.target.value })}
-                                className="bg-transparent border-b border-white/30 text-white w-full focus:outline-none focus:border-white font-bold text-xs md:text-lg placeholder-indigo-200"
+                                className="bg-transparent border-b border-white/30 text-white w-full focus:outline-none focus:border-white font-bold text-xs md:text-base placeholder-indigo-200"
                                 placeholder="اسم المدرسة..."
                             />
                         ) : (
-                            // UPDATED: text-xs for mobile as requested
-                            <h3 className="text-xs md:text-lg print:text-base font-bold leading-tight truncate text-white">{visit.schoolName}</h3>
+                            // UPDATED: Changed from md:text-lg to md:text-base for better fit with long names
+                            <h3 className="text-xs md:text-base print:text-sm font-bold leading-tight truncate text-white">{visit.schoolName}</h3>
                         )}
                     </div>
                 </div>
@@ -318,7 +316,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                                     placeholder="اسم المصنع..."
                                 />
                             ) : (
-                                <h4 className="text-xs md:text-base print:text-sm font-bold text-indigo-50 truncate">{visit.factory}</h4>
+                                <h4 className="text-xs md:text-sm print:text-xs font-bold text-indigo-50 truncate">{visit.factory}</h4>
                             )}
                         </div>
                     </div>

@@ -14,7 +14,7 @@ import mammoth from 'mammoth';
 
 // Firebase Imports
 import { db, auth } from './firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { uploadReportImage } from './utils/uploadImage';
 
@@ -144,7 +144,17 @@ export default function App() {
               snapshot.forEach(doc => {
                   fetchedVisits.push({ id: doc.id, ...doc.data() } as Visit);
               });
-              fetchedVisits.sort((a, b) => a.id.localeCompare(b.id));
+              
+              // SORT: Order visits by Date (Ascending - Oldest First)
+              fetchedVisits.sort((a, b) => {
+                  // Normalize date format (replace / with -) for consistent parsing
+                  const dateA = new Date(a.date ? a.date.replace(/\//g, '-') : '9999-12-31').getTime();
+                  const dateB = new Date(b.date ? b.date.replace(/\//g, '-') : '9999-12-31').getTime();
+                  
+                  if (dateA !== dateB) return dateA - dateB;
+                  // If dates are equal, sort by creation time (ID)
+                  return a.id.localeCompare(b.id);
+              });
 
               if (fetchedVisits.length > 0) {
                   setReports(prev => {
