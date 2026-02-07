@@ -740,6 +740,20 @@ export default function App() {
       });
       if (isAdmin) setIsDirty(true);
   };
+  
+  // NEW: Handle Deletion of Partner Logo (Synced)
+  const handleDeletePartnerLogo = (index: number) => {
+      if (!window.confirm("هل أنت متأكد من حذف هذا الشريك؟")) return;
+
+      setReports(prevReports => {
+          return prevReports.map(r => {
+              const newPartners = [...r.logos.partners];
+              newPartners.splice(index, 1);
+              return { ...r, logos: { ...r.logos, partners: newPartners } };
+          });
+      });
+      if (isAdmin) setIsDirty(true);
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -1241,6 +1255,9 @@ export default function App() {
                                         <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, 0.05); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Plus size={12} /></button>
                                         <div className="w-px h-3 bg-gray-300"></div>
                                         <button onClick={(e) => { e.stopPropagation(); changePartnerScale(idx, -0.05); }} className="p-1 hover:bg-gray-100 text-brand-primary rounded"><Minus size={12} /></button>
+                                        {/* ADDED DELETE BUTTON */}
+                                        <div className="w-px h-3 bg-gray-300"></div>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeletePartnerLogo(idx); }} className="p-1 hover:bg-red-50 text-red-500 rounded"><Trash2 size={12} /></button>
                                     </div>
                                 )}
                             </div>
