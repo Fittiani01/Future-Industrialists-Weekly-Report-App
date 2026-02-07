@@ -100,13 +100,9 @@ export default function App() {
                 // LEGACY HANDLING: If no region is set, assume 'makkah'.
                 const reportRegion = data.region || 'makkah';
                 
-                // Safe patch for partners to ensure 12 slots
-                const currentPartners = data.logos?.partners || [];
-                const patchedPartners = [...currentPartners];
-                if (patchedPartners.length < 12) {
-                     patchedPartners.push(...INITIAL_REPORT.logos.partners.slice(patchedPartners.length, 12));
-                }
-                const patchedLogos = { ...(data.logos || INITIAL_REPORT.logos), partners: patchedPartners };
+                // Safe handling for partners: use existing or fallback to initial (but DON'T force 12 if user deleted them)
+                const currentPartners = data.logos?.partners || INITIAL_REPORT.logos.partners;
+                const patchedLogos = { ...(data.logos || INITIAL_REPORT.logos), partners: currentPartners };
                 
                 if (reportRegion === selectedRegion) {
                     loadedReports.push({ id: doc.id, ...data, visits: data.visits || [], logos: patchedLogos } as WeeklyReport);
@@ -564,18 +560,14 @@ export default function App() {
       const weekTitle = `الأسبوع ${getArabicOrdinal(nextWeekNum)}`;
       const newId = `week-${Date.now()}`;
       
-      // Ensure partners array is 12 items for new reports
+      // Ensure partners array uses the current list (preserving deletions) for new reports
       const currentPartners = report.logos.partners || [];
-      const mergedPartners = [...currentPartners];
-      if (mergedPartners.length < 12) {
-           mergedPartners.push(...INITIAL_REPORT.logos.partners.slice(mergedPartners.length, 12));
-      }
 
       const newReport: WeeklyReport = {
           ...INITIAL_REPORT,
           id: newId,
           header: { ...INITIAL_REPORT.header, weekTitle: weekTitle },
-          logos: { ...report.logos, partners: mergedPartners }, 
+          logos: { ...report.logos, partners: currentPartners }, 
           visits: [], 
           decorations: report.decorations || [],
           createdAt: serverTimestamp() 
