@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Visit, WeeklyReport, Statistics, CategoryLogos, PartnerLogo, Decoration } from './types';
-import { INITIAL_REPORT } from './constants';
+import { INITIAL_REPORT, LOGOS } from './constants';
 import { VisitCard } from './components/VisitCard';
 import { StatisticsSection } from './components/StatisticsSection';
 import { ReportPrintTemplate } from './components/ReportPrintTemplate';
@@ -746,6 +746,23 @@ export default function App() {
       });
       if (isAdmin) setIsDirty(true);
   };
+  
+  // NEW: Handle Adding New Partner Logo (Synced)
+  const handleAddPartnerLogo = () => {
+        const newPartner: PartnerLogo = {
+            id: `partner-${Date.now()}`,
+            url: LOGOS.partner, // Placeholder from constants
+            scale: 1.0
+        };
+
+        setReports(prevReports => {
+            return prevReports.map(r => {
+                const newPartners = [...r.logos.partners, newPartner];
+                return { ...r, logos: { ...r.logos, partners: newPartners } };
+            });
+        });
+        if (isAdmin) setIsDirty(true);
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -1275,6 +1292,18 @@ export default function App() {
                             {idx < report.logos.partners.length - 1 && <div className="h-10 w-px bg-gray-200 mx-2"></div>}
                         </React.Fragment>
                     ))}
+                    
+                    {/* NEW ADD PARTNER BUTTON */}
+                    {isEditing && (
+                        <button 
+                            onClick={handleAddPartnerLogo}
+                            className="flex flex-col items-center justify-center w-24 h-16 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:border-brand-primary hover:text-brand-primary hover:bg-gray-50 transition-all gap-1"
+                            title="إضافة شريك جديد"
+                        >
+                            <Plus size={20} />
+                            <span className="text-[10px] font-bold">إضافة شريك</span>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
