@@ -250,8 +250,15 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
   const visitsChunks = chunkArray<Visit>(report.visits, 4); 
   const hasPageBg = !!report.pageBackgroundImage;
   const regionArabicName = getRegionArabicName(report.region);
-  // Dynamic Edition Text: 2nd for Qassim, 4th for others
-  const editionText = report.region === 'qassim' ? "النسخة الثانية" : "النسخة الرابعة";
+  
+  // Dynamic Edition Text: Use custom subtitle if available, otherwise fallback to defaults
+  const getDefaultSubtitle = (region?: string) => {
+      if (region === 'qassim') return "مبادرة صناعيو المستقبل – النسخة الثانية";
+      if (region === 'riyadh') return "مبادرة صناعيو المستقبل – النسخة الأولى";
+      if (region === 'sharqiyah') return "مبادرة صناعيو المستقبل – النسخة الأولى";
+      return "مبادرة صناعيو المستقبل – النسخة الرابعة";
+  };
+  const subtitle = report.header.subtitle ?? getDefaultSubtitle(report.region);
 
   return (
     <div 
@@ -302,7 +309,7 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
                          </h2>
                          {/* Lifted using pb-1 */}
                          <span className="text-xs text-gray-500 font-bold dir-ltr leading-tight whitespace-nowrap pb-1" style={{ fontFamily: 'Tajawal, sans-serif' }}>
-                             مبادرة صناعيو المستقبل – {editionText} | {report.header.dateRange}
+                             {subtitle} | {report.header.dateRange}
                          </span>
                     </div>
 

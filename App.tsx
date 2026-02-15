@@ -252,8 +252,16 @@ export default function App() {
 
   const report = reports[currentReportIndex] || { ...INITIAL_REPORT, region: selectedRegion || 'makkah' };
   
-  // Determine Edition Text based on region
-  const editionText = selectedRegion === 'qassim' ? "النسخة الثانية" : "النسخة الرابعة";
+  // --- SUBTITLE & EDITION LOGIC ---
+  const getDefaultSubtitle = (region?: string) => {
+      if (region === 'qassim') return "مبادرة صناعيو المستقبل – النسخة الثانية";
+      if (region === 'riyadh') return "مبادرة صناعيو المستقبل – النسخة الأولى";
+      if (region === 'sharqiyah') return "مبادرة صناعيو المستقبل – النسخة الأولى";
+      return "مبادرة صناعيو المستقبل – النسخة الرابعة"; // Default (Makkah)
+  };
+
+  // If DB has subtitle, use it. Otherwise use default based on region.
+  const currentSubtitle = report.header.subtitle ?? getDefaultSubtitle(selectedRegion || report.region);
 
   // --- NEW: Handle Custom API Key ---
   const handleSetCustomKey = () => {
@@ -637,6 +645,7 @@ export default function App() {
     updateCurrentReport(prev => ({ ...prev, stats: { ...prev.stats, [key]: value } }));
   };
 
+  // UPDATED: Modified handleUpdateHeader to support any key in header (including subtitle)
   const handleUpdateHeader = (key: keyof WeeklyReport['header'], value: string) => {
       updateCurrentReport(prev => ({ ...prev, header: { ...prev.header, [key]: value } }));
   }
@@ -1249,15 +1258,25 @@ export default function App() {
         </div>
 
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
-            <div className="text-right order-2 md:order-1">
+            <div className="text-right order-2 md:order-1 flex-1">
                 <h1 className="text-lg md:text-3xl font-bold mb-1">التقرير الأسبوعي ({selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'الشرقية' : selectedRegion === 'qassim' ? 'القصيم' : ''})</h1>
-                <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – {editionText}</p>
+                {isEditing ? (
+                    <input 
+                        type="text" 
+                        value={currentSubtitle}
+                        onChange={(e) => handleUpdateHeader('subtitle', e.target.value)}
+                        className="bg-transparent border-b border-indigo-300 text-indigo-100 text-sm md:text-base w-full focus:outline-none focus:border-white placeholder-indigo-300"
+                        placeholder="أدخل نص النسخة هنا..."
+                    />
+                ) : (
+                    <p className="text-indigo-100 text-sm md:text-base">{currentSubtitle}</p>
+                )}
             </div>
             <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm order-1 md:order-2 w-full md:w-auto">
                 {isEditing ? (
                     <div className="flex flex-col gap-1 w-full">
-                        <input type="text" value={report.header.weekTitle} onChange={(e) => handleUpdateHeader('weekTitle', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white font-bold w-full" />
-                        <input type="text" value={report.header.dateRange} onChange={(e) => handleUpdateHeader('dateRange', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white text-sm w-full" />
+                        <input type="text" value={report.header.weekTitle} onChange={(e) => handleUpdateHeader('weekTitle', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white font-bold w-full focus:outline-none" />
+                        <input type="text" value={report.header.dateRange} onChange={(e) => handleUpdateHeader('dateRange', e.target.value)} className="bg-transparent border-b border-indigo-300 text-white text-sm w-full focus:outline-none" />
                     </div>
                 ) : (
                     <div className="flex flex-row md:flex-col justify-between md:justify-start items-center md:items-start gap-4 md:gap-0">

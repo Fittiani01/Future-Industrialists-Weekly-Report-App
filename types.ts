@@ -27,6 +27,7 @@ export interface Statistics {
 export interface ReportHeader {
   weekTitle: string;
   dateRange: string;
+  subtitle?: string; // Optional field for full custom subtitle (e.g. Edition text)
 }
 
 export interface PartnerLogo {
