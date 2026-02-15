@@ -218,7 +218,25 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
         ].join(" ")}
         style={{ fontVariantNumeric: "tabular-nums" }}
     >
-        {/* Date (Top) */}
+        {/* Participants (Top) - SWAPPED as requested */}
+        <div className="flex items-center justify-end gap-1.5 w-full">
+             <span className="text-indigo-200 text-[9px] md:text-[10px] print:text-[9px] leading-none">مشارك</span>
+            {isEditing ? (
+                    <input
+                    type="number"
+                    value={visit.participants}
+                    onChange={(e) => onUpdate(visit.id, { participants: parseInt(e.target.value) || 0 })}
+                    className="bg-transparent text-white text-right focus:outline-none font-bold text-[10px] md:text-sm w-8"
+                />
+            ) : (
+                <span className="font-bold text-indigo-50 text-[10px] md:text-sm print:text-xs leading-none">
+                    {visit.participants}
+                </span>
+            )}
+             <Users size={12} className="text-indigo-200 opacity-80" />
+        </div>
+
+        {/* Date (Bottom) - SWAPPED as requested */}
         <div className="flex items-center justify-end gap-1.5 w-full">
             {isEditing ? (
                 <input
@@ -235,24 +253,6 @@ export const VisitCard: React.FC<VisitCardProps> = ({ visit, isEditing, onUpdate
                 </span>
             )}
              <Calendar size={12} className="text-indigo-200 opacity-80" />
-        </div>
-
-        {/* Participants (Bottom) */}
-        <div className="flex items-center justify-end gap-1.5 w-full">
-             <span className="text-indigo-200 text-[9px] md:text-[10px] print:text-[9px] leading-none">مشارك</span>
-            {isEditing ? (
-                    <input
-                    type="number"
-                    value={visit.participants}
-                    onChange={(e) => onUpdate(visit.id, { participants: parseInt(e.target.value) || 0 })}
-                    className="bg-transparent text-white text-right focus:outline-none font-bold text-[10px] md:text-sm w-8"
-                />
-            ) : (
-                <span className="font-bold text-indigo-50 text-[10px] md:text-sm print:text-xs leading-none">
-                    {visit.participants}
-                </span>
-            )}
-             <Users size={12} className="text-indigo-200 opacity-80" />
         </div>
     </div>
   );
