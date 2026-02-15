@@ -250,6 +250,8 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
   const visitsChunks = chunkArray<Visit>(report.visits, 4); 
   const hasPageBg = !!report.pageBackgroundImage;
   const regionArabicName = getRegionArabicName(report.region);
+  // Dynamic Edition Text: 2nd for Qassim, 4th for others
+  const editionText = report.region === 'qassim' ? "النسخة الثانية" : "النسخة الرابعة";
 
   return (
     <div 
@@ -299,7 +301,9 @@ export const ReportPrintTemplate: React.FC<ReportPrintTemplateProps> = ({ report
                              التقرير الأسبوعي ({regionArabicName}) - {report.header.weekTitle}
                          </h2>
                          {/* Lifted using pb-1 */}
-                         <span className="text-xs text-gray-500 font-bold dir-ltr leading-tight whitespace-nowrap pb-1" style={{ fontFamily: 'Tajawal, sans-serif' }}>{report.header.dateRange}</span>
+                         <span className="text-xs text-gray-500 font-bold dir-ltr leading-tight whitespace-nowrap pb-1" style={{ fontFamily: 'Tajawal, sans-serif' }}>
+                             مبادرة صناعيو المستقبل – {editionText} | {report.header.dateRange}
+                         </span>
                     </div>
 
                     <div className="flex flex-col gap-1">

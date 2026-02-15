@@ -69,6 +69,10 @@ export default function App() {
   const decorationInputRef1 = useRef<HTMLInputElement>(null);
   const decorationInputRef2 = useRef<HTMLInputElement>(null);
   const partnerRefs = useRef<(HTMLInputElement | null)[]>([]);
+  
+  // NEW REFS FOR HEADERS
+  const mainLogoRef = useRef<HTMLInputElement>(null);
+  const rightLogoRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // 1. Check Admin Mode
   useEffect(() => {
@@ -247,6 +251,9 @@ export default function App() {
   };
 
   const report = reports[currentReportIndex] || { ...INITIAL_REPORT, region: selectedRegion || 'makkah' };
+  
+  // Determine Edition Text based on region
+  const editionText = selectedRegion === 'qassim' ? "النسخة الثانية" : "النسخة الرابعة";
 
   // --- NEW: Handle Custom API Key ---
   const handleSetCustomKey = () => {
@@ -896,9 +903,21 @@ export default function App() {
             <div className="flex items-center gap-2 md:gap-4 h-8 md:h-16 print:h-12">
                  {report.logos.rightLogos.map((logo, idx) => (
                     <React.Fragment key={idx}>
-                        <div className="relative h-full flex items-center">
+                        <div 
+                            className={`relative h-full flex items-center ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`}
+                            onClick={() => isEditing && rightLogoRefs.current[idx]?.click()}
+                        >
                             {/* UPDATED: Removed max-h constraint to allow logo to fill height */}
                             <img src={logo} alt="" className="h-full object-contain md:max-h-14 print:max-h-10" />
+                            {isEditing && (
+                                <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*"
+                                    ref={(el) => { rightLogoRefs.current[idx] = el; }}
+                                    onChange={handleLogoUpdate('right', idx)}
+                                />
+                            )}
                         </div>
                         {idx < report.logos.rightLogos.length - 1 && <div className="h-4 md:h-8 w-px bg-gray-300 mx-1 md:mx-2"></div>}
                     </React.Fragment>
@@ -906,7 +925,21 @@ export default function App() {
             </div>
             {/* UPDATED: h-10 md:h-20 for BIGGER mobile logo */}
             <div className="flex flex-col gap-2 relative h-10 md:h-20 print:h-14 items-end justify-center">
-                 <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
+                 <div 
+                    className={`h-full ${isEditing ? 'cursor-pointer hover:opacity-80' : ''}`}
+                    onClick={() => isEditing && mainLogoRef.current?.click()}
+                 >
+                    <img src={report.logos.main} alt="Future Industrialists" className="h-full object-contain" />
+                    {isEditing && (
+                        <input 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*"
+                            ref={mainLogoRef}
+                            onChange={handleLogoUpdate('main')}
+                        />
+                    )}
+                 </div>
             </div>
       </header>
   );
@@ -1218,7 +1251,7 @@ export default function App() {
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 md:gap-0 bg-gradient-to-l from-brand-dark via-brand-primary to-brand-accent text-white p-4 rounded-lg mb-10 shadow-lg relative z-20">
             <div className="text-right order-2 md:order-1">
                 <h1 className="text-lg md:text-3xl font-bold mb-1">التقرير الأسبوعي ({selectedRegion === 'makkah' ? 'مكة المكرمة' : selectedRegion === 'riyadh' ? 'الرياض' : selectedRegion === 'sharqiyah' ? 'الشرقية' : selectedRegion === 'qassim' ? 'القصيم' : ''})</h1>
-                <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – النسخة الرابعة</p>
+                <p className="text-indigo-100 text-sm md:text-base">مبادرة صناعيو المستقبل – {editionText}</p>
             </div>
             <div className="text-left bg-white/10 p-2 rounded backdrop-blur-sm order-1 md:order-2 w-full md:w-auto">
                 {isEditing ? (
