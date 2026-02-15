@@ -316,8 +316,6 @@ export const LandingMap: React.FC<LandingMapProps> = ({ onSelectRegion, isAdmin 
                     صناعيو المستقبل
                 </h1>
                 <div className="flex items-center justify-center gap-2 text-indigo-200 text-base md:text-xl font-light">
-                    <span>النسخة الرابعة</span>
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
                     <span>2026</span>
                 </div>
             </div>

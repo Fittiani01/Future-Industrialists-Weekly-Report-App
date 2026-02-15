@@ -1066,29 +1066,48 @@ export default function App() {
       )}
 
       <div className="max-w-[210mm] mx-auto mt-4 md:mt-8 relative z-50 no-print px-4 md:px-0">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-white/40 flex flex-col items-end md:flex-row md:justify-between md:items-start gap-4 shadow-xl">
-            <div className="flex items-start md:items-center gap-3 w-full">
+        <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-3 border border-white/50 shadow-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center gap-3 w-full md:w-auto">
                 {/* Back Button */}
-                <button onClick={handleBackToMap} className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors flex-shrink-0" title="عودة للخريطة">
+                <button onClick={handleBackToMap} className="p-2.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors shadow-sm" title="عودة للخريطة">
                     <ArrowRight size={20} />
                 </button>
-
-                <div className="flex flex-wrap items-center gap-2 w-full">
-                    {reports.map((r: WeeklyReport, idx) => (
-                        <button key={r.id} onClick={() => setCurrentReportIndex(idx)} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${currentReportIndex === idx ? 'bg-brand-primary text-white shadow-md' : 'bg-white/50 text-gray-700 hover:bg-white border border-transparent hover:border-gray-200'}`}>{r.header.weekTitle}</button>
-                    ))}
-                    {isAdmin && <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 hover:bg-indigo-100"><Plus size={18} /></button>}
-                </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 flex-shrink-0 self-end md:self-start pt-2 md:pt-0 justify-end">
-                <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><FileDown size={16} /> تحميل PDF</button>
+            {/* Week Selector - CENTER */}
+            <div className="flex flex-wrap justify-center gap-2 flex-1">
+                {reports.map((r: WeeklyReport, idx) => (
+                    <button 
+                        key={r.id} 
+                        onClick={() => setCurrentReportIndex(idx)} 
+                        className={`
+                            relative px-4 py-2 rounded-full text-sm font-bold transition-all duration-300 ease-out border
+                            ${currentReportIndex === idx 
+                                ? 'bg-brand-dark text-white border-brand-dark shadow-lg shadow-brand-dark/30 scale-105' 
+                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-white hover:border-brand-primary/50 hover:text-brand-primary hover:shadow-md'}
+                        `}
+                    >
+                        {r.header.weekTitle}
+                        {currentReportIndex === idx && (
+                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full"></span>
+                        )}
+                    </button>
+                ))}
+                {isAdmin && (
+                    <button onClick={handleCreateNewReport} className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100 hover:bg-indigo-100 hover:scale-105 transition-all shadow-sm">
+                        <Plus size={18} />
+                    </button>
+                )}
+            </div>
+
+            {/* Actions - RIGHT */}
+            <div className="flex items-center gap-3 flex-shrink-0 w-full md:w-auto justify-end">
+                <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white hover:bg-black text-xs font-bold shadow-lg shadow-gray-900/20 transition-all transform hover:-translate-y-0.5"><FileDown size={16} /> تحميل PDF</button>
                 {isAdmin && (
                     <>
-                        <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                        <button onClick={() => setShowPrintPreview(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"><Eye size={14} /> معاينة</button>
-                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "تعديل" : "معاينة"}</button>
-                        <button onClick={saveReportToFirestore} disabled={saving} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-brand-primary text-white hover:bg-brand-dark'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "حفظ"}</button>
+                        <button onClick={() => setShowPrintPreview(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"><Eye size={14} /> معاينة</button>
+                        <button onClick={() => setIsEditing(!isEditing)} className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-xs transition-colors ${isEditing ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{isEditing ? <Edit3 size={14} /> : <Edit3 size={14} />} {isEditing ? "تعديل" : "معاينة"}</button>
+                        <button onClick={saveReportToFirestore} disabled={saving} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold shadow-md transition-all ${isDirty ? 'bg-green-600 text-white hover:bg-green-700 animate-pulse' : 'bg-brand-primary text-white hover:bg-brand-dark'}`}>{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "جاري الحفظ..." : isDirty ? "حفظ التغييرات" : "حفظ"}</button>
                     </>
                 )}
             </div>
