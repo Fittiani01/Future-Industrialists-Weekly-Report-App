@@ -160,28 +160,18 @@ const VisitItem: React.FC<{ visit: Visit }> = ({ visit }) => {
 
                 {/* Left Side: Stats & Logo */}
                 <div className="flex items-center gap-2 flex-shrink-0 h-full py-0">
-                    <div className="flex items-end gap-2 h-full pb-[2mm]">
-                        {/* Participants Pill - MOVED TO TOP (LEFT visual in LTR code, but logically top in stats) */}
-                        {/* Note: The user requested Date UNDER Participants. 
-                            In this VisitItem layout, they are side-by-side pills. 
-                            If the user meant the VisitCard component on screen, that's handled in VisitCard.tsx.
-                            If the user meant this PDF layout, "under" implies vertical stacking, 
-                            but currently they are horizontal pills. 
-                            I will assume the request "وفي كروت الزيارة" refers to the main component or if they want stacking here.
-                            Since the PDF layout uses horizontal pills to save height, I will swap their order horizontally 
-                            so Participants is first (rightmost in RTL) and Date is second (leftmost in RTL).
-                        */}
-                        
-                        {/* Participants Pill (Now First/Rightmost) */}
-                        <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[45px]">
-                             <Users size={12} className="text-white/90 mb-[1px]" />
-                            <span className="text-white text-[10px] font-bold pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.participants}</span>
+                    {/* UPDATED: Stacked vertically (Participants Top, Date Bottom) */}
+                    <div className="flex flex-col justify-center items-end gap-1 h-full pb-[2px]">
+                        {/* Participants Pill */}
+                        <div className="bg-white/15 rounded px-2 h-[18px] flex items-center justify-center gap-1 min-w-[45px]">
+                             <Users size={10} className="text-white/90" />
+                            <span className="text-white text-[9px] font-bold pb-[1px] block" style={{ fontFamily: 'Tajawal, sans-serif' }}>{visit.participants}</span>
                         </div>
 
-                        {/* Date Pill (Now Second/Leftmost) */}
-                        <div className="bg-white/15 rounded px-2 h-[22px] flex items-center justify-center gap-1 min-w-[70px]">
-                            <Calendar size={12} className="text-white/90 mb-[1px]" />
-                            <span className="text-white text-[10px] font-bold pb-[3px] block" style={{ fontFamily: 'Tajawal, sans-serif', direction: 'ltr', unicodeBidi: 'plaintext' }}>{formatDisplayDate(visit.date)}</span>
+                        {/* Date Pill */}
+                        <div className="bg-white/15 rounded px-2 h-[18px] flex items-center justify-center gap-1 min-w-[70px]">
+                            <Calendar size={10} className="text-white/90" />
+                            <span className="text-white text-[9px] font-bold pb-[1px] block" style={{ fontFamily: 'Tajawal, sans-serif', direction: 'ltr', unicodeBidi: 'plaintext' }}>{formatDisplayDate(visit.date)}</span>
                         </div>
                     </div>
                     

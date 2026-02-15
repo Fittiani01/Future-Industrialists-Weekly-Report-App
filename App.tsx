@@ -1175,6 +1175,15 @@ export default function App() {
 
       <div ref={containerRef} className="screen-only-container max-w-[210mm] mx-4 md:mx-auto mt-6 bg-white shadow-2xl min-h-[297mm] h-auto p-6 md:p-12 relative flex flex-col z-10 rounded-[2rem] overflow-hidden border border-gray-100/50">
         
+        {/* BACKGROUND IMAGE FOR SCREEN EDITOR VIEW */}
+        {report.pageBackgroundImage && (
+            <img 
+                src={report.pageBackgroundImage} 
+                className="absolute inset-0 w-full h-full object-cover z-0 opacity-50 pointer-events-none" 
+                alt="" 
+            />
+        )}
+
         {isEditing && isAdmin && (
             <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl no-print space-y-6 relative z-50">
                  <div className="border-b border-indigo-100 pb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
